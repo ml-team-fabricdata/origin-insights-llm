@@ -1,16 +1,8 @@
-name: Build & Push to ECR (per branch tag)
+name: Build & Push to ECR
 
 on:
   push:
     branches: [ main, rafa, ele, fran ]
-    paths:
-      - 'Dockerfile'
-      - 'app/**'
-      - 'requirements.txt'
-      - 'pyproject.toml'
-      - 'poetry.lock'
-      - '!infra/**'   # cambios solo de infra NO disparan build
-  workflow_dispatch: {}
 
 permissions:
   id-token: write
@@ -19,16 +11,17 @@ permissions:
 env:
   AWS_REGION: ${{ secrets.AWS_REGION }}
   AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
-  ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
   ROLE_ARN: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+  ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Configure AWS credentials (OIDC)
+      - name: Configure AWS creds (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ env.ROLE_ARN }}
@@ -38,29 +31,23 @@ jobs:
         id: ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Pick tag from branch
+      - name: Decide tag by branch
         id: tag
-        shell: bash
         run: |
           case "${GITHUB_REF_NAME}" in
-            main) TAG="main" ;;
-            rafa) TAG="rg" ;;
-            ele)  TAG="er" ;;
-            fran) TAG="ff" ;;
-            *) echo "Branch ${GITHUB_REF_NAME} no mapeada, saliendo"; echo "skip=true" >> $GITHUB_OUTPUT; exit 0 ;;
+            main) TAG=main ;;
+            rafa) TAG=rg   ;;
+            ele)  TAG=er   ;;
+            fran) TAG=ff   ;;
+            *)    echo "Branch not mapped"; exit 1 ;;
           esac
-          TS=$(date +%Y%m%d-%H%M%S)
-          echo "tag=$TAG"       >> $GITHUB_OUTPUT
-          echo "ts=$TS"         >> $GITHUB_OUTPUT
-          echo "repo=${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}" >> $GITHUB_OUTPUT
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
 
-      - name: Build & Push
-        if: steps.tag.outputs.tag != ''
+      - name: Build
         run: |
-          REPO="${{ steps.tag.outputs.repo }}"
-          TAG="${{ steps.tag.outputs.tag }}"
-          TS="${{ steps.tag.outputs.ts }}"
+          docker build -t $ECR_REPOSITORY:${{ steps.tag.outputs.tag }} .
 
-          docker build -t "$REPO:$TAG" -t "$REPO:${TAG}-${TS}" .
-          docker push "$REPO:$TAG"
-          docker push "$REPO:${TAG}-${TS}"
+      - name: Push
+        run: |
+          docker tag $ECR_REPOSITORY:${{ steps.tag.outputs.tag }} $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:${{ steps.tag.outputs.tag }}
+          docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:${{ steps.tag.outputs.tag }}

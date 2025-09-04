@@ -9,8 +9,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app ./app
 
-# App Runner usa 8080; igual lo hacemos configurable
+# App Runner usa 8080; dejamos PORT configurable
 ENV PORT=8080
 EXPOSE 8080
 
-CMD ["python","-m","uvicorn","app.main:app","--host","0.0.0.0","--port",""]
+# ¡usar shell para expandir !
+CMD ["sh","-c","python -m uvicorn app.main:app --host 0.0.0.0 --port "]

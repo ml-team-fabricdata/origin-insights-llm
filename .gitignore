@@ -1,0 +1,22 @@
+@"
+# Terraform
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+.terraform.lock.hcl
+
+# Python (por si lo usás)
+__pycache__/
+*.pyc
+.env
+.venv
+dist/
+build/
+
+# Node (solo si se suma frontend)
+node_modules/
+"@ | Set-Content -Encoding UTF8 .gitignore

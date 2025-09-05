@@ -1,53 +1,115 @@
-name: Build & Push to ECR
+name: Build & Push to ECR (per branch)
 
 on:
   push:
     branches: [ main, rafa, ele, fran ]
+  workflow_dispatch:
 
 permissions:
   id-token: write
   contents: read
 
+concurrency:
+  group: build-${{ github.ref_name }}
+  cancel-in-progress: false
+
 env:
-  AWS_REGION: ${{ secrets.AWS_REGION }}
-  AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
-  ROLE_ARN: ${{ secrets.AWS_ROLE_TO_ASSUME }}
-  ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
+  AWS_REGION:        ${{ secrets.AWS_REGION }}
+  AWS_ACCOUNT_ID:    ${{ secrets.AWS_ACCOUNT_ID }}
+  AWS_ROLE_TO_ASSUME: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+  ECR_REPOSITORY:    ${{ secrets.ECR_REPOSITORY }}
 
 jobs:
-  build:
+  build-and-push:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Determina el tag según la rama
+      - name: Compute image tag
+        id: tag
+        shell: bash
+        run: |
+          case "${GITHUB_REF_NAME}" in
+            main) t=main ;;
+            rafa) t=rg   ;;
+            ele)  t=er   ;;
+            fran) t=ff   ;;
+            *) echo "Branch no mapeada: ${GITHUB_REF_NAME}"; exit 1 ;;
+          esac
+          echo "tag=$t" >> "$GITHUB_OUTPUT"
+
+      # Timestamp de build para metadata
+      - name: Build timestamp (UTC)
+        id: ts
+        run: echo "now=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+
+      # AWS + login ECR (OIDC)
       - name: Configure AWS creds (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ env.ROLE_ARN }}
+          role-to-assume: ${{ env.AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Login to ECR
+      - name: Login to Amazon ECR
         id: ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Decide tag by branch
-        id: tag
+      # Build & Push (con build-args -> Dockerfile)
+      - name: Build & Push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64
+          tags: |
+            ${{ steps.ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.tag.outputs.tag }}
+          build-args: |
+            BUILD_SHA=${{ github.sha }}
+            BUILD_REF=${{ github.ref_name }}
+            BUILD_TIME=${{ steps.ts.outputs.now }}
+          cache-from: type=gha
+          cache-to:   type=gha,mode=max
+
+      # ---------- SMOKE POST-DEPLOY (usa variables de repo con URLs) ----------
+      - name: Pick service URL
+        id: svc
+        shell: bash
         run: |
           case "${GITHUB_REF_NAME}" in
-            main) TAG=main ;;
-            rafa) TAG=rg   ;;
-            ele)  TAG=er   ;;
-            fran) TAG=ff   ;;
-            *)    echo "Branch not mapped"; exit 1 ;;
+            main) url="${{ vars.APPRUNNER_URL_MAIN }}" ;;
+            rafa) url="${{ vars.APPRUNNER_URL_RAFA }}" ;;
+            ele)  url="${{ vars.APPRUNNER_URL_ELE }}"  ;;
+            fran) url="${{ vars.APPRUNNER_URL_FRAN }}" ;;
+            *) echo "No URL for branch ${GITHUB_REF_NAME}"; exit 1 ;;
           esac
-          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          if [ -z "$url" ]; then
+            echo "Service URL variable is empty"; exit 1
+          fi
+          echo "url=$url" >> "$GITHUB_OUTPUT"
 
-      - name: Build
+      - name: Wait for healthy & correct version
+        shell: bash
         run: |
-          docker build -t $ECR_REPOSITORY:${{ steps.tag.outputs.tag }} .
+          url="${{ steps.svc.outputs.url }}"
+          target="${GITHUB_SHA}"
 
-      - name: Push
-        run: |
-          docker tag $ECR_REPOSITORY:${{ steps.tag.outputs.tag }} $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:${{ steps.tag.outputs.tag }}
-          docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:${{ steps.tag.outputs.tag }}
+          echo "Waiting for $url to serve build $target ..."
+          for i in {1..45}; do
+            status=$(curl -sS -o /dev/null -w "%{http_code}" "$url/healthz" || true)
+            if [ "$status" = "200" ]; then
+              got=$(curl -sS "$url/version" | tr -d '\r')
+              echo "version: $got"
+              # buscamos el sha completo para ser estrictos
+              if echo "$got" | grep -q "\"sha\":\"${target}\""; then
+                echo "✅ Healthy & correct image deployed"
+                exit 0
+              fi
+            fi
+            sleep 8
+          done
+          echo "❌ Timeout waiting for deploy of ${target} in ${url}"
+          # Para PoC podés volver esto no-rupturista cambiando a 'exit 0'
+          exit 1

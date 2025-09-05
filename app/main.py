@@ -1,6 +1,6 @@
 ﻿from fastapi import FastAPI, APIRouter
 import os
-from .routers.api import router as api_router
+from routers.api import router as api_router
 from starlette.responses import JSONResponse
 import psycopg2
 

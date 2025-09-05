@@ -14,8 +14,17 @@ def health():
 
 @app.get("/version")
 def version():
-    # lo podremos sobreescribir con un env BUILD desde CI si quieres
-    return {"build": os.getenv("BUILD", "unknown")}
+    import os
+    sha  = os.getenv("BUILD_SHA", "")
+    ref  = os.getenv("BUILD_REF", "")
+    time = os.getenv("BUILD_TIME", "")
 
-# Rutas de la API (incluye /query)
-app.include_router(api_router)
+    # compatibilidad: si alguien mira "build", devolvemos corto del SHA
+    build = os.getenv("BUILD", (sha[:7] if sha else "unknown"))
+
+    return {
+        "sha":  (sha or "unknown"),
+        "ref":  (ref or "unknown"),
+        "time": (time or ""),
+        "build": build
+    }

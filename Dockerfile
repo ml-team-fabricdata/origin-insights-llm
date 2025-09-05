@@ -16,6 +16,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app ./app
+RUN pip install -e .
 
 # App Runner usa 8080 (pero lo dejamos configurable)
 ENV PORT=8080

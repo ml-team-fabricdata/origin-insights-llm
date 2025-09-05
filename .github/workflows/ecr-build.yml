@@ -77,31 +77,73 @@ jobs:
             --image-ids imageTag=${{ steps.map.outputs.tag }} \
             --query "imageDetails[0].[imageDigest,imagePushedAt]" --output table
 
-      # --- Deploy en App Runner ---
-      - name: Maybe start App Runner deployment (only when RUNNING)
-        id: kick
+# --- Fuerza deployment SOLO si el servicio está RUNNING ---
+        - name: Maybe start App Runner deployment
+          id: maybe_deploy
+          shell: bash
+          run: |
+            set -euo pipefail
+            # Descubrir el nombre del servicio según la rama
+            case "${GITHUB_REF_NAME}" in
+              main) SVC="origin-insights-llm-main" ;;
+              rafa) SVC="origin-insights-llm-rafa" ;;
+              ele)  SVC="origin-insights-llm-ele"  ;;
+              fran) SVC="origin-insights-llm-fran" ;;
+              *) echo "Branch no mapeada: ${GITHUB_REF_NAME}"; exit 1 ;;
+            esac
+
+            ARN=$(aws apprunner list-services --region "${{ env.AWS_REGION }}" \
+                    --query "ServiceSummaryList[?ServiceName=='${SVC}']|[0].ServiceArn" --output text)
+            echo "arn=$ARN" >> "$GITHUB_OUTPUT"
+
+            # Estado actual del servicio
+            ST=$(aws apprunner describe-service --region "${{ env.AWS_REGION }}" --service-arn "$ARN" \
+                   --query "Service.Status" --output text)
+            echo "Service status: $ST"
+
+            # Si está RUNNING, intentamos start-deployment (idempotente a nivel de intención)
+            if [ "$ST" = "RUNNING" ]; then
+              echo "Triggering start-deployment..."
+              aws apprunner start-deployment --region "${{ env.AWS_REGION }}" --service-arn "$ARN" >/dev/null
+              echo "triggered=yes" >> "$GITHUB_OUTPUT"
+            else
+              echo "Service is not RUNNING ($ST); no start-deployment."
+              echo "triggered=no" >> "$GITHUB_OUTPUT"
+            fi
+
+      # --- Fuerza deployment SOLO si el servicio está RUNNING ---
+      - name: Maybe start App Runner deployment
+        id: maybe_deploy
         shell: bash
         run: |
           set -euo pipefail
-          SVC="${{ steps.map.outputs.svc }}"
+          # Descubrir el nombre del servicio según la rama
+          case "${GITHUB_REF_NAME}" in
+            main) SVC="origin-insights-llm-main" ;;
+            rafa) SVC="origin-insights-llm-rafa" ;;
+            ele)  SVC="origin-insights-llm-ele"  ;;
+            fran) SVC="origin-insights-llm-fran" ;;
+            *) echo "Branch no mapeada: ${GITHUB_REF_NAME}"; exit 1 ;;
+          esac
+
           ARN=$(aws apprunner list-services --region "${{ env.AWS_REGION }}" \
-                 --query "ServiceSummaryList[?ServiceName=='${SVC}']|[0].ServiceArn" --output text)
-          echo "Service ARN: $ARN"
+                  --query "ServiceSummaryList[?ServiceName=='${SVC}']|[0].ServiceArn" --output text)
+          echo "arn=$ARN" >> "$GITHUB_OUTPUT"
 
-          STATUS=$(aws apprunner describe-service --region "${{ env.AWS_REGION }}" \
-                     --service-arn "$ARN" --query "Service.Status" --output text)
-          echo "Service status: $STATUS"
+          # Estado actual del servicio
+          ST=$(aws apprunner describe-service --region "${{ env.AWS_REGION }}" --service-arn "$ARN" \
+                 --query "Service.Status" --output text)
+          echo "Service status: $ST"
 
-          # Si está RUNNING, podemos forzar un deploy manual (opcional)
-          if [ "$STATUS" = "RUNNING" ]; then
-            echo "Service is RUNNING → starting on-demand deployment…"
-            aws apprunner start-deployment --region "${{ env.AWS_REGION }}" --service-arn "$ARN" || true
-            echo "started=true" >> "$GITHUB_OUTPUT"
+          # Si está RUNNING, intentamos start-deployment (idempotente a nivel de intención)
+          if [ "$ST" = "RUNNING" ]; then
+            echo "Triggering start-deployment..."
+            aws apprunner start-deployment --region "${{ env.AWS_REGION }}" --service-arn "$ARN" >/dev/null
+            echo "triggered=yes" >> "$GITHUB_OUTPUT"
           else
-            echo "Service not RUNNING ($STATUS). Skipping start-deployment (auto-deploy seguirá su curso)."
-            echo "started=false" >> "$GITHUB_OUTPUT"
+            echo "Service is not RUNNING ($ST); no start-deployment."
+            echo "triggered=no" >> "$GITHUB_OUTPUT"
           fi
-
 
       # --- URL del servicio (usa vars del repo: APPRUNNER_URL_*) ---
       - name: Pick service URL
@@ -121,25 +163,46 @@ jobs:
           sudo apt-get update -y
           sudo apt-get install -y jq
 
-      # --- espera health y /version ---
-      - name: Wait for healthy & correct version (with diagnostics)
+      # --- Espera a que la última operación termine y luego valida /version ---
+      - name: Wait for App Runner operation then check /version
         shell: bash
         run: |
           set -euo pipefail
-          url="${{ steps.svc.outputs.url }}"
-          target_sha="${GITHUB_SHA}"
-          short="${GITHUB_SHA:0:7}"
+          ARN="${{ steps.maybe_deploy.outputs.arn }}"
 
-          echo "Waiting for ${url} to serve build ${target_sha} ..."
+          # 1) Esperar a que no haya operación IN_PROGRESS
+          echo "Waiting for App Runner operation to finish..."
+          for i in {1..60}; do
+            OP=$(aws apprunner list-operations --region "${{ env.AWS_REGION }}" --service-arn "$ARN" --max-results 1 \
+                  --query "OperationSummaryList[0].Status" --output text 2>/dev/null || echo "UNKNOWN")
+            echo "  Last operation status: $OP"
+            if [ "$OP" != "IN_PROGRESS" ] && [ "$OP" != "UNKNOWN" ]; then
+              break
+            fi
+            sleep 10
+          done
+
+          # 2) Validar endpoint /version hasta ver el SHA nuevo
+          case "${GITHUB_REF_NAME}" in
+            main) url="${{ vars.APPRUNNER_URL_MAIN }}" ;;
+            rafa) url="${{ vars.APPRUNNER_URL_RAFA }}" ;;
+            ele)  url="${{ vars.APPRUNNER_URL_ELE }}"  ;;
+            fran) url="${{ vars.APPRUNNER_URL_FRAN }}" ;;
+          esac
+
+          target_sha="${GITHUB_SHA}"
+          short="${target_sha:0:7}"
+          echo "Waiting for ${url} to serve build ${short} ..."
+
+          # Espera flexible (hasta 10 min)
           for i in {1..60}; do
             code=$(curl -sS -o /dev/null -w "%{http_code}" "$url/healthz" || true)
             if [ "$code" = "200" ]; then
-              got=$(curl -sS "$url/version" | tr -d '\r')
-              echo "version: $got"
-              # acepta {"sha": "..."} o {"build":"..."} o {"build":"dev"}
-              sha=$(echo "$got" | jq -r '.sha // empty' 2>/dev/null || true)
-              build=$(echo "$got" | jq -r '.build // empty' 2>/dev/null || true)
-              if [ "$sha" = "$target_sha" ] || [ "$sha" = "$short" ] || [ "$build" = "$target_sha" ] || [ "$build" = "$short" ]; then
+              body=$(curl -sS "$url/version" | tr -d '\r' || echo '{}')
+              echo "version: $body"
+              # Acepta 'sha' o 'build' (según tu app)
+              sha=$(echo "$body" | jq -r '.sha // .build // empty' 2>/dev/null || true)
+              if [ "$sha" = "$target_sha" ] || [ "$sha" = "$short" ]; then
                 echo "✅ Healthy & correct image deployed"
                 exit 0
               fi
@@ -147,13 +210,6 @@ jobs:
             sleep 10
           done
 
-          echo "❌ Timeout esperando deploy de ${target_sha} en ${url}"
-          echo "🔎 Dump de estado App Runner para diagnosticar…"
-          SVC="${{ steps.map.outputs.svc }}"
-          ARN=$(aws apprunner list-services --region "${{ env.AWS_REGION }}" \
-                 --query "ServiceSummaryList[?ServiceName=='${SVC}']|[0].ServiceArn" --output text)
-          aws apprunner describe-service --region "${{ env.AWS_REGION }}" --service-arn "$ARN" \
-            --query "{Status:Service.Status, AutoDeploy:Service.SourceConfiguration.AutoDeploymentsEnabled, Image:Service.SourceConfiguration.ImageRepository.ImageIdentifier}" --output json || true
-          aws apprunner list-operations --region "${{ env.AWS_REGION }}" --service-arn "$ARN" --max-results 5 --output json || true
-
+          echo "❌ Timeout esperando deploy de ${short} en ${url}"
           exit 1
+

@@ -77,13 +77,31 @@ jobs:
             --image-ids imageTag=${{ steps.map.outputs.tag }} \
             --query "imageDetails[0].[imageDigest,imagePushedAt]" --output table
 
-      # --- fuerzo deploy en App Runner (por si el auto-deploy está desactivado o tarda en enganchar) ---
-      - name: Start App Runner deployment for this branch
+      # --- Deploy en App Runner ---
+      - name: Maybe start App Runner deployment (only when RUNNING)
+        id: kick
+        shell: bash
         run: |
+          set -euo pipefail
+          SVC="${{ steps.map.outputs.svc }}"
           ARN=$(aws apprunner list-services --region "${{ env.AWS_REGION }}" \
-                 --query "ServiceSummaryList[?ServiceName=='${{ steps.map.outputs.svc }}']|[0].ServiceArn" --output text)
+                 --query "ServiceSummaryList[?ServiceName=='${SVC}']|[0].ServiceArn" --output text)
           echo "Service ARN: $ARN"
-          aws apprunner start-deployment --region "${{ env.AWS_REGION }}" --service-arn "$ARN"
+
+          STATUS=$(aws apprunner describe-service --region "${{ env.AWS_REGION }}" \
+                     --service-arn "$ARN" --query "Service.Status" --output text)
+          echo "Service status: $STATUS"
+
+          # Si está RUNNING, podemos forzar un deploy manual (opcional)
+          if [ "$STATUS" = "RUNNING" ]; then
+            echo "Service is RUNNING → starting on-demand deployment…"
+            aws apprunner start-deployment --region "${{ env.AWS_REGION }}" --service-arn "$ARN" || true
+            echo "started=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Service not RUNNING ($STATUS). Skipping start-deployment (auto-deploy seguirá su curso)."
+            echo "started=false" >> "$GITHUB_OUTPUT"
+          fi
+
 
       # --- URL del servicio (usa vars del repo: APPRUNNER_URL_*) ---
       - name: Pick service URL
@@ -103,24 +121,39 @@ jobs:
           sudo apt-get update -y
           sudo apt-get install -y jq
 
-      # --- espera health y que /version tenga este SHA (acepta sha completo o 7 chars) ---
-      - name: Wait for healthy & correct version
+      # --- espera health y /version ---
+      - name: Wait for healthy & correct version (with diagnostics)
+        shell: bash
         run: |
+          set -euo pipefail
           url="${{ steps.svc.outputs.url }}"
           target_sha="${GITHUB_SHA}"
+          short="${GITHUB_SHA:0:7}"
+
           echo "Waiting for ${url} to serve build ${target_sha} ..."
           for i in {1..60}; do
             code=$(curl -sS -o /dev/null -w "%{http_code}" "$url/healthz" || true)
             if [ "$code" = "200" ]; then
               got=$(curl -sS "$url/version" | tr -d '\r')
               echo "version: $got"
-              sha=$(echo "$got" | jq -r '.sha // .build // empty' 2>/dev/null || true)
-              if [ "$sha" = "$target_sha" ] || [ "$sha" = "${target_sha:0:7}" ]; then
+              # acepta {"sha": "..."} o {"build":"..."} o {"build":"dev"}
+              sha=$(echo "$got" | jq -r '.sha // empty' 2>/dev/null || true)
+              build=$(echo "$got" | jq -r '.build // empty' 2>/dev/null || true)
+              if [ "$sha" = "$target_sha" ] || [ "$sha" = "$short" ] || [ "$build" = "$target_sha" ] || [ "$build" = "$short" ]; then
                 echo "✅ Healthy & correct image deployed"
                 exit 0
               fi
             fi
             sleep 10
           done
+
           echo "❌ Timeout esperando deploy de ${target_sha} en ${url}"
+          echo "🔎 Dump de estado App Runner para diagnosticar…"
+          SVC="${{ steps.map.outputs.svc }}"
+          ARN=$(aws apprunner list-services --region "${{ env.AWS_REGION }}" \
+                 --query "ServiceSummaryList[?ServiceName=='${SVC}']|[0].ServiceArn" --output text)
+          aws apprunner describe-service --region "${{ env.AWS_REGION }}" --service-arn "$ARN" \
+            --query "{Status:Service.Status, AutoDeploy:Service.SourceConfiguration.AutoDeploymentsEnabled, Image:Service.SourceConfiguration.ImageRepository.ImageIdentifier}" --output json || true
+          aws apprunner list-operations --region "${{ env.AWS_REGION }}" --service-arn "$ARN" --max-results 5 --output json || true
+
           exit 1

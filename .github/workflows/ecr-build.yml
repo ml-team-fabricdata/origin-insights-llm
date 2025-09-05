@@ -36,43 +36,56 @@ jobs:
       - name: Login to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Decide image tag from branch
-        id: tag
+      - name: Decide image tag & service by branch
+        id: map
         run: |
           case "${GITHUB_REF_NAME}" in
-            main) TAG=main ;;
-            rafa) TAG=rg   ;;
-            ele)  TAG=er   ;;
-            fran) TAG=ff   ;;
+            main) TAG=main ; SVC=origin-insights-llm-main ;;
+            rafa) TAG=rg   ; SVC=origin-insights-llm-rafa ;;
+            ele)  TAG=er   ; SVC=origin-insights-llm-ele  ;;
+            fran) TAG=ff   ; SVC=origin-insights-llm-fran ;;
             *) echo "Branch no mapeada: ${GITHUB_REF_NAME}"; exit 1 ;;
           esac
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "svc=$SVC" >> "$GITHUB_OUTPUT"
 
-      # --- CONSTRUCCIÓN CON BUILD-ARGS ---
-      - name: Build image (with build metadata)
+      # --- build SIN CACHE + build-args ---
+      - name: Build image (no cache) with metadata
         run: |
-          docker build \
+          docker build --no-cache \
             --build-arg BUILD_SHA="${GITHUB_SHA}" \
             --build-arg BUILD_REF="${GITHUB_REF_NAME}" \
             --build-arg BUILD_TIME="${{ steps.now.outputs.now }}" \
-            -t "${{ env.ECR_REPOSITORY }}:${{ steps.tag.outputs.tag }}" .
+            -t "${{ env.ECR_REPOSITORY }}:${{ steps.map.outputs.tag }}" .
+
+      # --- sanity: la imagen TIENE las env BUILD_* ---
+      - name: Inspect image env (debug)
+        run: |
+          docker inspect "${{ env.ECR_REPOSITORY }}:${{ steps.map.outputs.tag }}" \
+            --format '{{json .Config.Env}}' | jq -r '.[]' | grep -E '^BUILD_(SHA|REF|TIME)=' || true
 
       - name: Tag & push
         run: |
-          IMAGE_URI="${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ steps.tag.outputs.tag }}"
-          docker tag "${{ env.ECR_REPOSITORY }}:${{ steps.tag.outputs.tag }}" "$IMAGE_URI"
+          IMAGE_URI="${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ steps.map.outputs.tag }}"
+          docker tag "${{ env.ECR_REPOSITORY }}:${{ steps.map.outputs.tag }}" "$IMAGE_URI"
           docker push "$IMAGE_URI"
 
       - name: Show pushed digest (debug)
         run: |
           aws ecr describe-images \
             --repository-name "${{ env.ECR_REPOSITORY }}" \
-            --image-ids imageTag=${{ steps.tag.outputs.tag }} \
-            --query "imageDetails[0].imageDigest" --output text
+            --image-ids imageTag=${{ steps.map.outputs.tag }} \
+            --query "imageDetails[0].[imageDigest,imagePushedAt]" --output table
 
-      # --- VALIDACIÓN POST-DEPLOY EN APP RUNNER (OPCIONAL PERO ÚTIL) ---
-      # Define estas 4 variables a nivel "Repository variables" en GitHub:
-      #   APPRUNNER_URL_MAIN, APPRUNNER_URL_RAFA, APPRUNNER_URL_ELE, APPRUNNER_URL_FRAN
+      # --- fuerzo deploy en App Runner (por si el auto-deploy está desactivado o tarda en enganchar) ---
+      - name: Start App Runner deployment for this branch
+        run: |
+          ARN=$(aws apprunner list-services --region "${{ env.AWS_REGION }}" \
+                 --query "ServiceSummaryList[?ServiceName=='${{ steps.map.outputs.svc }}']|[0].ServiceArn" --output text)
+          echo "Service ARN: $ARN"
+          aws apprunner start-deployment --region "${{ env.AWS_REGION }}" --service-arn "$ARN"
+
+      # --- URL del servicio (usa vars del repo: APPRUNNER_URL_*) ---
       - name: Pick service URL
         id: svc
         run: |
@@ -85,24 +98,29 @@ jobs:
           esac
           echo "url=$url" >> "$GITHUB_OUTPUT"
 
+      - name: Install jq (if missing)
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y jq
+
+      # --- espera health y que /version tenga este SHA (acepta sha completo o 7 chars) ---
       - name: Wait for healthy & correct version
         run: |
           url="${{ steps.svc.outputs.url }}"
           target_sha="${GITHUB_SHA}"
           echo "Waiting for ${url} to serve build ${target_sha} ..."
-          for i in {1..45}; do
+          for i in {1..60}; do
             code=$(curl -sS -o /dev/null -w "%{http_code}" "$url/healthz" || true)
             if [ "$code" = "200" ]; then
               got=$(curl -sS "$url/version" | tr -d '\r')
               echo "version: $got"
-              # acepta tanto {"sha": "..."} como {"build": "..."} por compatibilidad
               sha=$(echo "$got" | jq -r '.sha // .build // empty' 2>/dev/null || true)
               if [ "$sha" = "$target_sha" ] || [ "$sha" = "${target_sha:0:7}" ]; then
                 echo "✅ Healthy & correct image deployed"
                 exit 0
               fi
             fi
-            sleep 8
+            sleep 10
           done
           echo "❌ Timeout esperando deploy de ${target_sha} en ${url}"
           exit 1

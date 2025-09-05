@@ -9,7 +9,7 @@ def root():
 
 @app.get("/healthz")
 def health():
-    # placeholder
+    # placeholder:
     return {"ok": True, "db": True}
 
 @app.get("/version")

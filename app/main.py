@@ -1,5 +1,6 @@
-from fastapi import FastAPI
+﻿from fastapi import FastAPI
 import os
+from .routers.api import router as api_router
 
 app = FastAPI(title="origin-insights-llm")
 
@@ -9,13 +10,12 @@ def root():
 
 @app.get("/healthz")
 def health():
-    # placeholder:
     return {"ok": True, "db": True}
 
 @app.get("/version")
 def version():
-    return {
-        "sha": os.getenv("BUILD_SHA", "unknown"),
-        "ref": os.getenv("BUILD_REF", "unknown"),
-        "time": os.getenv("BUILD_TIME", "unknown"),
-    }
+    # lo podremos sobreescribir con un env BUILD desde CI si quieres
+    return {"build": os.getenv("BUILD", "unknown")}
+
+# Rutas de la API (incluye /query)
+app.include_router(api_router)

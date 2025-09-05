@@ -62,7 +62,7 @@ jobs:
       - name: Inspect image env (debug)
         run: |
           docker inspect "${{ env.ECR_REPOSITORY }}:${{ steps.map.outputs.tag }}" \
-            --format '{{json .Config.Env}}' | jq -r '.[]' | grep -E '^BUILD_(SHA|REF|TIME)=' || true
+            --format '{{range .Config.Env}}{{println .}}{{end}}' | grep -E '^BUILD_(SHA|REF|TIME)=' || true
 
       - name: Tag & push
         run: |

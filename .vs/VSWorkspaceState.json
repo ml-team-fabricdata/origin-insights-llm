@@ -3,8 +3,9 @@
     "",
     "\\.github",
     "\\.github\\workflows",
-    "\\app"
+    "\\app",
+    "\\infra"
   ],
-  "SelectedNode": "\\.github\\workflows\\ecr-build.yml",
+  "SelectedNode": "\\requirements.txt",
   "PreviewInSolutionExplorer": false
 }

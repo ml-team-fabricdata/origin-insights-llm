@@ -19,3 +19,4 @@ def health():
 @app.post("/ask")
 def ask(query: str):
     return handle_query(query)
+

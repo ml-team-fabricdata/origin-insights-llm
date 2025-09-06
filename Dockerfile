@@ -24,4 +24,5 @@ RUN pip install -e .
 # Puerto y comando de ejecución
 ENV PORT=8080
 EXPOSE 8080
+ENV PYTHONPATH=/code
 CMD ["sh", "-c", "python -m uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8080}"]

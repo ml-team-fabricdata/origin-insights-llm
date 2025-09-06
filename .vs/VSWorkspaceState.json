@@ -3,9 +3,8 @@
     "",
     "\\.github",
     "\\.github\\workflows",
-    "\\app",
-    "\\infra"
+    "\\app"
   ],
-  "SelectedNode": "\\requirements.txt",
+  "SelectedNode": "\\app\\main.py",
   "PreviewInSolutionExplorer": false
 }

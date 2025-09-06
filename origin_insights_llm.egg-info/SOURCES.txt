@@ -1,0 +1,7 @@
+README.md
+setup.py
+origin_insights_llm.egg-info/PKG-INFO
+origin_insights_llm.egg-info/SOURCES.txt
+origin_insights_llm.egg-info/dependency_links.txt
+origin_insights_llm.egg-info/requires.txt
+origin_insights_llm.egg-info/top_level.txt

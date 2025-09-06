@@ -1,8 +1,13 @@
+# setup.py
 from setuptools import setup, find_packages
 
 setup(
-    name="origin-insights-llm",
-    version="0.1",
-    packages=find_packages(include=["app", "app.*", "infra", "infra.*"]),
-    install_requires=[],
+    name="origin_insights_llm",
+    version="0.1.0",
+    packages=find_packages(),  # esto incluye infra/, app/, etc.
+    install_requires=[
+        "fastapi",
+        "uvicorn",
+        # otros requirements que se sumen luego
+    ],
 )

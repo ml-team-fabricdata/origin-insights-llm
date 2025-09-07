@@ -1,2 +1,4 @@
 ﻿fastapi==0.112.*
 uvicorn==0.30.*
+boto3
+botocore

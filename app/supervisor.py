@@ -45,12 +45,14 @@ def handle_query(query: str) -> dict:
 
     elif is_complex_query(query):
         # Se usa modelo más potente (Sonnet)
+        from infra.bedrock import call_bedrock_llm2  # <- lazy import
         llm_response = call_bedrock_llm2(query)
         result = {"output": llm_response.get("completion", "[sin respuesta]")}
         node = "llm_sonnet"
 
     else:
         # Fallback rápido (Haiku)
+        from infra.bedrock import call_bedrock_llm1  # <- lazy import
         llm_response = call_bedrock_llm1(query)
         result = {"output": llm_response.get("completion", "[sin respuesta]")}
         node = "llm_haiku"

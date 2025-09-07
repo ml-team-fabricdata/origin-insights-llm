@@ -1,8 +1,8 @@
-﻿from fastapi import FastAPI, Query
+﻿import os
+from fastapi import FastAPI, Query
 from app.supervisor import handle_query
 from app.router_determinista import router as determinista_router
 from app.router_llm import router as llm_router
-from infra.bedrock import call_bedrock_llm1, call_bedrock_llm2
 
 app = FastAPI(title="Origin Insights LLM")
 
@@ -16,6 +16,14 @@ def root():
 @app.get("/healthz")
 def health():
     return {"ok": True, "db": True}
+
+@app.get("/version")
+def version():
+    return {
+        "sha": os.getenv("BUILD_SHA", "unknown"),
+        "ref": os.getenv("BUILD_REF", "unknown"),
+        "time": os.getenv("BUILD_TIME", "unknown"),
+    }
 
 @app.post("/ask")
 def ask(query: str):

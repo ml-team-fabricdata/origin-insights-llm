@@ -1,7 +1,8 @@
-﻿from fastapi import FastAPI
+﻿from fastapi import FastAPI, Query
 from app.supervisor import handle_query
 from app.router_determinista import router as determinista_router
 from app.router_llm import router as llm_router
+from infra.bedrock import call_bedrock_llm1, call_bedrock_llm2
 
 app = FastAPI(title="Origin Insights LLM")
 
@@ -19,4 +20,3 @@ def health():
 @app.post("/ask")
 def ask(query: str):
     return handle_query(query)
-

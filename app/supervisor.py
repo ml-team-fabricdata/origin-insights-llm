@@ -7,8 +7,6 @@ from modules import (
     response_formatter,
 )
 
-from infra.bedrock import call_bedrock_llm1, call_bedrock_llm2
-
 # --- Clasificadores heurísticos ---
 def is_metadata_query(query: str) -> bool:
     return "título" in query.lower() or "title" in query.lower()
@@ -44,15 +42,15 @@ def handle_query(query: str) -> dict:
         node = "kb"
 
     elif is_complex_query(query):
-        # Se usa modelo más potente (Sonnet)
-        from infra.bedrock import call_bedrock_llm2  # <- lazy import
+        # Sonnet (lazy import aquí)
+        from infra.bedrock import call_bedrock_llm2
         llm_response = call_bedrock_llm2(query)
         result = {"output": llm_response.get("completion", "[sin respuesta]")}
         node = "llm_sonnet"
 
     else:
-        # Fallback rápido (Haiku)
-        from infra.bedrock import call_bedrock_llm1  # <- lazy import
+        # Haiku (lazy import aquí)
+        from infra.bedrock import call_bedrock_llm1
         llm_response = call_bedrock_llm1(query)
         result = {"output": llm_response.get("completion", "[sin respuesta]")}
         node = "llm_haiku"

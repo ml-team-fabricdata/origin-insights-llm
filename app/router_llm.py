@@ -1,9 +1,7 @@
 # app/router_llm.py
-
 from fastapi import APIRouter, Query
 import os
-from app.supervisor import handle_query
-from infra.bedrock import call_bedrock_llm1, call_bedrock_llm2
+from app.supervisor import handle_query  # OK mantenerlo
 
 router = APIRouter()
 
@@ -24,6 +22,8 @@ def ping_llm():
 
 @router.get("/llm/test_llm1")
 def test_llm1(prompt: str = Query(..., description="Prompt para Claude 3.5 Haiku")):
+    # Lazy import para evitar fallas en import-time
+    from infra.bedrock import call_bedrock_llm1
     response = call_bedrock_llm1(prompt)
     return {
         "model_used": "claude-3.5-haiku",
@@ -34,6 +34,8 @@ def test_llm1(prompt: str = Query(..., description="Prompt para Claude 3.5 Haiku
 
 @router.get("/llm/test_llm2")
 def test_llm2(prompt: str = Query(..., description="Prompt para Claude 3 Sonnet")):
+    # Lazy import para evitar fallas en import-time
+    from infra.bedrock import call_bedrock_llm2
     response = call_bedrock_llm2(prompt)
     return {
         "model_used": "claude-3-sonnet",

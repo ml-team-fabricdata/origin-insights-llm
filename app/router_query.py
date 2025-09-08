@@ -80,8 +80,10 @@ def _sess_get(sid: str) -> Dict[str, Any]:
     if _R:
         raw = _R.get(f"sess:{sid}")
         if raw:
-            try: return json.loads(raw)
-            except: pass
+            try:
+                return json.loads(raw)
+            except Exception:
+                pass
         ctx = _default_ctx()
         _R.setex(f"sess:{sid}", SESS_TTL, json.dumps(ctx))
         return ctx
@@ -125,8 +127,10 @@ def _detect_lang_local(text: str, fallback="es") -> str:
         pass
     # 2) heurísticas
     t = (text or "").lower()
-    if RE_ES_HINT.search(t): return "es"
-    if RE_EN_HINT.search(t): return "en"
+    if RE_ES_HINT.search(t):
+        return "es"
+    if RE_EN_HINT.search(t):
+        return "en"
     return fallback
 
 def _detect_lang_llm(text: str, fallback: str) -> str:
@@ -206,7 +210,8 @@ def _cache_search(term: str, min_sim: float, top_k: int):
     for r in rows:
         key = (r.get("imdb_id") or r.get("uid") or "").lower()
         if key and key not in seen:
-            out.append(r); seen.add(key)
+            out.append(r)
+            seen.add(key)
     return tuple(out[:10])
 
 def _search_candidates_from_text(text: str, min_sim: float = None, top_k: int = None) -> List[Candidate]:
@@ -222,12 +227,14 @@ def _search_candidates_from_text(text: str, min_sim: float = None, top_k: int = 
     return [Candidate(**r) for r in rows]
 
 def _safe_autopick(rows: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
-    if not rows: return None
+    if not rows:
+        return None
     s0 = float(rows[0].get("sim") or 0.0)
     s1 = float(rows[1].get("sim") or 0.0) if len(rows) > 1 else 0.0
     SIM = float(os.getenv("AUTOPICK_SIM", "0.94"))
     DEL = float(os.getenv("AUTOPICK_DELTA", "0.03"))
-    if s0 >= SIM and (s0 - s1) >= DEL: return rows[0]
+    if s0 >= SIM and (s0 - s1) >= DEL:
+        return rows[0]
     return None
 
 def _spanish_kind(t: Optional[str]) -> str:
@@ -262,16 +269,68 @@ def _format_selected_metadata(meta: Dict[str, Any], lang: str) -> str:
     imdb = meta.get("imdb_id") or "-"
     if lang.startswith("es"):
         header = f"{t}: es una {kind}{f' de {y}' if y else ''}"
-        if dir_: header += f", dirigida por {dir_}"
+        if dir_:
+            header += f", dirigida por {dir_}"
         body = f"Sinopsis: {syn}"
         tail = f"(UID: {uid} — IMDb: {imdb})\n\n¿Quieres disponibilidad por plataforma/país o popularidad (HITS) en algún mercado u otro dato?"
         return f"{header}. {body}\n{tail}"
     else:
         header = f"{t}: a {kind}{f' from {y}' if y else ''}"
-        if dir_: header += f", directed by {dir_}"
+        if dir_:
+            header += f", directed by {dir_}"
         body = f"Synopsis: {syn}"
         tail = f"(UID: {uid} — IMDb: {imdb})\n\nWould you like availability by platform/country or popularity (HITS) in any market?"
         return f"{header}. {body}\n{tail}"
+
+# --- Selección por número/ordinal/UID/IMDb ---
+_ORD_MAP = {
+    # números
+    "1": 1, "2": 2, "3": 3, "4": 4, "5": 5, "6": 6, "7": 7, "8": 8, "9": 9, "10": 10,
+    # español
+    "primero": 1, "primer": 1, "la primera": 1, "el primero": 1,
+    "segunda": 2, "segundo": 2, "la segunda": 2, "el segundo": 2,
+    "tercera": 3, "tercero": 3, "la tercera": 3, "el tercero": 3,
+    "cuarta": 4, "cuarto": 4, "la cuarta": 4, "el cuarto": 4,
+    "quinta": 5, "quinto": 5, "la quinta": 5, "el quinto": 5,
+    # inglés
+    "first": 1, "the first": 1, "second": 2, "the second": 2, "third": 3, "the third": 3,
+    "fourth": 4, "the fourth": 4, "fifth": 5, "the fifth": 5,
+}
+_RE_ONLY_NUMBER = re.compile(r"^\s*#?\s*(\d{1,2})\s*$")
+_RE_UID = re.compile(r"\b[a-f0-9]{16,}\b", re.I)
+_RE_IMDB = re.compile(r"\btt\d{6,9}\b", re.I)
+
+def _parse_selection(msg: str, n_items: int) -> Optional[int]:
+    """Devuelve un índice 0-based si el mensaje parece una selección 1..n."""
+    s = (msg or "").strip().lower()
+    # 1) número puro
+    m = _RE_ONLY_NUMBER.match(s)
+    if m:
+        i = int(m.group(1))
+        if 1 <= i <= n_items:
+            return i - 1
+    # 2) ordinal textual
+    if s in _ORD_MAP:
+        i = _ORD_MAP[s]
+        if 1 <= i <= n_items:
+            return i - 1
+    return None
+
+def _pick_by_ids(msg: str, rows: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """Permite elegir por UID o IMDb si el usuario lo pega."""
+    m = _RE_IMDB.search(msg or "")
+    if m:
+        imdb = m.group(0).lower()
+        for r in rows:
+            if (r.get("imdb_id") or "").lower() == imdb:
+                return r
+    m = _RE_UID.search(msg or "")
+    if m:
+        uid = m.group(0).lower()
+        for r in rows:
+            if (r.get("uid") or "").lower() == uid:
+                return r
+    return None
 
 # ===================== Endpoint principal =====================
 @router.post("/query", response_model=QueryOut)
@@ -281,8 +340,11 @@ def query(payload: QueryIn, response: Response):
 
     msg = (payload.message or "").strip()
     if not msg:
-        return QueryOut(session_id=sid, step="error",
-                        text=_i18n("Escribe una consulta por favor.", "Please type a query.", (payload.language or "es")))
+        return QueryOut(
+            session_id=sid,
+            step="error",
+            text=_i18n("Escribe una consulta por favor.", "Please type a query.", (payload.language or "es")),
+        )
 
     # Detección de idioma SIEMPRE en backend
     lang = detect_user_lang(msg, hint=(payload.language or None))
@@ -297,71 +359,137 @@ def query(payload: QueryIn, response: Response):
         ctx["last_imdb_id"] = payload.select_imdb_id
         ctx["last_candidates"] = []
         _sess_set(sid, ctx)
-        return QueryOut(session_id=sid, step="answer",
-                        text=_i18n("Seleccionado. Pide sinopsis o disponibilidad (puedes decir el país).",
-                                   "Selected. Ask for synopsis or availability (you may include the country).",
-                                   lang),
-                        selected_uid=payload.select_uid or payload.select_imdb_id)
+        return QueryOut(
+            session_id=sid,
+            step="answer",
+            text=_i18n(
+                "Seleccionado. Pide sinopsis o disponibilidad (puedes decir el país).",
+                "Selected. Ask for synopsis or availability (you may include the country).",
+                lang,
+            ),
+            selected_uid=payload.select_uid or payload.select_imdb_id,
+        )
+
+    # --- NUEVO: si hay candidatos en sesión, intenta interpretar la respuesta como selección ---
+    if ctx.get("last_candidates"):
+        rows = ctx["last_candidates"]  # lista de dicts (no Pydantic)
+        sel_idx = _parse_selection(msg, len(rows))
+        chosen: Optional[Dict[str, Any]] = None
+        if sel_idx is not None:
+            chosen = rows[sel_idx]
+        else:
+            chosen = _pick_by_ids(msg, rows)
+
+        if chosen:
+            ctx.update({
+                "last_uid": chosen.get("uid"),
+                "last_imdb_id": chosen.get("imdb_id"),
+                "last_title": chosen.get("title"),
+                "last_year": chosen.get("year"),
+                "last_candidates": [],
+            })
+            _sess_set(sid, ctx)
+            return QueryOut(
+                session_id=sid,
+                step="answer",
+                text=_i18n(
+                    "Seleccionado. Pide sinopsis o disponibilidad (puedes decir el país).",
+                    "Selected. Ask for synopsis or availability (you may include the country).",
+                    lang,
+                ),
+                selected_uid=chosen.get("uid") or chosen.get("imdb_id"),
+            )
 
     # Intents
     ask_synopsis = bool(RE_SYNOPSIS.search(msg))
-    ask_avail    = bool(RE_AVAIL.search(msg))
-    ask_hits     = bool(RE_HITS.search(msg))
+    ask_avail = bool(RE_AVAIL.search(msg))
+    ask_hits = bool(RE_HITS.search(msg))
 
     # 1) SINOPSIS
     if ask_synopsis:
-        uid = ctx.get("last_uid"); imdb = ctx.get("last_imdb_id")
+        uid = ctx.get("last_uid")
+        imdb = ctx.get("last_imdb_id")
         if not (uid or imdb):
             cands = _search_candidates_from_text(msg)
             if not cands:
-                return QueryOut(session_id=sid, step="error",
-                                text=_i18n("No encontré coincidencias. Añade año/director o usa comillas.",
-                                           "No matches found. Try adding year/director or quotes.", lang))
-            rows = [c.model_dump() for c in cands]; pick = _safe_autopick(rows)
+                return QueryOut(
+                    session_id=sid,
+                    step="error",
+                    text=_i18n(
+                        "No encontré coincidencias. Añade año/director o usa comillas.",
+                        "No matches found. Try adding year/director or quotes.",
+                        lang,
+                    ),
+                )
+            rows = [c.model_dump() for c in cands]
+            pick = _safe_autopick(rows)
             if not pick:
-                ctx["last_candidates"] = rows; _sess_set(sid, ctx)
+                ctx["last_candidates"] = rows
+                _sess_set(sid, ctx)
                 lst = _format_candidates_list([Candidate(**r) for r in rows])
-                return QueryOut(session_id=sid, step="disambiguation",
-                                text=_disambig_text(lang) + "\n\n" + lst,
-                                candidates=[Candidate(**r) for r in rows],
-                                next=NextAction(type="select_candidate", method="POST", endpoint="/query"))
+                return QueryOut(
+                    session_id=sid,
+                    step="disambiguation",
+                    text=_disambig_text(lang) + "\n\n" + lst,
+                    candidates=[Candidate(**r) for r in rows],
+                    next=NextAction(type="select_candidate", method="POST", endpoint="/query"),
+                )
             uid, imdb = pick["uid"], pick.get("imdb_id")
-            ctx.update({"last_uid": uid, "last_imdb_id": imdb}); _sess_set(sid, ctx)
+            ctx.update({"last_uid": uid, "last_imdb_id": imdb})
+            _sess_set(sid, ctx)
 
         # Obtener metadatos por UID o IMDb
         meta = m_meta.get_metadata_by_uid(uid) if uid else None
         if (not meta) and imdb:
             meta = m_meta.get_metadata_by_imdb(imdb)
         if not meta:
-            return QueryOut(session_id=sid, step="error",
-                            text=_i18n("No se encontraron metadatos.", "No metadata found.", lang))
+            return QueryOut(
+                session_id=sid,
+                step="error",
+                text=_i18n("No se encontraron metadatos.", "No metadata found.", lang),
+            )
         # Asegurar uid/imdb en meta
         meta = dict(meta)
-        if uid:  meta["uid"] = uid
-        if imdb: meta["imdb_id"] = imdb
+        if uid:
+            meta["uid"] = uid
+        if imdb:
+            meta["imdb_id"] = imdb
 
         txt = _format_selected_metadata(meta, lang)
         return QueryOut(session_id=sid, step="answer", text=txt, selected_uid=uid or imdb)
 
     # 2) DISPONIBILIDAD
     if ask_avail:
-        uid = ctx.get("last_uid"); imdb = ctx.get("last_imdb_id")
+        uid = ctx.get("last_uid")
+        imdb = ctx.get("last_imdb_id")
         if not (uid or imdb):
             cands = _search_candidates_from_text(msg)
             if not cands:
-                return QueryOut(session_id=sid, step="error",
-                                text=_i18n("No encontré coincidencias. Especifica el título (p. ej., ‘Conclave 2024’).",
-                                           "No matches found. Provide a title (e.g., ‘Conclave 2024’).", lang))
-            rows = [c.model_dump() for c in cands]; pick = _safe_autopick(rows)
+                return QueryOut(
+                    session_id=sid,
+                    step="error",
+                    text=_i18n(
+                        "No encontré coincidencias. Especifica el título (p. ej., ‘Conclave 2024’).",
+                        "No matches found. Provide a title (e.g., ‘Conclave 2024’).",
+                        lang,
+                    ),
+                )
+            rows = [c.model_dump() for c in cands]
+            pick = _safe_autopick(rows)
             if not pick:
-                ctx["last_candidates"] = rows; _sess_set(sid, ctx)
+                ctx["last_candidates"] = rows
+                _sess_set(sid, ctx)
                 lst = _format_candidates_list([Candidate(**r) for r in rows])
-                return QueryOut(session_id=sid, step="disambiguation",
-                                text=_disambig_text(lang) + "\n\n" + lst,
-                                candidates=[Candidate(**r) for r in rows],
-                                next=NextAction(type="select_candidate", method="POST", endpoint="/query"))
+                return QueryOut(
+                    session_id=sid,
+                    step="disambiguation",
+                    text=_disambig_text(lang) + "\n\n" + lst,
+                    candidates=[Candidate(**r) for r in rows],
+                    next=NextAction(type="select_candidate", method="POST", endpoint="/query"),
+                )
             uid, imdb = pick["uid"], pick.get("imdb_id")
-            ctx.update({"last_uid": uid, "last_imdb_id": imdb}); _sess_set(sid, ctx)
+            ctx.update({"last_uid": uid, "last_imdb_id": imdb})
+            _sess_set(sid, ctx)
 
         # Resolver país y availability
         try:
@@ -376,11 +504,15 @@ def query(payload: QueryIn, response: Response):
         include_prices = bool(re.search(r"\b(precio|prices?)\b", msg, re.I))
         rows = m_avail.fetch_availability_by_uid(uid, iso2=iso2, with_prices=include_prices) if uid else []
         txt = m_avail.render_availability(
-            rows, lang=lang, country_pretty=(pretty or (iso2 if (iso2 and len(str(iso2)) == 2) else "")),
-            include_details=False, include_prices=include_prices
+            rows,
+            lang=lang,
+            country_pretty=(pretty or (iso2 if (iso2 and len(str(iso2)) == 2) else "")),
+            include_details=False,
+            include_prices=include_prices,
         )
         if iso2:
-            ctx["last_country"] = iso2; _sess_set(sid, ctx)
+            ctx["last_country"] = iso2
+            _sess_set(sid, ctx)
         return QueryOut(session_id=sid, step="answer", text=txt, selected_uid=uid or imdb)
 
     # 3) HITS
@@ -393,7 +525,8 @@ def query(payload: QueryIn, response: Response):
                 iso2, pretty = None, None
             df_s, dt_s, used_year = m_hits.ensure_hits_range(df, dt, iso2)
 
-            uid = ctx.get("last_uid"); imdb = ctx.get("last_imdb_id")
+            uid = ctx.get("last_uid")
+            imdb = ctx.get("last_imdb_id")
             if not uid and imdb:
                 uid = m_meta.resolve_uid_by_imdb(imdb)
 
@@ -408,45 +541,68 @@ def query(payload: QueryIn, response: Response):
             asked_topn = None
             m = re.search(r"\btop\s*(\d{1,3})\b", msg, re.I)
             if m:
-                try: asked_topn = int(m.group(1))
-                except: pass
+                try:
+                    asked_topn = int(m.group(1))
+                except Exception:
+                    pass
             series_only = bool(re.search(r"\b(serie|series)\b", msg, re.I))
-            movie_only  = bool(re.search(r"\b(pel[ií]cula|pelicula|movie|film)\b", msg, re.I))
+            movie_only = bool(re.search(r"\b(pel[ií]cula|pelicula|movie|film)\b", msg, re.I))
             content_type = "series" if (series_only and not movie_only) else ("movie" if (movie_only and not series_only) else None)
 
-            items = m_hits.get_top_hits_by_period(country_iso2=iso2, date_from=df_s, date_to=dt_s,
-                                                  limit=(asked_topn or 20), content_type=content_type) or []
-            txt = m_hits.render_top_hits(items, country=(pretty or iso2), lang=lang, year_used=used_year,
-                                         series_only=(content_type == "series"), top_n=asked_topn)
+            items = m_hits.get_top_hits_by_period(
+                country_iso2=iso2, date_from=df_s, date_to=dt_s, limit=(asked_topn or 20), content_type=content_type
+            ) or []
+            txt = m_hits.render_top_hits(
+                items, country=(pretty or iso2), lang=lang, year_used=used_year, series_only=(content_type == "series"), top_n=asked_topn
+            )
             return QueryOut(session_id=sid, step="answer", text=txt)
         except Exception:
             log.exception("HITS error")
-            return QueryOut(session_id=sid, step="error",
-                            text=_i18n("Ocurrió un error al consultar HITS. Intenta nuevamente (puedes indicar un año).",
-                                       "Something went wrong with HITS. Try again (you can include a year).", lang))
+            return QueryOut(
+                session_id=sid,
+                step="error",
+                text=_i18n(
+                    "Ocurrió un error al consultar HITS. Intenta nuevamente (puedes indicar un año).",
+                    "Something went wrong with HITS. Try again (you can include a year).",
+                    lang,
+                ),
+            )
 
     # 4) Búsqueda general (desambiguación o autopick)
     cands = _search_candidates_from_text(msg)
     if not cands:
-        return QueryOut(session_id=sid, step="error",
-                        text=_i18n("No encontré coincidencias. Añade año/director o usa comillas.",
-                                   "No matches found. Try adding year/director or quotes.", lang))
-    rows = [c.model_dump() for c in cands]; pick = _safe_autopick(rows)
+        return QueryOut(
+            session_id=sid,
+            step="error",
+            text=_i18n("No encontré coincidencias. Añade año/director o usa comillas.", "No matches found. Try adding year/director or quotes.", lang),
+        )
+    rows = [c.model_dump() for c in cands]
+    pick = _safe_autopick(rows)
     if pick:
-        ctx.update({"last_uid": pick["uid"], "last_imdb_id": pick.get("imdb_id"),
-                    "last_title": pick.get("title"), "last_year": pick.get("year"),
-                    "last_candidates": []})
+        ctx.update(
+            {
+                "last_uid": pick["uid"],
+                "last_imdb_id": pick.get("imdb_id"),
+                "last_title": pick.get("title"),
+                "last_year": pick.get("year"),
+                "last_candidates": [],
+            }
+        )
         _sess_set(sid, ctx)
         txt = _i18n(
             f"Único resultado fiable: {pick.get('title')} ({pick.get('year')}). Pide sinopsis o disponibilidad (puedes decir el país).",
             f"Single reliable match: {pick.get('title')} ({pick.get('year')}). Ask for synopsis or availability (you may include the country).",
-            lang
+            lang,
         )
         return QueryOut(session_id=sid, step="answer", text=txt, selected_uid=pick["uid"] or pick.get("imdb_id"))
 
-    ctx["last_candidates"] = rows; _sess_set(sid, ctx)
+    ctx["last_candidates"] = rows
+    _sess_set(sid, ctx)
     lst = _format_candidates_list([Candidate(**r) for r in rows])
-    return QueryOut(session_id=sid, step="disambiguation",
-                    text=_disambig_text(lang) + "\n\n" + lst,
-                    candidates=[Candidate(**r) for r in rows],
-                    next=NextAction(type="select_candidate", method="POST", endpoint="/query"))
+    return QueryOut(
+        session_id=sid,
+        step="disambiguation",
+        text=_disambig_text(lang) + "\n\n" + lst,
+        candidates=[Candidate(**r) for r in rows],
+        next=NextAction(type="select_candidate", method="POST", endpoint="/query"),
+    )

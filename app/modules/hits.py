@@ -1,262 +1,225 @@
 # app/modules/hits.py
-import re, datetime as dt
-from typing import Any, Dict, List, Optional, Tuple
-from infra.db import run_sql
-from infra.config import SETTINGS
+import os
+import re
+import datetime as dt
+from typing import Optional, Tuple, List, Dict, Any
 
-_year = re.compile(r"\b(19[0-9]{2}|20[0-3][0-9])\b")
+from infra.db import get_conn  # asumiendo que ya lo tienes (igual que db_health)
+from app.modules import metadata as m_meta
 
-def _date_to_str(d):
-    if not d: return None
-    return d.isoformat() if hasattr(d, "isoformat") else str(d)
+# ===================== Utilidades de fechas =====================
 
-def _full_year(df: Optional[str], dt_: Optional[str]) -> Optional[int]:
-    try:
-        if not df or not dt_: return None
-        m1 = re.match(r"^(\d{4})-01-01$", df); m2 = re.match(r"^(\d{4})-12-31$", dt_)
-        if m1 and m2 and m1.group(1) == m2.group(1): return int(m1.group(1))
-    except Exception: pass
-    return None
-
-def get_default_hits_year(country_iso2: Optional[str] = None) -> Optional[int]:
-    try:
-        if SETTINGS.offline_mode: return dt.date.today().year
-        if country_iso2:
-            rows = run_sql("""
-                SELECT MAX(currentyear)::int AS y
-                FROM ms.hits_presence_2
-                WHERE country = %(c1)s OR country = %(c2)s
-            """, {"c1": country_iso2, "c2": country_iso2}) or []
-            y = rows[0].get("y") if rows else None
-            return int(y) if y is not None else dt.date.today().year
-        rows = run_sql("SELECT MAX(currentyear)::int AS y FROM ms.hits_global;") or []
-        y = rows[0].get("y") if rows else None
-        return int(y) if y is not None else dt.date.today().year
-    except Exception:
-        return dt.date.today().year
-
-def ensure_hits_range(date_from, date_to, country_iso2: Optional[str]) -> Tuple[Optional[str], Optional[str], Optional[int]]:
-    df_str = _date_to_str(date_from); dt_str = _date_to_str(date_to)
-    if df_str or dt_str: return df_str, dt_str, _full_year(df_str, dt_str)
-    y = get_default_hits_year(country_iso2) or dt.date.today().year
-    return f"{y}-01-01", f"{y}-12-31", y
+_YEAR_RE = re.compile(r"\b(20\d{2}|19\d{2})\b")
 
 def extract_date_range(text: str) -> Tuple[Optional[dt.date], Optional[dt.date]]:
-    if not text: return None, None
-    m = re.findall(r"\b(20[0-3]\d|19\d{2})-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])\b", text)
-    if m and len(m) >= 1:
-        dates = []
-        for y, mo, d in m[:2]:
-            try: dates.append(dt.date(int(y), int(mo), int(d)))
-            except Exception: pass
-        if len(dates) == 2: return min(dates), max(dates)
-        if len(dates) == 1: return dates[0], None
-    y = _year.findall(text)
-    if y:
-        try:
-            yy = int(y[0]); return dt.date(yy,1,1), dt.date(yy,12,31)
-        except Exception: pass
-    return None, None
+    """
+    Detecta año en el texto. Si encuentra un año Y, devuelve [Y-01-01, Y-12-31].
+    Si no hay año, devuelve (None, None) para que el caller decida.
+    """
+    if not text:
+        return None, None
+    m = _YEAR_RE.search(text)
+    if not m:
+        return None, None
+    y = int(m.group(1))
+    y = max(1900, min(2100, y))
+    return dt.date(y, 1, 1), dt.date(y, 12, 31)
 
-def get_hits_by_uid(uid: str, country_iso2: Optional[str] = None,
-                    date_from: Optional[dt.date] = None, date_to: Optional[dt.date] = None) -> List[Dict[str, Any]]:
-    if SETTINGS.offline_mode or not uid: return []
-    df = _date_to_str(date_from); dt_ = _date_to_str(date_to); full = _full_year(df, dt_)
+def ensure_hits_range(df: Optional[dt.date], dt_to: Optional[dt.date], country_iso2: Optional[str]) -> Tuple[dt.date, dt.date, int]:
+    """
+    Si no vino rango, usar año actual.
+    Devuelve (date_from, date_to, used_year).
+    """
+    today = dt.date.today()
+    if df and dt_to:
+        return df, dt_to, df.year
+    return dt.date(today.year, 1, 1), dt.date(today.year, 12, 31), today.year
+
+# ===================== Consultas =====================
+
+def _resolve_uid(uid: Optional[str], imdb_id: Optional[str]) -> Optional[str]:
+    if uid:
+        return uid
+    if imdb_id:
+        return m_meta.resolve_uid_by_imdb(imdb_id)
+    return None
+
+def get_title_hits_sum(
+    uid: Optional[str] = None,
+    imdb_id: Optional[str] = None,
+    country_iso2: Optional[str] = None,
+    date_from: Optional[dt.date] = None,
+    date_to: Optional[dt.date] = None,
+) -> float:
+    """
+    Suma HITS para un título:
+      - si country_iso2 está presente → usa ms.hits_presence_2 filtrando por country
+      - si no hay país:
+          * si HITS_GLOBAL_TABLE está configurada, usa esa tabla (col: uid, date_hits, hits)
+          * si no, suma en hits_presence_2 sin filtrar país (agrega todos los países)
+    """
+    the_uid = _resolve_uid(uid, imdb_id)
+    if not the_uid:
+        return 0.0
+
+    df = date_from or dt.date(dt.date.today().year, 1, 1)
+    dtf = date_to or dt.date(dt.date.today().year, 12, 31)
+
+    global_table = os.getenv("HITS_GLOBAL_TABLE", "").strip()  # ej: "ms.hits_presence_global"
+    sql = ""
+    params: List[Any] = []
+
     if country_iso2:
-        dcol = "date_hits"; ccol = "country"
-        if full is not None:
-            return run_sql(f"""
-                SELECT {dcol}::date AS date, hits
-                FROM ms.hits_presence_2
-                WHERE uid=%(u)s AND {ccol}=%(c)s AND currentyear = %(y)s
-                ORDER BY date;
-            """, {"u": uid, "c": country_iso2, "y": full})
-        return run_sql(f"""
-            SELECT {dcol}::date AS date, hits
+        sql = """
+            SELECT COALESCE(SUM(hits),0)
             FROM ms.hits_presence_2
-            WHERE uid=%(u)s AND {ccol}=%(c)s
-              AND (%(df)s IS NULL OR {dcol}::date >= %(df)s)
-              AND (%(dt)s IS NULL OR {dcol}::date <= %(dt)s)
-            ORDER BY date;
-        """, {"u": uid, "c": country_iso2, "df": date_from, "dt": date_to})
-    gdcol = "date"
-    if full is not None:
-        return run_sql(f"""
-            SELECT {gdcol}::date AS date, hits
-            FROM ms.hits_global
-            WHERE uid=%(u)s AND currentyear = %(y)s
-            ORDER BY 1;
-        """, {"u": uid, "y": full})
-    return run_sql(f"""
-        SELECT {gdcol}::date AS date, hits
-        FROM ms.hits_global
-        WHERE uid=%(u)s
-          AND (%(df)s IS NULL OR {gdcol}::date >= %(df)s)
-          AND (%(dt)s IS NULL OR {gdcol}::date <= %(dt)s)
-        ORDER BY 1;
-    """, {"u": uid, "df": date_from, "dt": date_to})
-
-def _fmt_hits(x: Any) -> str:
-    if x is None: return "0"
-    from decimal import Decimal, ROUND_HALF_UP
-    d = Decimal(str(x)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-    return str(int(d)) if d == d.to_integral_value() else f"{d:.2f}"
-
-def get_top_hits_by_period(country_iso2: Optional[str] = None,
-                           date_from: Optional[str] = None,
-                           date_to: Optional[str] = None,
-                           limit: int = 20,
-                           content_type: Optional[str] = None) -> List[Dict[str, Any]]:
-    if SETTINGS.offline_mode: return []
-    df, dt_, full = date_from, date_to, None
-    if df and dt_:
-        m1 = re.match(r"^(\d{4})-01-01$", df); m2 = re.match(r"^(\d{4})-12-31$", dt_)
-        if m1 and m2 and m1.group(1) == m2.group(1): full = int(m1.group(1))
-    params: Dict[str, Any] = {"lim": limit, "df": df, "dt": dt_, "y": full}
-    ctype_clause = ""
-    if content_type:
-        ctype_clause = " AND LOWER(m.type) = %(ctype)s "
-        params["ctype"] = content_type.lower()
-    if country_iso2:
-        where_c = " AND country = %(c)s"
-        params["c"] = country_iso2
-        if full is not None:
-            return run_sql(f"""
-                WITH src AS (
-                  SELECT uid, hits
-                  FROM ms.hits_presence_2
-                  WHERE uid IS NOT NULL AND currentyear = %(y)s {where_c}
-                ), agg AS (
-                  SELECT uid, ROUND(SUM(hits)::numeric, 2) AS total_hits
-                  FROM src GROUP BY uid
-                )
-                SELECT a.uid, a.total_hits, m.title, m.year, m.imdb_id, m.type
-                FROM agg a JOIN ms.new_cp_metadata_estandar m ON m.uid = a.uid
-                WHERE 1=1 {ctype_clause}
-                ORDER BY a.total_hits DESC LIMIT %(lim)s;
-            """, params) or []
-        return run_sql(f"""
-            WITH src AS (
-              SELECT uid, date_hits::date AS d, hits
-              FROM ms.hits_presence_2
-              WHERE uid IS NOT NULL {where_c}
-                AND (%(df)s IS NULL OR date_hits >= %(df)s::date)
-                AND (%(dt)s IS NULL OR date_hits <= %(dt)s::date)
-            ), agg AS (
-              SELECT uid, ROUND(SUM(hits)::numeric, 2) AS total_hits
-              FROM src GROUP BY uid
-            )
-            SELECT a.uid, a.total_hits, m.title, m.year, m.imdb_id, m.type
-            FROM agg a JOIN ms.new_cp_metadata_estandar m ON m.uid = a.uid
-            WHERE 1=1 {ctype_clause}
-            ORDER BY a.total_hits DESC LIMIT %(lim)s;
-        """, params) or []
-    if full is not None:
-        return run_sql(f"""
-            WITH src AS (
-              SELECT uid, hits
-              FROM ms.hits_global
-              WHERE uid IS NOT NULL AND currentyear = %(y)s
-            ), agg AS (
-              SELECT uid, ROUND(SUM(hits)::numeric, 2) AS total_hits
-              FROM src GROUP BY uid
-            )
-            SELECT a.uid, a.total_hits, m.title, m.year, m.imdb_id, m.type
-            FROM agg a JOIN ms.new_cp_metadata_estandar m ON m.uid = a.uid
-            WHERE 1=1 {ctype_clause}
-            ORDER BY a.total_hits DESC LIMIT %(lim)s;
-        """, params) or []
-    return run_sql(f"""
-        WITH src AS (
-          SELECT uid, COALESCE(date, date_hits)::date AS d, hits
-          FROM ms.hits_global
-          WHERE uid IS NOT NULL
-            AND (%(df)s IS NULL OR COALESCE(date, date_hits) >= %(df)s::date)
-            AND (%(dt)s IS NULL OR COALESCE(date, date_hits) <= %(dt)s::date)
-        ), agg AS (
-          SELECT uid, ROUND(SUM(hits)::numeric, 2) AS total_hits
-          FROM src GROUP BY uid
-        )
-        SELECT a.uid, a.total_hits, m.title, m.year, m.imdb_id, m.type
-        FROM agg a JOIN ms.new_cp_metadata_estandar m ON m.uid = a.uid
-        WHERE 1=1 {ctype_clause}
-        ORDER BY a.total_hits DESC LIMIT %(lim)s;
-    """, params) or []
-
-def render_top_hits(items: List[Dict[str, Any]], country: Optional[str] = None,
-                    lang: str = "es", year_used: Optional[int] = None,
-                    series_only: bool = False, top_n: Optional[int] = None) -> str:
-    if not items: return "Sin resultados de popularidad." if lang.startswith("es") else "No popularity results."
-    n = top_n or len(items)
-    pretty_country = country
-    if lang.startswith("es"):
-        head = ("La serie más popular" if series_only and n == 1 else
-                f"Top {n} series más populares" if series_only else
-                "El título más popular" if n == 1 else f"Top {n} títulos más populares")
-        where = ""
-        if pretty_country: where += f" en {pretty_country}"
-        if year_used: where += f" en {year_used}"
-        header = head + (where + ":" if where else ":")
-        lines = []
-        for i, it in enumerate(items[:n], start=1):
-            t = it.get("title") or "-"; y = it.get("year"); hits = _fmt_hits(it.get("total_hits"))
-            lines.append(f"{i}. {t}{f' ({y})' if y else ''} — HITS: {hits}")
-        return header + "\n" + "\n".join(lines)
+            WHERE uid = %s
+              AND country = %s
+              AND date_hits BETWEEN %s AND %s
+        """
+        params = [the_uid, country_iso2.upper(), df, dtf]
     else:
-        head = ("The most popular series" if series_only and n == 1 else
-                f"Top {n} most popular series" if series_only else
-                "The most popular title" if n == 1 else f"Top {n} most popular titles")
-        where = ""
-        if pretty_country: where += f" in {pretty_country}"
-        if year_used: where += f" in {year_used}"
-        header = head + (where + ":" if where else ":")
-        lines = []
-        for i, it in enumerate(items[:n], start=1):
-            t = it.get("title") or "-"; y = it.get("year"); hits = _fmt_hits(it.get("total_hits"))
-            lines.append(f"{i}. {t}{f' ({y})' if y else ''} — HITS: {hits}")
-        return header + "\n" + "\n".join(lines)
+        if global_table:
+            # usa tabla global si existe (columnas: uid, date_hits, hits)
+            sql = f"""
+                SELECT COALESCE(SUM(hits),0)
+                FROM {global_table}
+                WHERE uid = %s
+                  AND date_hits BETWEEN %s AND %s
+            """
+            params = [the_uid, df, dtf]
+        else:
+            # fallback: agrega sobre todos los países
+            sql = """
+                SELECT COALESCE(SUM(hits),0)
+                FROM ms.hits_presence_2
+                WHERE uid = %s
+                  AND date_hits BETWEEN %s AND %s
+            """
+            params = [the_uid, df, dtf]
 
-def render_hits(hits_rows: List[Dict[str, Any]], scope: str = "global", lang: str = "es") -> str:
-    if not hits_rows:
-        return "No hay HITS registrados." if lang == "es" else "No HITS recorded."
-    total = sum(int(r.get("hits") or 0) for r in hits_rows)
-    if lang == "es":
-        return f"Puntuación (HITS) {('global' if scope=='global' else 'por país')}: **{total}** (últimos {len(hits_rows)} días)"
-    return f"HITS score {('global' if scope=='global' else 'by country')}: **{total}** (last {len(hits_rows)} days)"
+    with get_conn() as conn, conn.cursor() as cur:
+        cur.execute(sql, params)
+        row = cur.fetchone()
+        return float(row[0] or 0.0)
 
-# --- NUEVO: texto de HITS para un título con contexto de #1 del período ---
+def get_top_hits_by_period(
+    country_iso2: Optional[str],
+    date_from: dt.date,
+    date_to: dt.date,
+    limit: int = 20,
+    content_type: Optional[str] = None,  # "movie" | "series" | None
+) -> List[Dict[str, Any]]:
+    """
+    Ranking por periodo. Agrega HITS de ms.hits_presence_2 (filtrado por país si se provee)
+    y joinea metadatos básicos desde ms.new_cp_metadata_estandar.
+    """
+    base = """
+        SELECT hp.uid,
+               COALESCE(SUM(hp.hits),0) AS hits_sum
+        FROM ms.hits_presence_2 hp
+        WHERE hp.date_hits BETWEEN %s AND %s
+    """
+    params: List[Any] = [date_from, date_to]
+
+    if country_iso2:
+        base += " AND hp.country = %s"
+        params.append(country_iso2.upper())
+
+    base += " GROUP BY hp.uid"
+
+    # envolvemos para unir metadatos
+    sql = f"""
+        WITH agg AS (
+            {base}
+        )
+        SELECT a.uid,
+               a.hits_sum,
+               m.title,
+               m.year,
+               m.type,
+               m.directors,
+               m.imdb_id
+        FROM agg a
+        LEFT JOIN ms.new_cp_metadata_estandar m
+          ON m.uid = a.uid
+    """
+
+    # filtro por tipo si se requiere
+    if content_type in ("movie", "series"):
+        sql += " WHERE LOWER(COALESCE(m.type,'')) = %s"
+        params.append(content_type.lower())
+
+    sql += " ORDER BY a.hits_sum DESC NULLS LAST LIMIT %s"
+    params.append(limit)
+
+    out: List[Dict[str, Any]] = []
+    with get_conn() as conn, conn.cursor() as cur:
+        cur.execute(sql, params)
+        for row in cur.fetchall():
+            out.append({
+                "uid": row[0],
+                "hits_sum": float(row[1] or 0.0),
+                "title": row[2],
+                "year": row[3],
+                "type": row[4],
+                "directors": row[5],
+                "imdb_id": row[6],
+            })
+    return out
+
+# ===================== Render helpers =====================
+
+def render_top_hits(
+    items: List[Dict[str, Any]],
+    country: Optional[str],
+    lang: str,
+    year_used: Optional[int] = None,
+    series_only: bool = False,
+    top_n: Optional[int] = None,
+) -> str:
+    label = "series" if series_only else "títulos"
+    if lang.startswith("es"):
+        hdr = f"TOP {top_n or len(items)} {label} por HITS" + (f" en {country}" if country else "")
+        if year_used:
+            hdr += f" ({year_used})"
+    else:
+        lbl = "series" if series_only else "titles"
+        hdr = f"TOP {top_n or len(items)} {lbl} by HITS" + (f" in {country}" if country else "")
+        if year_used:
+            hdr += f" ({year_used})"
+
+    lines = [hdr + ":"]
+    for i, it in enumerate(items, start=1):
+        t = it.get("title") or "-"
+        y = it.get("year")
+        s = int(round(it.get("hits_sum") or 0))
+        imdb = it.get("imdb_id") or "-"
+        lines.append(f"{i}. {t}{f' ({y})' if y else ''} — HITS={s} — IMDb: {imdb}")
+    return "\n".join(lines)
+
 def render_title_hits_with_context(
     meta: Dict[str, Any],
     hits_sum: float,
-    baseline: Optional[Dict[str, Any]],
-    *,
-    lang: str = "es",
+    lang: str,
     country_pretty: Optional[str] = None,
-    year_used: Optional[int] = None
+    year_used: Optional[int] = None,
 ) -> str:
-    t = meta.get("title") or "-"
+    t = meta.get("title") or "(título)"
     y = meta.get("year")
-    where = ""
-    if country_pretty:
-        where += (" en " if lang.startswith("es") else " in ") + str(country_pretty)
-    if year_used:
-        where += (" en " if lang.startswith("es") else " in ") + str(year_used)
-
+    scope = f"en {country_pretty}" if (country_pretty) else "global"
+    s = int(round(hits_sum or 0))
     if lang.startswith("es"):
-        head = f"{t}{f' ({y})' if y else ''} — HITS: {_fmt_hits(hits_sum)}{where}."
-        if baseline:
-            bt = baseline.get("title") or "-"
-            by = baseline.get("year")
-            bscore = _fmt_hits(baseline.get("total_hits"))
-            ctx = f"Para referencia, el #1{(' en ' + country_pretty) if country_pretty else ''}{(' en ' + str(year_used)) if year_used else ''} fue {bt}{f' ({by})' if by else ''} con HITS {bscore}."
-            return head + "\n" + ctx
-        return head
+        head = f"Popularidad (HITS) de «{t}»{f' ({y})' if y else ''} — {scope}"
+        if year_used:
+            head += f" — {year_used}"
+        body = f"Suma anual de HITS: {s}"
+        tail = "¿Quieres comparar con otro título o ver el TOP por país/año?"
+        return f"{head}\n{body}\n{tail}"
     else:
-        head = f"{t}{f' ({y})' if y else ''} — HITS: {_fmt_hits(hits_sum)}{where}."
-        if baseline:
-            bt = baseline.get("title") or "-"
-            by = baseline.get("year")
-            bscore = _fmt_hits(baseline.get("total_hits"))
-            ctx = f"For context, the #1{(' in ' + country_pretty) if country_pretty else ''}{(' in ' + str(year_used)) if year_used else ''} was {bt}{f' ({by})' if by else ''} with HITS {bscore}."
-            return head + "\n" + ctx
-        return head
+        head = f"Popularity (HITS) for “{t}”{f' ({y})' if y else ''} — {scope}"
+        if year_used:
+            head += f" — {year_used}"
+        body = f"Yearly HITS sum: {s}"
+        tail = "Would you like to compare with another title or see the country/year TOP?"
+        return f"{head}\n{body}\n{tail}"

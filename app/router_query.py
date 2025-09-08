@@ -1,4 +1,3 @@
-# app/router_query.py
 import os
 import re
 import json
@@ -19,7 +18,7 @@ from app.modules import hits as m_hits
 log = logging.getLogger("router_query")
 router = APIRouter()
 
-# ===================== Modelos de I/O (contrato del HTML) =====================
+# ===================== Modelos de I/O =====================
 class Candidate(BaseModel):
     uid: str
     imdb_id: Optional[str] = None
@@ -37,7 +36,7 @@ class NextAction(BaseModel):
 class QueryIn(BaseModel):
     session_id: Optional[str] = None
     message: str
-    language: Optional[str] = None     # hint del front
+    language: Optional[str] = None
     select_uid: Optional[str] = None
     select_imdb_id: Optional[str] = None
     context_uid: Optional[str] = None
@@ -52,7 +51,7 @@ class QueryOut(BaseModel):
     next: Optional[NextAction] = None
     selected_uid: Optional[str] = None
 
-# ===================== Sesiones (memoria/Redis) =====================
+# ===================== Sesiones =====================
 SESS_TTL = int(os.getenv("SESS_TTL", "3600"))
 _R = None
 try:
@@ -99,7 +98,7 @@ def _ensure_session(session_id: Optional[str]) -> Tuple[str, Dict[str, Any]]:
     sid = session_id or uuid4().hex
     return sid, _sess_get(sid)
 
-# ===================== Idioma: detección + traducción =====================
+# ===================== Idioma / LLM helper =====================
 try:
     from langdetect import detect as _ld_detect
 except Exception:
@@ -131,7 +130,7 @@ def _detect_lang_llm(text: str, fallback: str) -> str:
     try:
         if os.getenv("ENABLE_LLM_LANG", "0") != "1":
             return fallback
-        from infra.bedrock import call_bedrock_llm1  # lazy
+        from infra.bedrock import call_bedrock_llm1
         prompt = (
             "Clasifica el idioma del siguiente texto SOLO como \"es\" o \"en\".\n"
             "Responde con una sola palabra (es|en), sin explicaciones.\n\n"
@@ -156,7 +155,7 @@ def _translate_with_llm(text: str, target_lang: str) -> str:
     try:
         if not text or os.getenv("ENABLE_TRANSLATION", "1") != "1":
             return text
-        from infra.bedrock import call_bedrock_llm1  # lazy
+        from infra.bedrock import call_bedrock_llm1
         to = "Spanish" if target_lang.startswith("es") else "English"
         prompt = (
             f"Traduce al {to} el siguiente texto. Mantén nombres propios y URLs.\n"
@@ -186,7 +185,7 @@ def translate_if_needed(text: str, target_lang: str) -> str:
         return _translate_with_llm(text, "en")
     return text
 
-# ===================== Heurísticas / regex auxiliares =====================
+# ===================== Heurísticas / regex =====================
 RE_SYNOPSIS = re.compile(r"\b(de\s*qu[eé]\s*trata|sinopsis|plot|summary|synopsis)\b", re.I)
 RE_AVAIL = re.compile(r"\b(d[oó]nde.*(?:ver|verla|verlo)|where.*watch|availability|available|plataforma|precio[s]?)\b", re.I)
 RE_HITS = re.compile(r"\b(hits|popularidad|popularity|top\s*\d+|m[aá]s\s+popular(?:es)?|most\s+popular)\b", re.I)
@@ -259,14 +258,14 @@ def _format_selected_metadata(meta: Dict[str, Any], lang: str) -> str:
     kind = _spanish_kind(meta.get("type")) if lang.startswith("es") else (meta.get("type") or "title")
     dir_ = meta.get("directors")
     syn_raw = meta.get("synopsis") or (_i18n("Sin sinopsis disponible.", "No synopsis available.", lang))
-    syn = translate_if_needed(syn_raw, lang)  # Traducción aquí
+    syn = translate_if_needed(syn_raw, lang)
     uid = meta.get("uid") or "-"
     imdb = meta.get("imdb_id") or "-"
     if lang.startswith("es"):
         header = f"{t}: es una {kind}{f' de {y}' if y else ''}"
         if dir_: header += f", dirigida por {dir_}"
         body = f"Sinopsis: {syn}"
-        tail = f"(UID: {uid} — IMDb: {imdb})\n\n¿Quieres disponibilidad por plataforma/país o popularidad (HITS) en algún mercado u otro dato?"
+        tail = f"(UID: {uid} — IMDb: {imdb})\n\n¿Quieres disponibilidad por plataforma/país o popularidad (HITS) en algún mercado?"
         return f"{header}. {body}\n{tail}"
     else:
         header = f"{t}: a {kind}{f' from {y}' if y else ''}"
@@ -329,14 +328,13 @@ def query(payload: QueryIn, response: Response):
 
     lang = detect_user_lang(msg, hint=(payload.language or None))
 
-    # Intents simples: saludo / identidad
+    # Saludo / Identidad
     if RE_GREET.search(msg):
         return QueryOut(session_id=sid, step="answer",
                         text=_i18n(
                             "¡Hola! Soy el asistente virtual de Fabric, potenciado por IA. Puedo ayudarte con sinopsis, disponibilidad y precios por país/plataforma, y popularidad (HITS, local y global).",
                             "Hello! I’m Fabric Data’s virtual assistant, powered by AI. I can help with metadata, availability & prices by platform/country, and popularity (HITS, local & global).",
                             lang))
-
     if RE_IDENTITY.search(msg):
         return QueryOut(session_id=sid, step="answer",
                         text=_i18n(
@@ -348,12 +346,20 @@ def query(payload: QueryIn, response: Response):
     if payload.context_uid and not ctx.get("last_uid"):
         ctx["last_uid"] = payload.context_uid
 
-    # Selección directa
+    # Selección directa desde UI
     if payload.select_uid or payload.select_imdb_id:
         ctx["last_uid"] = payload.select_uid
         ctx["last_imdb_id"] = payload.select_imdb_id
         ctx["last_candidates"] = []
         _sess_set(sid, ctx)
+        # Responder ya con sinopsis según tu preferencia de UX
+        meta = m_meta.get_metadata_by_uid(payload.select_uid) if payload.select_uid else (m_meta.get_metadata_by_imdb(payload.select_imdb_id) if payload.select_imdb_id else None)
+        if meta:
+            meta = dict(meta)
+            if payload.select_uid:  meta["uid"] = payload.select_uid
+            if payload.select_imdb_id: meta["imdb_id"] = payload.select_imdb_id
+            txt = _format_selected_metadata(meta, lang)
+            return QueryOut(session_id=sid, step="answer", text=txt, selected_uid=payload.select_uid or payload.select_imdb_id)
         return QueryOut(session_id=sid, step="answer",
                         text=_i18n("Seleccionado. Pide sinopsis o disponibilidad (puedes decir el país).",
                                    "Selected. Ask for synopsis or availability (you may include the country).", lang),
@@ -363,12 +369,7 @@ def query(payload: QueryIn, response: Response):
     if ctx.get("last_candidates"):
         rows = ctx["last_candidates"]
         sel_idx = _parse_selection(msg, len(rows))
-        chosen: Optional[Dict[str, Any]] = None
-        if sel_idx is not None:
-            chosen = rows[sel_idx]
-        else:
-            chosen = _pick_by_ids(msg, rows)
-
+        chosen: Optional[Dict[str, Any]] = rows[sel_idx] if sel_idx is not None else _pick_by_ids(msg, rows)
         if chosen:
             ctx.update({
                 "last_uid": chosen.get("uid"),
@@ -378,6 +379,14 @@ def query(payload: QueryIn, response: Response):
                 "last_candidates": [],
             })
             _sess_set(sid, ctx)
+            # Responder de inmediato con sinopsis
+            meta = m_meta.get_metadata_by_uid(chosen.get("uid")) if chosen.get("uid") else (m_meta.get_metadata_by_imdb(chosen.get("imdb_id")) if chosen.get("imdb_id") else None)
+            if meta:
+                meta = dict(meta)
+                if chosen.get("uid"):  meta["uid"] = chosen.get("uid")
+                if chosen.get("imdb_id"): meta["imdb_id"] = chosen.get("imdb_id")
+                txt = _format_selected_metadata(meta, lang)
+                return QueryOut(session_id=sid, step="answer", text=txt, selected_uid=chosen.get("uid") or chosen.get("imdb_id"))
             return QueryOut(session_id=sid, step="answer",
                             text=_i18n("Seleccionado. Pide sinopsis o disponibilidad (puedes decir el país).",
                                        "Selected. Ask for synopsis or availability (you may include the country).", lang),
@@ -408,16 +417,13 @@ def query(payload: QueryIn, response: Response):
             uid, imdb = pick["uid"], pick.get("imdb_id")
             ctx.update({"last_uid": uid, "last_imdb_id": imdb}); _sess_set(sid, ctx)
 
-        meta = m_meta.get_metadata_by_uid(uid) if uid else None
-        if (not meta) and imdb:
-            meta = m_meta.get_metadata_by_imdb(imdb)
+        meta = m_meta.get_metadata_by_uid(uid) if uid else (m_meta.get_metadata_by_imdb(imdb) if imdb else None)
         if not meta:
             return QueryOut(session_id=sid, step="error",
                             text=_i18n("No se encontraron metadatos.", "No metadata found.", lang))
         meta = dict(meta)
         if uid:  meta["uid"] = uid
         if imdb: meta["imdb_id"] = imdb
-
         txt = _format_selected_metadata(meta, lang)
         return QueryOut(session_id=sid, step="answer", text=txt, selected_uid=uid or imdb)
 
@@ -459,7 +465,7 @@ def query(payload: QueryIn, response: Response):
             ctx["last_country"] = iso2; _sess_set(sid, ctx)
         return QueryOut(session_id=sid, step="answer", text=txt, selected_uid=uid or imdb)
 
-    # 3) HITS
+    # 3) HITS (sum anual por defecto, + referencia top)
     if ask_hits:
         try:
             df, dt_ = m_hits.extract_date_range(msg)
@@ -469,9 +475,8 @@ def query(payload: QueryIn, response: Response):
                 iso2, pretty = None, None
             df_s, dt_s, used_year = m_hits.ensure_hits_range(df, dt_, iso2)
 
-            # Si es ranking general, ignorar last_uid
+            # ¿ranking general?
             if _is_global_hits_query(msg) or not (ctx.get("last_uid") or ctx.get("last_imdb_id")):
-                # Ranking TOP
                 asked_topn = None
                 mmm = re.search(r"\btop\s*(\d{1,3})\b", msg, re.I)
                 if mmm:
@@ -491,13 +496,22 @@ def query(payload: QueryIn, response: Response):
                                              year_used=used_year, series_only=(content_type == "series"), top_n=asked_topn)
                 return QueryOut(session_id=sid, step="answer", text=txt)
 
-            # HITS del título seleccionado (suma anual)
+            # HITS del título seleccionado: suma anual (por defecto el año actual)
             uid = ctx.get("last_uid"); imdb = ctx.get("last_imdb_id")
-            hits_sum = m_hits.get_title_hits_sum(uid=uid, imdb_id=imdb, country_iso2=iso2, date_from=df_s, date_to=dt_s)
+            # resolver tipo (movie/series) para la referencia
             meta = m_meta.get_metadata_by_uid(uid) if uid else (m_meta.get_metadata_by_imdb(imdb) if imdb else {})
             meta = meta or {}
-            txt = m_hits.render_title_hits_with_context(meta=meta, hits_sum=hits_sum, lang=lang,
-                                                        country_pretty=(pretty or iso2), year_used=used_year)
+            ctype = (meta.get("type") or "").lower()
+            ctype = ctype if ctype in ("movie", "series") else None
+
+            hits_sum = m_hits.get_title_hits_sum(uid=uid, imdb_id=imdb, country_iso2=iso2, date_from=df_s, date_to=dt_s)
+
+            # referencia: top 1 mismo periodo/país/tipo
+            bench_rows = m_hits.get_top_hits_by_period(country_iso2=iso2, date_from=df_s, date_to=dt_s, limit=1, content_type=ctype)
+            bench = bench_rows[0] if bench_rows else None
+
+            txt = m_hits.render_title_hits_with_context(meta=dict(meta), hits_sum=hits_sum, lang=lang,
+                                                        country_pretty=(pretty or iso2), year_used=used_year, baseline=bench)
             return QueryOut(session_id=sid, step="answer", text=txt, selected_uid=uid or imdb)
 
         except Exception:
@@ -515,6 +529,14 @@ def query(payload: QueryIn, response: Response):
                         "last_title": pick.get("title"), "last_year": pick.get("year"),
                         "last_candidates": []})
             _sess_set(sid, ctx)
+            # UX: responder ya con sinopsis
+            meta = m_meta.get_metadata_by_uid(pick["uid"]) if pick.get("uid") else (m_meta.get_metadata_by_imdb(pick.get("imdb_id")) if pick.get("imdb_id") else None)
+            if meta:
+                meta = dict(meta)
+                if pick.get("uid"): meta["uid"] = pick["uid"]
+                if pick.get("imdb_id"): meta["imdb_id"] = pick.get("imdb_id")
+                txt = _format_selected_metadata(meta, lang)
+                return QueryOut(session_id=sid, step="answer", text=txt, selected_uid=pick["uid"] or pick.get("imdb_id"))
             txt = _i18n(
                 f"Único resultado fiable: {pick.get('title')} ({pick.get('year')}). Pide sinopsis o disponibilidad (puedes decir el país).",
                 f"Single reliable match: {pick.get('title')} ({pick.get('year')}). Ask for synopsis or availability (you may include the country).",
@@ -529,11 +551,10 @@ def query(payload: QueryIn, response: Response):
                         candidates=[Candidate(**r) for r in rows],
                         next=NextAction(type="select_candidate", method="POST", endpoint="/query"))
 
-    # 5) Fallback LLM (mediador) — opcional
-    if os.getenv("ENABLE_FREEFORM_LLM", "0") == "1":
+    # 5) LLM mediador siempre disponible (por defecto ON)
+    if os.getenv("ENABLE_FREEFORM_LLM", "1") == "1":
         try:
-            from infra.bedrock import call_bedrock_llm1  # lazy
-            # Pedimos respuesta breve, en el idioma detectado, y con identidad de marca.
+            from infra.bedrock import call_bedrock_llm1
             to_lang = "Spanish" if lang.startswith("es") else "English"
             brand_intro = (
                 "Soy el asistente virtual de Fabric, potenciado por IA. "
@@ -542,12 +563,12 @@ def query(payload: QueryIn, response: Response):
                 "I’m Fabric Data’s virtual assistant, powered by AI. "
                 "If your question is about metadata, availability or HITS, I can also query our deterministic datasets."
             )
+            # Ancla el “presente” en septiembre 2025
             prompt = (
-                f"Answer the user's question in {to_lang}. Keep it concise and correct. "
-                "If the question requests facts beyond the provided datasets, answer from general knowledge. "
-                "Do NOT mention provider names or model names. "
-                "Start with a one-line brand-friendly intro, then the answer.\n\n"
-                f"Intro line (use this language): {brand_intro}\n\n"
+                f"You are answering in {to_lang}. Treat the current date as September 2025.\n"
+                "Be concise and correct. Do NOT mention provider/model names.\n"
+                "Start with a one-line brand intro, then answer. Translate to the user's language.\n\n"
+                f"Brand intro (use this language): {brand_intro}\n\n"
                 f"User message:\n{msg}"
             )
             r = call_bedrock_llm1(prompt) or {}
@@ -555,10 +576,7 @@ def query(payload: QueryIn, response: Response):
             text = text or ( "No tengo información para eso." if lang.startswith("es") else "I don't have information on that." )
             return QueryOut(session_id=sid, step="answer", text=text)
         except Exception:
-            # si falla el LLM, devolvemos mensaje neutro
-            return QueryOut(session_id=sid, step="error",
-                            text=_i18n("No pude responder eso por ahora.", "I couldn’t answer that right now.", lang))
+            pass
 
-    # Si llegamos aquí, no hubo matches
     return QueryOut(session_id=sid, step="error",
                     text=_i18n("No encontré coincidencias.", "No matches found.", lang))

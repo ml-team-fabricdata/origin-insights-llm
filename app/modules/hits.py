@@ -5,7 +5,7 @@ import datetime as dt
 from typing import Optional, Tuple, List, Dict, Any
 
 # ===================== Conexión a DB =====================
-# Intentamos reutilizar get_conn() si existe en infra.db; si no, usamos un fallback local.
+# Reutiliza infra.db.get_conn si existe; si no, usa fallback local.
 try:
     from infra.db import get_conn as _shared_get_conn  # type: ignore
 except Exception:
@@ -20,7 +20,7 @@ def get_conn():
     if _shared_get_conn:
         return _shared_get_conn()
     import psycopg2  # fallback local
-    conn = psycopg2.connect(
+    return psycopg2.connect(
         host=os.getenv("PGHOST", os.getenv("DB_HOST", "localhost")),
         port=int(os.getenv("PGPORT", os.getenv("DB_PORT", "5432"))),
         user=os.getenv("PGUSER", os.getenv("DB_USER", "postgres")),
@@ -28,7 +28,6 @@ def get_conn():
         dbname=os.getenv("PGDATABASE", os.getenv("DB_NAME", "postgres")),
         connect_timeout=int(os.getenv("DB_CONNECT_TIMEOUT", "10")),
     )
-    return conn
 
 # ===================== Utilidades de fechas =====================
 
@@ -121,7 +120,6 @@ def get_title_hits_sum(
         params = [the_uid, country_iso2.upper(), df, dtf]
     else:
         if global_table:
-            # usa tabla global si existe (columnas: uid, date_hits, hits)
             sql = f"""
                 SELECT COALESCE(SUM(hits),0)
                 FROM {global_table}
@@ -130,7 +128,6 @@ def get_title_hits_sum(
             """
             params = [the_uid, df, dtf]
         else:
-            # fallback: agrega sobre todos los países
             sql = """
                 SELECT COALESCE(SUM(hits),0)
                 FROM ms.hits_presence_2
@@ -169,7 +166,6 @@ def get_top_hits_by_period(
 
     base += " GROUP BY hp.uid"
 
-    # envolvemos para unir metadatos
     sql = f"""
         WITH agg AS (
             {base}
@@ -186,7 +182,6 @@ def get_top_hits_by_period(
           ON m.uid = a.uid
     """
 
-    # filtro por tipo si se requiere
     if content_type in ("movie", "series"):
         sql += " WHERE LOWER(COALESCE(m.type,'')) = %s"
         params.append(content_type.lower())
@@ -209,7 +204,67 @@ def get_top_hits_by_period(
             })
     return out
 
-# ===================== Render helpers =====================
+# ---------- Compatibilidad con rutas antiguas ----------
+
+def get_hits_by_uid(
+    uid: str,
+    country_iso2: Optional[str] = None,
+    date_from: Optional[dt.date] = None,
+    date_to: Optional[dt.date] = None,
+) -> List[Dict[str, Any]]:
+    """
+    Devuelve serie temporal diaria de HITS para un UID.
+    Pensado para compatibilidad con router_determinista y otros llamados legacy.
+    """
+    if not uid:
+        return []
+    # Defaults: últimos 8 días (incluyendo hoy) si no viene rango
+    end = date_to or dt.date.today()
+    start = date_from or (end - dt.timedelta(days=7))
+
+    sql = """
+        SELECT date_hits::date AS d, COALESCE(SUM(hits),0) AS s
+        FROM ms.hits_presence_2
+        WHERE uid = %s
+          AND date_hits BETWEEN %s AND %s
+    """
+    params: List[Any] = [uid, start, end]
+
+    if country_iso2:
+        sql += " AND country = %s"
+        params.append(country_iso2.upper())
+
+    sql += " GROUP BY d ORDER BY d DESC"
+
+    out: List[Dict[str, Any]] = []
+    with get_conn() as conn, conn.cursor() as cur:
+        cur.execute(sql, params)
+        for d, s in cur.fetchall():
+            out.append({"date_hits": d, "hits": float(s or 0.0)})
+    return out
+
+def render_hits(rows: List[Dict[str, Any]], scope: str, lang: str) -> str:
+    """
+    Render simple para la serie temporal de HITS:
+    - scope: "country" o "global" (texto informativo)
+    - suma total y ventana (n días)
+    """
+    n = len(rows)
+    total = int(round(sum((r.get("hits") or 0.0) for r in rows)))
+    if lang.startswith("es"):
+        if n == 0:
+            return "No hay HITS registrados."
+        if scope == "country":
+            return f"Puntuación (HITS) por país: {total} (últimos {n} días)"
+        return f"Puntuación (HITS) global: {total} (últimos {n} días)"
+    else:
+        if n == 0:
+            return "No HITS data."
+        if scope == "country":
+            return f"HITS (country): {total} (last {n} days)"
+        return f"HITS (global): {total} (last {n} days)"
+
+# ===================== Render helpers adicionales =====================
 
 def render_top_hits(
     items: List[Dict[str, Any]],

@@ -51,7 +51,7 @@ class QueryOut(BaseModel):
     next: Optional[NextAction] = None
     selected_uid: Optional[str] = None
 
-# ===================== Sesiones =====================
+# ===================== Sesioness =====================
 SESS_TTL = int(os.getenv("SESS_TTL", "3600"))
 _R = None
 try:

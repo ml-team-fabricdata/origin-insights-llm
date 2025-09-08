@@ -15,7 +15,6 @@ from app.modules import countries as m_countries
 from app.modules import metadata as m_meta
 from app.modules import availability as m_avail
 from app.modules import hits as m_hits
-from infra.bedrock import call_bedrock_llm1  # LLM rápido para clasificar/ traducir
 
 log = logging.getLogger("router_query")
 router = APIRouter()
@@ -38,7 +37,7 @@ class NextAction(BaseModel):
 class QueryIn(BaseModel):
     session_id: Optional[str] = None
     message: str
-    language: Optional[str] = None     # el front puede mandarlo; lo tratamos como hint
+    language: Optional[str] = None     # hint del front
     select_uid: Optional[str] = None
     select_imdb_id: Optional[str] = None
     context_uid: Optional[str] = None
@@ -106,8 +105,8 @@ try:
 except Exception:
     _ld_detect = None
 
-RE_ES_HINT = re.compile(r"[¿¡áéíóúñ]|\\b(cu[aá]l|qu[eé]|d[oó]nde|pel[ií]cula|serie|ver|plataforma)\\b", re.I)
-RE_EN_HINT = re.compile(r"\\b(what|where|movie|series|watch|platform)\\b", re.I)
+RE_ES_HINT = re.compile(r"[¿¡áéíóúñ]|\b(cu[aá]l|qu[eé]|d[oó]nde|pel[ií]cula|serie|ver|plataforma)\b", re.I)
+RE_EN_HINT = re.compile(r"\b(what|where|movie|series|watch|platform)\b", re.I)
 
 def _explicit_lang(msg: str) -> Optional[str]:
     s = (msg or "").lower()
@@ -134,6 +133,8 @@ def _detect_lang_llm(text: str, fallback: str) -> str:
     try:
         if os.getenv("ENABLE_LLM_LANG", "0") != "1":
             return fallback
+        # Lazy import aquí para no romper en import-time
+        from infra.bedrock import call_bedrock_llm1
         prompt = (
             "Clasifica el idioma del siguiente texto SOLO como \"es\" o \"en\". "
             "Responde con una sola palabra (es|en), sin explicaciones.\n\n"
@@ -160,6 +161,8 @@ def _translate_with_llm(text: str, target_lang: str) -> str:
     try:
         if not text or os.getenv("ENABLE_TRANSLATION", "1") != "1":
             return text
+        # Lazy import aquí para no romper en import-time
+        from infra.bedrock import call_bedrock_llm1
         to = "Spanish" if target_lang.startswith("es") else "English"
         prompt = (
             f"Traduce al {to} el siguiente texto. Mantén nombres propios y URLs. "
@@ -191,7 +194,7 @@ def translate_if_needed(text: str, target_lang: str) -> str:
         return _translate_with_llm(text, "en")
     return text
 
-# ===================== Heurísticas de intentos / búsqueda =====================
+# ===================== Heurísticas de intents / búsqueda =====================
 RE_SYNOPSIS = re.compile(r"\b(de\s*qu[eé]\s*trata|sinopsis|plot|summary|synopsis)\b", re.I)
 RE_AVAIL = re.compile(r"\b(d[oó]nde.*(?:ver|verla|verlo)|where.*watch|availability|available|plataforma|precio[s]?)\b", re.I)
 RE_HITS = re.compile(r"\b(hits|popularidad|popularity|top\s*\d+|m[aá]s\s+popular(?:es)?|most\s+popular)\b", re.I)
@@ -325,12 +328,18 @@ def query(payload: QueryIn, response: Response):
             uid, imdb = pick["uid"], pick.get("imdb_id")
             ctx.update({"last_uid": uid, "last_imdb_id": imdb}); _sess_set(sid, ctx)
 
-        raw = oi.GetMetadataByUIDTool()._run(uid=uid, imdb_id=imdb)  # type: ignore
-        rows = json.loads(raw) if isinstance(raw, str) else (raw or [])
-        if not rows:
+        # Obtener metadatos por UID o IMDb
+        meta = m_meta.get_metadata_by_uid(uid) if uid else None
+        if (not meta) and imdb:
+            meta = m_meta.get_metadata_by_imdb(imdb)
+        if not meta:
             return QueryOut(session_id=sid, step="error",
                             text=_i18n("No se encontraron metadatos.", "No metadata found.", lang))
-        meta = rows[0]; meta["uid"] = uid or meta.get("uid"); meta["imdb_id"] = imdb or meta.get("imdb_id")
+        # Asegurar uid/imdb en meta
+        meta = dict(meta)
+        if uid:  meta["uid"] = uid
+        if imdb: meta["imdb_id"] = imdb
+
         txt = _format_selected_metadata(meta, lang)
         return QueryOut(session_id=sid, step="answer", text=txt, selected_uid=uid or imdb)
 
@@ -354,19 +363,20 @@ def query(payload: QueryIn, response: Response):
             uid, imdb = pick["uid"], pick.get("imdb_id")
             ctx.update({"last_uid": uid, "last_imdb_id": imdb}); _sess_set(sid, ctx)
 
-        # país (primero determinista/DB; si no, LLM — ya lo maneja oi.guess_country)
+        # Resolver país y availability
         try:
-            iso2, pretty = oi.guess_country(msg)
+            iso2, pretty = m_countries.guess_country(msg)
         except Exception:
             iso2, pretty = None, None
 
+        # Si solo vino IMDb, resolver UID
+        if not uid and imdb:
+            uid = m_meta.resolve_uid_by_imdb(imdb)
+
         include_prices = bool(re.search(r"\b(precio|prices?)\b", msg, re.I))
-        rows = oi.GetAvailabilityByUIDTool()._run(
-            uid=uid, imdb_id=imdb, iso_alpha2=iso2, platform_country=pretty, with_prices=include_prices
-        )  # type: ignore
-        data = json.loads(rows) if isinstance(rows, str) else (rows or [])
-        txt = oi.render_availability(
-            data, lang=lang, country_pretty=(pretty or (iso2 if (iso2 and len(str(iso2)) == 2) else "")),
+        rows = m_avail.fetch_availability_by_uid(uid, iso2=iso2, with_prices=include_prices) if uid else []
+        txt = m_avail.render_availability(
+            rows, lang=lang, country_pretty=(pretty or (iso2 if (iso2 and len(str(iso2)) == 2) else "")),
             include_details=False, include_prices=include_prices
         )
         if iso2:
@@ -376,26 +386,22 @@ def query(payload: QueryIn, response: Response):
     # 3) HITS
     if ask_hits:
         try:
-            df, dt = oi.extract_date_range(msg)
+            df, dt = m_hits.extract_date_range(msg)
             try:
-                iso2, pretty = oi.guess_country(msg)
+                iso2, pretty = m_countries.guess_country(msg)
             except Exception:
                 iso2, pretty = None, None
-            df_s, dt_s, used_year = oi.ensure_hits_range(df, dt, iso2)
+            df_s, dt_s, used_year = m_hits.ensure_hits_range(df, dt, iso2)
 
             uid = ctx.get("last_uid"); imdb = ctx.get("last_imdb_id")
-            if uid or imdb:
-                raw_meta = oi.GetMetadataByUIDTool()._run(uid=uid, imdb_id=imdb)  # type: ignore
-                meta_rows = json.loads(raw_meta) if isinstance(raw_meta, str) else (raw_meta or [])
-                meta = meta_rows[0] if meta_rows else {"uid": uid, "imdb_id": imdb}
-                total = oi.get_title_hits_sum(uid=uid, imdb_id=imdb, country_iso2=iso2, date_from=df_s, date_to=dt_s) or 0
-                bench_rows = oi.get_top_hits_by_period(
-                    country_iso2=iso2, date_from=df_s, date_to=dt_s, limit=1,
-                    content_type=((meta.get("type") or "").lower() if (meta.get("type") or "").lower() in ("movie","series") else None)
-                ) or []
-                bench = bench_rows[0] if bench_rows else None
-                txt = oi.render_title_hits_with_context(meta=meta, hits_sum=total, baseline=bench, lang=lang,
-                                                        country_pretty=(pretty or iso2), year_used=used_year)
+            if not uid and imdb:
+                uid = m_meta.resolve_uid_by_imdb(imdb)
+
+            if uid:
+                # HITS del título seleccionado (simple)
+                rows = m_hits.get_hits_by_uid(uid=uid, country_iso2=iso2, date_from=df, date_to=dt) or []
+                scope = "country" if iso2 else "global"
+                txt = m_hits.render_hits(rows, scope=scope, lang=lang)
                 return QueryOut(session_id=sid, step="answer", text=txt, selected_uid=uid or imdb)
 
             # Ranking (TOP)
@@ -408,10 +414,10 @@ def query(payload: QueryIn, response: Response):
             movie_only  = bool(re.search(r"\b(pel[ií]cula|pelicula|movie|film)\b", msg, re.I))
             content_type = "series" if (series_only and not movie_only) else ("movie" if (movie_only and not series_only) else None)
 
-            items = oi.get_top_hits_by_period(country_iso2=iso2, date_from=df_s, date_to=dt_s,
-                                              limit=(asked_topn or 20), content_type=content_type) or []
-            txt = oi.render_top_hits(items, country=(pretty or iso2), lang=lang, year_used=used_year,
-                                     series_only=(content_type == "series"), top_n=asked_topn)
+            items = m_hits.get_top_hits_by_period(country_iso2=iso2, date_from=df_s, date_to=dt_s,
+                                                  limit=(asked_topn or 20), content_type=content_type) or []
+            txt = m_hits.render_top_hits(items, country=(pretty or iso2), lang=lang, year_used=used_year,
+                                         series_only=(content_type == "series"), top_n=asked_topn)
             return QueryOut(session_id=sid, step="answer", text=txt)
         except Exception:
             log.exception("HITS error")

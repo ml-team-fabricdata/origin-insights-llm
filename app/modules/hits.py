@@ -3,9 +3,84 @@ import re
 import datetime as dt
 from typing import Optional, Tuple, List, Dict, Any
 
-from infra.db import get_conn
+# ===================== DB connector shim =====================
+# Se adapta a distintos helpers posibles en infra/db.py.
+# Si no existiera ninguno, usa DATABASE_URL (psycopg 3).
+def _build_db_conn():
+    # intenta varias firmas comunes
+    try:
+        from infra.db import get_conn as _gc  # pragma: no cover
+        return _gc
+    except Exception:
+        pass
+    try:
+        from infra.db import get_connection as _gc  # pragma: no cover
+        return _gc
+    except Exception:
+        pass
+    try:
+        from infra.db import get_pg as _gp  # pragma: no cover
+        return _gp
+    except Exception:
+        pass
+    try:
+        from infra.db import connect as _cx  # pragma: no cover
+        return _cx
+    except Exception:
+        pass
+    try:
+        from infra.db import pool as _pool  # pragma: no cover
+        def _from_pool():
+            # asume psycopg3 pool (pool.connection()) o simple callable
+            try:
+                return _pool.connection()
+            except Exception:
+                return _pool()
+        return _from_pool
+    except Exception:
+        pass
+
+    # Fallback: conectar con psycopg usando env vars
+    def _dsn():
+        dsn = (
+            os.getenv("DATABASE_URL")
+            or os.getenv("PG_DSN")
+            or (
+                "dbname={dbname} user={user} password={password} host={host} port={port}".format(
+                    dbname=os.getenv("PGDATABASE", "postgres"),
+                    user=os.getenv("PGUSER", "postgres"),
+                    password=os.getenv("PGPASSWORD", ""),
+                    host=os.getenv("PGHOST", "localhost"),
+                    port=os.getenv("PGPORT", "5432"),
+                )
+            )
+        )
+        return dsn
+
+    def _fallback_connect():
+        try:
+            import psycopg  # psycopg3
+            return psycopg.connect(_dsn())
+        except Exception:
+            # último intento psycopg2
+            import psycopg2  # type: ignore
+            return psycopg2.connect(_dsn())
+
+    return _fallback_connect
+
+_get_conn = _build_db_conn()
+
+def get_conn():
+    """
+    Devuelve un objeto conexión que soporta el protocolo context manager:
+    with get_conn() as conn, conn.cursor() as cur: ...
+    """
+    return _get_conn()
+
+# ===================== Metadatos =====================
 from app.modules import metadata as m_meta
 
+# ===================== Utilidades de fechas =====================
 _YEAR_RE = re.compile(r"\b(20\d{2}|19\d{2})\b")
 
 def extract_date_range(text: str) -> Tuple[Optional[dt.date], Optional[dt.date]]:
@@ -18,12 +93,13 @@ def extract_date_range(text: str) -> Tuple[Optional[dt.date], Optional[dt.date]]
     return dt.date(y, 1, 1), dt.date(y, 12, 31)
 
 def ensure_hits_range(df: Optional[dt.date], dt_to: Optional[dt.date], country_iso2: Optional[str]) -> Tuple[dt.date, dt.date, int]:
-    # por defecto: año actual (2025 durante 2025)
+    # por defecto: año actual (p.ej., 2025)
     today = dt.date.today()
     if df and dt_to:
         return df, dt_to, df.year
     return dt.date(today.year, 1, 1), dt.date(today.year, 12, 31), today.year
 
+# ===================== Helpers =====================
 def _resolve_uid(uid: Optional[str], imdb_id: Optional[str]) -> Optional[str]:
     if uid:
         return uid
@@ -31,6 +107,7 @@ def _resolve_uid(uid: Optional[str], imdb_id: Optional[str]) -> Optional[str]:
         return m_meta.resolve_uid_by_imdb(imdb_id)
     return None
 
+# ===================== API pública (compat) =====================
 def get_hits_by_uid(
     uid: str,
     country_iso2: Optional[str] = None,
@@ -57,7 +134,7 @@ def get_hits_by_uid(
         sql += " AND country = %s"
         params.append((country_iso2 or "").upper())
 
-    # ⚠️ En Postgres no se puede usar alias en GROUP BY → usa posición
+    # En Postgres usa posición en GROUP BY (no alias)
     sql += " GROUP BY 1 ORDER BY 1 DESC"
 
     out: List[Dict[str, Any]] = []
@@ -184,6 +261,7 @@ def get_top_hits_by_period(
             })
     return out
 
+# ===================== Render helpers =====================
 def render_top_hits(
     items: List[Dict[str, Any]],
     country: Optional[str],

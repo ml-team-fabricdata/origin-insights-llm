@@ -4,7 +4,31 @@ import re
 import datetime as dt
 from typing import Optional, Tuple, List, Dict, Any
 
-from infra.db import get_conn  # mismo helper que usas en otros módulos
+# ===================== Conexión a DB =====================
+# Intentamos reutilizar get_conn() si existe en infra.db; si no, usamos un fallback local.
+try:
+    from infra.db import get_conn as _shared_get_conn  # type: ignore
+except Exception:
+    _shared_get_conn = None
+
+def get_conn():
+    """
+    Devuelve una conexión psycopg2.
+    - Si existe infra.db.get_conn(), la usa.
+    - Si no, crea una conexión con variables de entorno estándar de Postgres.
+    """
+    if _shared_get_conn:
+        return _shared_get_conn()
+    import psycopg2  # fallback local
+    conn = psycopg2.connect(
+        host=os.getenv("PGHOST", os.getenv("DB_HOST", "localhost")),
+        port=int(os.getenv("PGPORT", os.getenv("DB_PORT", "5432"))),
+        user=os.getenv("PGUSER", os.getenv("DB_USER", "postgres")),
+        password=os.getenv("PGPASSWORD", os.getenv("DB_PASSWORD", "")),
+        dbname=os.getenv("PGDATABASE", os.getenv("DB_NAME", "postgres")),
+        connect_timeout=int(os.getenv("DB_CONNECT_TIMEOUT", "10")),
+    )
+    return conn
 
 # ===================== Utilidades de fechas =====================
 

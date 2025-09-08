@@ -1,58 +1,65 @@
-from app.modules import hits, similar
-from modules import (
-    metadata_query,
-    comparison_query,
-    complex_query_agent,
-    response_formatter,
-)
+# app/supervisor.py
+from typing import Dict
+from app.modules import titles, hits, countries, metadata
 
-# --- Clasificadores heurísticos ---
-def is_metadata_query(query: str) -> bool:
-    return "título" in query.lower() or "title" in query.lower()
+def _lang_from_text(s: str) -> str:
+    s = (s or "").lower()
+    # heurística muy simple; /query ya hace detección real
+    if any(w in s for w in [" dónde ", " donde ", "película", "pelicula", "serie", "sinopsis", "popularidad", "hits"]):
+        return "es"
+    return "en"
 
-def is_popularity_query(query: str) -> bool:
-    return "popularidad" in query.lower() or "hits" in query.lower()
+def is_popularity_query(q: str) -> bool:
+    s = (q or "").lower()
+    return any(k in s for k in ["hits", "popularidad", "top ", " ranking", "más popular", "most popular"])
 
-def is_comparison_query(query: str) -> bool:
-    return "vs" in query.lower() or "comparar" in query.lower()
+def is_metadata_query(q: str) -> bool:
+    s = (q or "").lower()
+    return any(k in s for k in ["sinopsis", "de qué trata", "de que trata", "plot", "synopsis"])
 
-def is_kb_query(query: str) -> bool:
-    return "sabías que" in query.lower() or "curiosidad" in query.lower()
+def handle_query(query: str) -> Dict:
+    """
+    Ruta liviana para /ask y /llm/ask.
+    Nota: la lógica completa vive en /query (router_query). Esto sólo da respuestas básicas
+    y evita fallar en import-time.
+    """
+    lang = _lang_from_text(query)
 
-def is_complex_query(query: str) -> bool:
-    return any(kw in query.lower() for kw in ["cuántos", "ranking", "mayor", "menor", "más visto", "menos"])
+    # 1) HITS simple (TOP títulos por país/año si aparecen en el texto)
+    if is_popularity_query(query):
+        df, dt = hits.extract_date_range(query)
+        iso2, pretty = countries.guess_country(query)
+        df_s, dt_s, used_year = hits.ensure_hits_range(df, dt, iso2)
+        items = hits.get_top_hits_by_period(country_iso2=iso2, date_from=df_s, date_to=dt_s, limit=10)
+        text = hits.render_top_hits(items, country=(pretty or iso2), lang=lang, year_used=used_year)
+        return {"ok": True, "type": "hits", "data": text}
 
-# --- Supervisor ---
-def handle_query(query: str) -> dict:
+    # 2) Metadata muy básica (autopick + sinopsis si está)
     if is_metadata_query(query):
-        result = metadata_query.run(query)
-        node = "metadata"
+        term = titles.extract_title_query(query, strip_country=True, guess_country_fn=countries.guess_country) or query
+        cands = titles.search_title_candidates(term, top_k=10, min_similarity=None)
+        pick = titles.safe_autopick(cands) or (cands[0] if cands else None)
+        if not pick:
+            msg = "No encontré coincidencias." if lang == "es" else "No matches found."
+            return {"ok": True, "type": "metadata", "data": msg}
+        m = metadata.get_metadata_by_uid(pick.get("uid"))
+        if not m:
+            msg = "No se encontraron metadatos." if lang == "es" else "No metadata found."
+            return {"ok": True, "type": "metadata", "data": msg}
+        # Resumen cortito
+        t = m.get("title") or "-"
+        y = m.get("year")
+        syn = (m.get("synopsis") or "").strip()
+        if lang == "es":
+            out = f"{t}{f' ({y})' if y else ''}. Sinopsis: {syn or 'Sin sinopsis disponible.'}"
+        else:
+            out = f"{t}{f' ({y})' if y else ''}. Synopsis: {syn or 'No synopsis available.'}"
+        return {"ok": True, "type": "metadata", "data": out}
 
-    elif is_popularity_query(query):
-        result = hits.run(query)
-        node = "popularity"
-
-    elif is_comparison_query(query):
-        result = comparison_query.run(query)
-        node = "comparison"
-
-    elif is_kb_query(query):
-        result = similar.run(query)
-        node = "kb"
-
-    elif is_complex_query(query):
-        # Sonnet (lazy import aquí)
-        from infra.bedrock import call_bedrock_llm2
-        llm_response = call_bedrock_llm2(query)
-        result = {"output": llm_response.get("completion", "[sin respuesta]")}
-        node = "llm_sonnet"
-
+    # 3) Fallback: sugerir usar /query (que es el flujo completo)
+    if lang == "es":
+        return {"ok": True, "type": "fallback",
+                "data": "Usa el endpoint /query para disponibilidad, HITS y desambiguación (el chat web ya lo usa)."}
     else:
-        # Haiku (lazy import aquí)
-        from infra.bedrock import call_bedrock_llm1
-        llm_response = call_bedrock_llm1(query)
-        result = {"output": llm_response.get("completion", "[sin respuesta]")}
-        node = "llm_haiku"
-
-    result["metadata"] = {"node_used": node}
-    return response_formatter.format(result)
+        return {"ok": True, "type": "fallback",
+                "data": "Use the /query endpoint for availability, HITS and disambiguation (the web chat already uses it)."}

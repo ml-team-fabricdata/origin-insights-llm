@@ -580,3 +580,130 @@ def query(payload: QueryIn, response: Response):
 
     return QueryOut(session_id=sid, step="error",
                     text=_i18n("No encontré coincidencias.", "No matches found.", lang))
+
+# ===================== EntryPoint interno para Supervisor =====================
+# Devuelve payloads ESTRUCTURADOS para que el supervisor los formatee y traduzca.
+
+class GenericResp(BaseModel):
+    kind: Literal["synopsis", "availability", "ambiguous", "error", "generic"]
+    payload: Dict[str, Any] = Field(default_factory=dict)
+
+def query_entrypoint(qin: QueryIn) -> GenericResp:
+    """
+    EntryPoint interno SIN FastAPI (para supervisor):
+      - Detecta intents de sinopsis / disponibilidad
+      - Resuelve desambiguación básica (incluye autopick)
+      - Devuelve payloads estructurados
+    No imprime, no levanta excepciones (retorna "error" con mensaje amable).
+    """
+    try:
+        msg = (qin.message or "").strip()
+        if not msg:
+            return GenericResp(kind="error", payload={"message": "Escribe una consulta por favor."})
+
+        lang = detect_user_lang(msg, hint=(qin.language or None))
+
+        # Intents (reutilizamos regex del módulo)
+        ask_synopsis = bool(RE_SYNOPSIS.search(msg))
+        ask_avail    = bool(RE_AVAIL.search(msg))
+
+        # Si no pide sinopsis ni disponibilidad, devolver "generic" (el supervisor decide)
+        if not (ask_synopsis or ask_avail):
+            return GenericResp(kind="generic", payload={"message": "Sin intent determinista para este entrypoint."})
+
+        # 0) Si UI/FE ya pasó un UID/IMDb en contexto, lo usamos directo
+        uid = qin.select_uid or qin.context_uid
+        imdb = qin.select_imdb_id
+
+        # 1) Resolver si no tenemos uid/imdb: búsqueda candidatos
+        if not (uid or imdb):
+            cands = _search_candidates_from_text(msg)
+            if not cands:
+                return GenericResp(
+                    kind="error",
+                    payload={"message": _i18n("No encontré coincidencias. Añade año/director o usa comillas.",
+                                              "No matches found. Try adding year/director or quotes.", lang)}
+                )
+            rows = [c.model_dump() for c in cands]
+            pick = _safe_autopick(rows)
+            if not pick:
+                # Ambiguo: devolvemos opciones para que el supervisor las liste
+                options = []
+                for r in rows[:10]:
+                    options.append({
+                        "uid": r.get("uid"),
+                        "imdb_id": r.get("imdb_id"),
+                        "title": r.get("title"),
+                        "year": r.get("year"),
+                        "type": r.get("type"),
+                        "directors": r.get("directors"),
+                        "sim": r.get("sim"),
+                    })
+                return GenericResp(kind="ambiguous", payload={"options": options})
+            uid, imdb = pick.get("uid"), pick.get("imdb_id")
+
+        # 2) Resolver sinopsis
+        if ask_synopsis:
+            meta = m_meta.get_metadata_by_uid(uid) if uid else (m_meta.get_metadata_by_imdb(imdb) if imdb else None)
+            if not meta:
+                return GenericResp(kind="error", payload={"message": _i18n("No se encontraron metadatos.", "No metadata found.", lang)})
+            meta = dict(meta)
+            if uid:  meta["uid"] = uid
+            if imdb: meta["imdb_id"] = imdb
+            # Payload estructurado para sinopsis
+            return GenericResp(kind="synopsis", payload={
+                "uid": meta.get("uid"),
+                "imdb_id": meta.get("imdb_id"),
+                "title": meta.get("title"),
+                "year": meta.get("year"),
+                "type": meta.get("type"),
+                "directors": meta.get("directors"),
+                "synopsis": meta.get("synopsis"),
+            })
+
+        # 3) Resolver disponibilidad
+        if ask_avail:
+            try:
+                iso2, pretty = m_countries.guess_country(msg)
+            except Exception:
+                iso2, pretty = None, None
+
+            if not uid and imdb:
+                uid = m_meta.resolve_uid_by_imdb(imdb)
+
+            include_prices = bool(re.search(r"\b(precio|prices?)\b", msg, re.I))
+            rows = m_avail.fetch_availability_by_uid(uid, iso2=iso2, with_prices=include_prices) if uid else []
+
+            # Estructuramos items de disponibilidad
+            items = []
+            for r in (rows or []):
+                items.append({
+                    "platform_name": r.get("platform_name"),
+                    "platform_country": r.get("platform_country"),
+                    "permalink": r.get("permalink"),
+                    "enter_on": r.get("enter_on"),
+                    "out_on": r.get("out_on"),
+                    "plan_name": r.get("plan_name"),
+                    "price": r.get("price") if include_prices else None,
+                })
+
+            meta = m_meta.get_metadata_by_uid(uid) if uid else {}
+            title = (meta or {}).get("title")
+            year  = (meta or {}).get("year")
+
+            return GenericResp(kind="availability", payload={
+                "uid": uid,
+                "imdb_id": imdb,
+                "title": title,
+                "year": year,
+                "country_pretty": (pretty or (iso2 if (iso2 and len(str(iso2)) == 2) else None)),
+                "items": items,
+                "include_prices": include_prices,
+            })
+
+        # 4) Fallback improbable
+        return GenericResp(kind="generic", payload={"message": "Sin intent determinista para este entrypoint."})
+
+    except Exception as e:
+        # Nunca rompemos el deploy
+        return GenericResp(kind="error", payload={"message": f"Error interno en query_entrypoint: {e}"})

@@ -4,6 +4,7 @@ import json
 import re
 from dataclasses import dataclass
 from typing import Optional, Dict, Any
+from urllib.parse import urlparse  # soporte DATABASE_URL
 
 # --- utilidades env -----------------------------------------------------------
 _AWS_SECRETS_ARN_RE = re.compile(
@@ -60,6 +61,7 @@ def _load_secret_payload_from_env_json(env_value: str) -> Dict[str, Any]:
 @dataclass(frozen=True)
 class Settings:
     # Feature flags
+    enable_freeform_llm: bool
     enable_llm_country: bool
     enable_llm_lang: bool
     enable_translation: bool
@@ -80,9 +82,10 @@ class Settings:
     aurora_pass: str
     aurora_port: int
 
-    # Derivados
+    # Derivados / otros
     db_ready: bool
-    db_source: str  # "env" | "secretsmanager:arn" | "env:json" | "none"
+    db_source: str  # "env" | "secretsmanager:arn" | "env:json" | "env:pg" | "env:database_url" | "none"
+    hits_global_table: str   # ms.hits_global
 
 def _collect_db_from_plain_env() -> Dict[str, Any]:
     return {
@@ -92,6 +95,35 @@ def _collect_db_from_plain_env() -> Dict[str, Any]:
         "password": _env("AURORA_PASSWORD", _env("AURORA_PASS", "")) or "",
         "port": int(_env("AURORA_PORT", "5432") or "5432"),
     }
+
+def _collect_db_from_pg_env() -> Dict[str, Any]:
+    """Lee PGHOST/PGUSER/PGPASSWORD/PGDATABASE/PGPORT si existen."""
+    host = _env("PGHOST", "")
+    user = _env("PGUSER", "")
+    pwd  = _env("PGPASSWORD", "")
+    db   = _env("PGDATABASE", "")
+    port = int(_env("PGPORT", "5432") or "5432")
+    return {"host": host, "database": db, "username": user, "password": pwd, "port": port}
+
+def _parse_database_url(url: str) -> Dict[str, Any]:
+    """
+    Acepta: postgresql://user:pass@host:5432/db?options=-c%20search_path%3Dms
+    Devuelve dict homólogo a AURORA_*.
+    """
+    try:
+        if not url:
+            return {}
+        u = urlparse(url)
+        if u.scheme not in ("postgresql", "postgres"):
+            return {}
+        username = u.username or ""
+        password = u.password or ""
+        host     = u.hostname or ""
+        port     = int(u.port or 5432)
+        database = (u.path or "").lstrip("/") or ""
+        return {"host": host, "database": database, "username": username, "password": password, "port": port}
+    except Exception:
+        return {}
 
 def _find_any_secret_arn() -> Optional[str]:
     # 1) preferido
@@ -139,8 +171,18 @@ def _coalesce_db_creds(plain: Dict[str, Any], secret: Dict[str, Any]) -> Dict[st
     return out
 
 def _load_settings() -> Settings:
-    # 1) base: env plano
-    db_env = _collect_db_from_plain_env()
+    # 1) base: env plano (AURORA_*) + fallbacks PG* + DATABASE_URL
+    base_env = _collect_db_from_plain_env()
+    pg_env   = _collect_db_from_pg_env()
+    url_env  = _parse_database_url(_env("DATABASE_URL", "") or "")
+
+    # coalesce local: AURORA_* tiene prioridad; luego PG*; luego DATABASE_URL
+    db_env = dict(base_env)
+    for k in ("host", "database", "username", "password", "port"):
+        if not db_env.get(k):
+            db_env[k] = pg_env.get(k, db_env.get(k))
+        if not db_env.get(k):
+            db_env[k] = url_env.get(k, db_env.get(k))
     db_source = "env"
     secret_dict: Dict[str, Any] = {}
 
@@ -163,6 +205,7 @@ def _load_settings() -> Settings:
     merged = _coalesce_db_creds(db_env, secret_dict)
 
     # 5) flags
+    enable_freeform_llm = _env_bool("ENABLE_FREEFORM_LLM", True)
     enable_llm_country = _env_bool("ENABLE_LLM_COUNTRY", False)
     enable_llm_lang = _env_bool("ENABLE_LLM_LANG", False)
     enable_translation = _env_bool("ENABLE_TRANSLATION", False)
@@ -178,10 +221,16 @@ def _load_settings() -> Settings:
             merged.get("port"),
         ]
     )
+    # etiquetar fuente real cuando no hay secret y se usó PG* o DATABASE_URL
+    if db_ready and db_source == "env":
+        if any(pg_env.values()) and not any(base_env.values()):
+            db_source = "env:pg"
+        if any(url_env.values()) and not any(base_env.values()) and not any(pg_env.values()):
+            db_source = "env:database_url"
 
-    # Si no hay DB y no estamos en offline, mantenemos db_ready=False;
-    # infra/db.py decidirá qué hacer (p.ej. no levantar pool y loggear warning).
+    # 7) construir Settings
     return Settings(
+        enable_freeform_llm=enable_freeform_llm,
         enable_llm_country=enable_llm_country,
         enable_llm_lang=enable_llm_lang,
         enable_translation=enable_translation,
@@ -199,6 +248,7 @@ def _load_settings() -> Settings:
         aurora_port=int(merged.get("port") or 5432),
         db_ready=bool(db_ready),
         db_source=db_source if db_ready else "none",
+        hits_global_table=str(_env("HITS_GLOBAL_TABLE", "ms.hits_global") or "ms.hits_global"),
     )
 
 SETTINGS = _load_settings()

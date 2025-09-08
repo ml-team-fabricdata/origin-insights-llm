@@ -53,8 +53,8 @@ def _ensure_pool() -> None:
         options=f"-c application_name=origin-insights-llm"
     )
     log.info(
-        "PG pool initialized (min=%s max=%s host=%s db=%s)",
-        minconn, maxconn, SETTINGS.aurora_host, SETTINGS.aurora_db
+        "PG pool initialized (min=%s max=%s host=%s db=%s, source=%s)",
+        minconn, maxconn, SETTINGS.aurora_host, SETTINGS.aurora_db, SETTINGS.db_source
     )
 
 

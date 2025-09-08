@@ -1,13 +1,9 @@
 {
   "ExpandedNodes": [
     "",
-    "\\.github",
-    "\\.github\\workflows",
     "\\app",
-    "\\infra",
-    "\\modules",
-    "\\origin_insights_llm.egg-info"
+    "\\app\\modules"
   ],
-  "SelectedNode": "\\test_llm.py",
+  "SelectedNode": "\\app\\router_query.py",
   "PreviewInSolutionExplorer": false
 }

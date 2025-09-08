@@ -4,8 +4,7 @@ import re
 import datetime as dt
 from typing import Optional, Tuple, List, Dict, Any
 
-from infra.db import get_conn  # asumiendo que ya lo tienes (igual que db_health)
-from app.modules import metadata as m_meta
+from infra.db import get_conn  # mismo helper que usas en otros módulos
 
 # ===================== Utilidades de fechas =====================
 
@@ -35,14 +34,32 @@ def ensure_hits_range(df: Optional[dt.date], dt_to: Optional[dt.date], country_i
         return df, dt_to, df.year
     return dt.date(today.year, 1, 1), dt.date(today.year, 12, 31), today.year
 
-# ===================== Consultas =====================
+# ===================== Helpers internos =====================
+
+def _resolve_uid_by_imdb(imdb_id: Optional[str]) -> Optional[str]:
+    """
+    Resuelve UID a partir de IMDb ID usando ms.new_cp_metadata_estandar.
+    Evita importar app.modules.metadata para no crear ciclos.
+    """
+    if not imdb_id:
+        return None
+    sql = """
+        SELECT uid
+        FROM ms.new_cp_metadata_estandar
+        WHERE LOWER(COALESCE(imdb_id,'')) = LOWER(%s)
+        LIMIT 1
+    """
+    with get_conn() as conn, conn.cursor() as cur:
+        cur.execute(sql, [imdb_id])
+        row = cur.fetchone()
+        return row[0] if row and row[0] else None
 
 def _resolve_uid(uid: Optional[str], imdb_id: Optional[str]) -> Optional[str]:
     if uid:
         return uid
-    if imdb_id:
-        return m_meta.resolve_uid_by_imdb(imdb_id)
-    return None
+    return _resolve_uid_by_imdb(imdb_id)
+
+# ===================== Consultas =====================
 
 def get_title_hits_sum(
     uid: Optional[str] = None,

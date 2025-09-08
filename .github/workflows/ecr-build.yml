@@ -12,12 +12,16 @@ env:
   AWS_REGION: ${{ secrets.AWS_REGION }}
   AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
   ROLE_ARN: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+  # Debe ser SOLO el nombre del repo ECR (sin registry)
   ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
   ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
 
     steps:
       - name: Checkout
@@ -49,7 +53,7 @@ jobs:
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "svc=$SVC" >> "$GITHUB_OUTPUT"
 
-      # --- build SIN CACHE + build-args ---
+      # Build SIN cache para asegurar reconstrucción limpia (puedes quitar --no-cache si querés acelerar)
       - name: Build image (no cache) with metadata
         run: |
           docker build --no-cache \
@@ -58,7 +62,6 @@ jobs:
             --build-arg BUILD_TIME="${{ steps.now.outputs.now }}" \
             -t "${{ env.ECR_REPOSITORY }}:${{ steps.map.outputs.tag }}" .
 
-      # --- sanity: la imagen TIENE las env BUILD_* ---
       - name: Inspect image env (debug)
         run: |
           docker inspect "${{ env.ECR_REPOSITORY }}:${{ steps.map.outputs.tag }}" \
@@ -69,6 +72,7 @@ jobs:
           IMAGE_URI="${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ steps.map.outputs.tag }}"
           docker tag "${{ env.ECR_REPOSITORY }}:${{ steps.map.outputs.tag }}" "$IMAGE_URI"
           docker push "$IMAGE_URI"
+          echo "image_uri=$IMAGE_URI" >> "$GITHUB_OUTPUT"
 
       - name: Show pushed digest (debug)
         run: |
@@ -77,31 +81,18 @@ jobs:
             --image-ids imageTag=${{ steps.map.outputs.tag }} \
             --query "imageDetails[0].[imageDigest,imagePushedAt]" --output table
 
-      # --- Fuerza deployment SOLO si el servicio está RUNNING ---
       - name: Maybe start App Runner deployment
         id: maybe_deploy
-        shell: bash
         run: |
-          set -euo pipefail
-          # Descubrir el nombre del servicio según la rama
-          case "${GITHUB_REF_NAME}" in
-            main) SVC="origin-insights-llm-main" ;;
-            rafa) SVC="origin-insights-llm-rafa" ;;
-            ele)  SVC="origin-insights-llm-ele"  ;;
-            fran) SVC="origin-insights-llm-fran" ;;
-            *) echo "Branch no mapeada: ${GITHUB_REF_NAME}"; exit 1 ;;
-          esac
-
+          SVC="${{ steps.map.outputs.svc }}"
           ARN=$(aws apprunner list-services --region "${{ env.AWS_REGION }}" \
                   --query "ServiceSummaryList[?ServiceName=='${SVC}']|[0].ServiceArn" --output text)
           echo "arn=$ARN" >> "$GITHUB_OUTPUT"
 
-          # Estado actual del servicio
           ST=$(aws apprunner describe-service --region "${{ env.AWS_REGION }}" --service-arn "$ARN" \
                  --query "Service.Status" --output text)
           echo "Service status: $ST"
 
-          # Si está RUNNING, intentamos start-deployment (idempotente a nivel de intención)
           if [ "$ST" = "RUNNING" ]; then
             echo "Triggering start-deployment..."
             aws apprunner start-deployment --region "${{ env.AWS_REGION }}" --service-arn "$ARN" >/dev/null
@@ -111,64 +102,49 @@ jobs:
             echo "triggered=no" >> "$GITHUB_OUTPUT"
           fi
 
-      # --- URL del servicio (usa vars del repo: APPRUNNER_URL_*) ---
       - name: Pick service URL
         id: svc
         run: |
           case "${GITHUB_REF_NAME}" in
             main) url="${{ vars.APPRUNNER_URL_MAIN }}" ;;
             rafa) url="${{ vars.APPRUNNER_URL_RAFA }}" ;;
-            ele)  url="${{ vars.APPRUNNER_URL_ELE }}" ;;
+            ele)  url="${{ vars.APPRUNNER_URL_ELE }}"  ;;
             fran) url="${{ vars.APPRUNNER_URL_FRAN }}" ;;
             *) echo "No URL for branch ${GITHUB_REF_NAME}"; exit 1 ;;
           esac
           echo "url=$url" >> "$GITHUB_OUTPUT"
 
-      - name: Install jq (if missing)
+      - name: Install jq
         run: |
           sudo apt-get update -y
           sudo apt-get install -y jq
 
-      # --- Espera a que la última operación termine y luego valida /version ---
       - name: Wait for App Runner operation then check /version
-        shell: bash
         run: |
-          set -euo pipefail
           ARN="${{ steps.maybe_deploy.outputs.arn }}"
+          URL="${{ steps.svc.outputs.url }}"
+          TARGET_SHA="${GITHUB_SHA}"
+          SHORT="${TARGET_SHA:0:7}"
 
-          # 1) Esperar a que no haya operación IN_PROGRESS
           echo "Waiting for App Runner operation to finish..."
           for i in {1..60}; do
             OP=$(aws apprunner list-operations --region "${{ env.AWS_REGION }}" --service-arn "$ARN" --max-results 1 \
-                  --query "OperationSummaryList[0].Status" --output text 2>/dev/null || echo "UNKNOWN")
+                  --query "OperationSummaryList[0].Status" --output text 2>/dev/null || echo "NONE")
             echo "  Last operation status: $OP"
-            if [ "$OP" != "IN_PROGRESS" ] && [ "$OP" != "UNKNOWN" ]; then
+            if [ "$OP" != "IN_PROGRESS" ]; then
               break
             fi
             sleep 10
           done
 
-          # 2) Validar endpoint /version hasta ver el SHA nuevo
-          case "${GITHUB_REF_NAME}" in
-            main) url="${{ vars.APPRUNNER_URL_MAIN }}" ;;
-            rafa) url="${{ vars.APPRUNNER_URL_RAFA }}" ;;
-            ele)  url="${{ vars.APPRUNNER_URL_ELE }}"  ;;
-            fran) url="${{ vars.APPRUNNER_URL_FRAN }}" ;;
-          esac
-
-          target_sha="${GITHUB_SHA}"
-          short="${target_sha:0:7}"
-          echo "Waiting for ${url} to serve build ${short} ..."
-
-          # Espera flexible (hasta 10 min)
+          echo "Waiting for ${URL} to serve build ${SHORT} ..."
           for i in {1..60}; do
-            code=$(curl -sS -o /dev/null -w "%{http_code}" "$url/healthz" || true)
+            code=$(curl -sS -o /dev/null -w "%{http_code}" "$URL/healthz" || true)
             if [ "$code" = "200" ]; then
-              body=$(curl -sS "$url/version" | tr -d '\r' || echo '{}')
+              body=$(curl -sS "$URL/version" | tr -d '\r' || echo '{}')
               echo "version: $body"
-              # Acepta 'sha' o 'build' (según tu app)
               sha=$(echo "$body" | jq -r '.sha // .build // empty' 2>/dev/null || true)
-              if [ "$sha" = "$target_sha" ] || [ "$sha" = "$short" ]; then
+              if [ "$sha" = "$TARGET_SHA" ] || [ "$sha" = "$SHORT" ]; then
                 echo "✅ Healthy & correct image deployed"
                 exit 0
               fi
@@ -176,6 +152,5 @@ jobs:
             sleep 10
           done
 
-          echo "❌ Timeout esperando deploy de ${short} en ${url}"
+          echo "❌ Timeout esperando deploy de ${SHORT} en ${URL}"
           exit 1
-

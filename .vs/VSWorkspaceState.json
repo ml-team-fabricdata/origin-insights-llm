@@ -3,8 +3,11 @@
     "",
     "\\.github",
     "\\.github\\workflows",
-    "\\app"
+    "\\app",
+    "\\infra",
+    "\\modules",
+    "\\origin_insights_llm.egg-info"
   ],
-  "SelectedNode": "\\app\\main.py",
+  "SelectedNode": "\\test_llm.py",
   "PreviewInSolutionExplorer": false
 }

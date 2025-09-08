@@ -1,8 +1,7 @@
+from app.modules import hits, similar
 from modules import (
     metadata_query,
-    popularity_query,
     comparison_query,
-    kb_query,
     complex_query_agent,
     response_formatter,
 )
@@ -30,7 +29,7 @@ def handle_query(query: str) -> dict:
         node = "metadata"
 
     elif is_popularity_query(query):
-        result = popularity_query.run(query)
+        result = hits.run(query)
         node = "popularity"
 
     elif is_comparison_query(query):
@@ -38,7 +37,7 @@ def handle_query(query: str) -> dict:
         node = "comparison"
 
     elif is_kb_query(query):
-        result = kb_query.run(query)
+        result = similar.run(query)
         node = "kb"
 
     elif is_complex_query(query):

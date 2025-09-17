@@ -3,6 +3,7 @@ import json
 import base64
 import time
 import psycopg2
+import psycopg2.extras
 import boto3
 from botocore.exceptions import ClientError
 

@@ -1,8 +1,7 @@
-
-from ..constants_sql import *
+from src.sql.constants_sql import *
 
 # =============================================================================
-# SQL QUERIES - TITLES
+# OPTIMIZED SQL QUERIES - TITLES
 # =============================================================================
 
 EXACT_SEARCH_SQL = f"""
@@ -19,19 +18,26 @@ WHERE LOWER(COALESCE(m.clean_title, m.title)) = LOWER(%s)
 ORDER BY m.uid, m.year NULLS LAST
 """
 
+# OPTIMIZED: Reducir cálculos duplicados y mejorar parámetros
 FUZZY_SEARCH_SQL = f"""
-WITH candidates AS (
+WITH normalized_query AS (
+  SELECT LOWER(%s::text) AS query_lower
+),
+candidates AS (
   SELECT
     a.uid,
     a.title AS aka_title,
     a.year,
     GREATEST(
-      {PG_TRGM_SCHEMA}.similarity(LOWER(COALESCE(a.clean_title, a.title))::text, %s::text),
-      {PG_TRGM_SCHEMA}.similarity(LOWER(a.title)::text, %s::text)
+      {PG_TRGM_SCHEMA}.similarity(LOWER(COALESCE(a.clean_title, a.title)), nq.query_lower),
+      {PG_TRGM_SCHEMA}.similarity(LOWER(a.title), nq.query_lower)
     ) AS title_similarity
   FROM {AKAS_TABLE} a
-  WHERE {PG_TRGM_SCHEMA}.similarity(LOWER(COALESCE(a.clean_title, a.title))::text, %s::text) >= %s
-     OR {PG_TRGM_SCHEMA}.similarity(LOWER(a.title)::text, %s::text) >= %s
+  CROSS JOIN normalized_query nq
+  WHERE (
+    {PG_TRGM_SCHEMA}.similarity(LOWER(COALESCE(a.clean_title, a.title)), nq.query_lower) >= %s
+    OR {PG_TRGM_SCHEMA}.similarity(LOWER(a.title), nq.query_lower) >= %s
+  )
 ),
 ranked AS (
   SELECT c.*, md.type, md.imdb_id
@@ -41,7 +47,7 @@ ranked AS (
 )
 SELECT *
 FROM ranked
-ORDER BY title_similarity DESC, year DESC
+ORDER BY title_similarity DESC, year DESC NULLS LAST
 LIMIT %s
 """
 
@@ -53,80 +59,152 @@ WHERE m.uid = %s
 
 
 # =============================================================================
-# SQL QUERIES - ACTORS
+# OPTIMIZED SQL QUERIES - ACTORS
 # =============================================================================
 
+# FIXED: Permitir múltiples resultados exactos
 ACTOR_EXACT_SQL = f"""
-    SELECT id, name, clean_name
-    FROM {CAST_TABLE}
-    WHERE LOWER(name) = LOWER(%s) OR LOWER(clean_name) = LOWER(%s)
-    LIMIT 1
+SELECT id, name, clean_name
+FROM {CAST_TABLE}
+WHERE LOWER(name) = LOWER(%s) OR LOWER(clean_name) = LOWER(%s)
+ORDER BY name ASC
+LIMIT 10
 """
 
+# OPTIMIZED: Mejorar cálculo de similarity
 ACTOR_FUZZY_SQL_TRGM = f"""
-    SELECT id, name, clean_name,
-           {PG_TRGM_SCHEMA}.similarity(LOWER(name), LOWER(%s)) AS sim
-    FROM {CAST_TABLE}
-    WHERE LOWER(name) % LOWER(%s) OR LOWER(clean_name) % LOWER(%s)
-    ORDER BY sim DESC
-    LIMIT {MAX_CANDIDATES}
+WITH query_normalized AS (
+  SELECT LOWER(%s) AS query_lower
+)
+SELECT 
+  c.id, 
+  c.name, 
+  c.clean_name,
+  GREATEST(
+    {PG_TRGM_SCHEMA}.similarity(LOWER(c.name), qn.query_lower),
+    {PG_TRGM_SCHEMA}.similarity(LOWER(COALESCE(c.clean_name, c.name)), qn.query_lower)
+  ) AS sim
+FROM {CAST_TABLE} c
+CROSS JOIN query_normalized qn
+WHERE (
+  LOWER(c.name) % qn.query_lower 
+  OR LOWER(COALESCE(c.clean_name, c.name)) % qn.query_lower
+)
+ORDER BY sim DESC, c.name ASC
+LIMIT {MAX_CANDIDATES}
 """
 
 ACTOR_FUZZY_SQL_ILIKE = f"""
-    SELECT id, name, clean_name,
-           0.0 AS sim
-    FROM {CAST_TABLE}
-    WHERE LOWER(name) LIKE CONCAT('%%', LOWER(%s), '%%')
-       OR LOWER(clean_name) LIKE CONCAT('%%', LOWER(%s), '%%')
-    ORDER BY name ASC
-    LIMIT {MAX_CANDIDATES}
+SELECT id, name, clean_name, 0.0 AS sim
+FROM {CAST_TABLE}
+WHERE LOWER(name) LIKE LOWER(CONCAT('%%', %s, '%%'))
+   OR LOWER(COALESCE(clean_name, name)) LIKE LOWER(CONCAT('%%', %s, '%%'))
+ORDER BY 
+  CASE WHEN LOWER(name) LIKE LOWER(CONCAT(%s, '%%')) THEN 1 ELSE 2 END,
+  name ASC
+LIMIT {MAX_CANDIDATES}
 """
 
 
 # =============================================================================
-# SQL QUERIES - DIRECTORS
+# OPTIMIZED SQL QUERIES - DIRECTORS
 # =============================================================================
 
+# OPTIMIZED: Búsqueda exacta sin JOIN innecesario para casos simples
 DIRECTOR_EXACT_SQL = f"""
-    SELECT d.id, d.name, d.clean_name, COALESCE(COUNT(db.uid), 0) AS n_titles
-    FROM {DIRECTOR_TABLE} d
-    LEFT JOIN {DIRECTED_TABLE} db ON db.director_id = d.id
-    WHERE LOWER(d.name) = LOWER(%s) OR LOWER(d.clean_name) = LOWER(%s)
-    GROUP BY d.id, d.name, d.clean_name
-    ORDER BY n_titles DESC NULLS LAST, d.id ASC
-    LIMIT 5
+SELECT 
+  d.id, 
+  d.name, 
+  d.clean_name,
+  (
+    SELECT COUNT(*)::integer 
+    FROM {DIRECTED_TABLE} db 
+    WHERE db.director_id = d.id
+  ) AS n_titles
+FROM {DIRECTOR_TABLE} d
+WHERE LOWER(d.name) = LOWER(%s) OR LOWER(d.clean_name) = LOWER(%s)
+ORDER BY n_titles DESC NULLS LAST, d.name ASC
+LIMIT 10
 """
 
+# OPTIMIZED: Mejorar similarity calculation y JOIN
 DIRECTOR_FUZZY_SQL_TRGM = f"""
-    SELECT
-        d.id,
-        d.name,
-        d.clean_name,
-        GREATEST(
-            {PG_TRGM_SCHEMA}.similarity(LOWER(d.name), LOWER(%s)),
-            {PG_TRGM_SCHEMA}.similarity(LOWER(d.clean_name), LOWER(%s))
-        ) AS sim,
-        COALESCE(COUNT(db.uid), 0) AS n_titles
-    FROM {DIRECTOR_TABLE} d
-    LEFT JOIN {DIRECTED_TABLE} db ON db.director_id = d.id
-    WHERE
-        LOWER(d.name) % LOWER(%s)
-        OR LOWER(d.clean_name) % LOWER(%s)
-    GROUP BY d.id, d.name, d.clean_name
-    ORDER BY sim DESC, n_titles DESC, d.name ASC
-    LIMIT 10;
+WITH query_normalized AS (
+  SELECT LOWER(%s) AS query_lower
+),
+director_similarities AS (
+  SELECT
+    d.id,
+    d.name,
+    d.clean_name,
+    GREATEST(
+      {PG_TRGM_SCHEMA}.similarity(LOWER(d.name), qn.query_lower),
+      {PG_TRGM_SCHEMA}.similarity(LOWER(COALESCE(d.clean_name, d.name)), qn.query_lower)
+    ) AS sim
+  FROM {DIRECTOR_TABLE} d
+  CROSS JOIN query_normalized qn
+  WHERE (
+    LOWER(d.name) % qn.query_lower
+    OR LOWER(COALESCE(d.clean_name, d.name)) % qn.query_lower
+  )
+)
+SELECT 
+  ds.*,
+  COALESCE(COUNT(db.uid), 0)::integer AS n_titles
+FROM director_similarities ds
+LEFT JOIN {DIRECTED_TABLE} db ON db.director_id = ds.id
+GROUP BY ds.id, ds.name, ds.clean_name, ds.sim
+ORDER BY ds.sim DESC, n_titles DESC, ds.name ASC
+LIMIT 15
 """
 
 DIRECTOR_FUZZY_SQL_ILIKE = f"""
-    SELECT d.id, d.name, d.clean_name,
-           0.0 AS sim,
-           COALESCE(COUNT(db.uid), 0) AS n_titles
-    FROM {DIRECTOR_TABLE} d
-    LEFT JOIN {DIRECTED_TABLE} db ON db.director_id = d.id
-    WHERE LOWER(d.name) LIKE CONCAT('%%', LOWER(%s), '%%')
-       OR LOWER(d.clean_name) LIKE CONCAT('%%', LOWER(%s), '%%')
-    GROUP BY d.id, d.name, d.clean_name
-    ORDER BY n_titles DESC, d.name ASC
-    LIMIT 10
+SELECT 
+  d.id, 
+  d.name, 
+  d.clean_name,
+  0.0 AS sim,
+  (
+    SELECT COUNT(*)::integer 
+    FROM {DIRECTED_TABLE} db 
+    WHERE db.director_id = d.id
+  ) AS n_titles
+FROM {DIRECTOR_TABLE} d
+WHERE LOWER(d.name) LIKE LOWER(CONCAT('%%', %s, '%%'))
+   OR LOWER(COALESCE(d.clean_name, d.name)) LIKE LOWER(CONCAT('%%', %s, '%%'))
+ORDER BY 
+  CASE WHEN LOWER(d.name) LIKE LOWER(CONCAT(%s, '%%')) THEN 1 ELSE 2 END,
+  n_titles DESC, 
+  d.name ASC
+LIMIT 15
 """
 
+
+# =============================================================================
+# PERFORMANCE OPTIMIZED ALTERNATIVES
+# =============================================================================
+
+# Para casos donde el performance es crítico
+ACTOR_EXACT_FAST_SQL = f"""
+SELECT id, name, clean_name
+FROM {CAST_TABLE}
+WHERE name = %s OR clean_name = %s
+UNION ALL
+SELECT id, name, clean_name  
+FROM {CAST_TABLE}
+WHERE LOWER(name) = LOWER(%s) OR LOWER(clean_name) = LOWER(%s)
+ORDER BY name ASC
+LIMIT 10
+"""
+
+DIRECTOR_EXACT_FAST_SQL = f"""
+SELECT id, name, clean_name, 0 as n_titles
+FROM {DIRECTOR_TABLE}
+WHERE name = %s OR clean_name = %s
+UNION ALL
+SELECT id, name, clean_name, 0 as n_titles
+FROM {DIRECTOR_TABLE}
+WHERE LOWER(name) = LOWER(%s) OR LOWER(clean_name) = LOWER(%s)
+ORDER BY name ASC
+LIMIT 10
+"""

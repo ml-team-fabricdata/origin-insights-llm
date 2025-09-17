@@ -10,11 +10,10 @@ from __future__ import annotations
 # Standard library imports
 from datetime import datetime, timedelta
 from rapidfuzz import process, fuzz
-import re, unicodedata as ud
+from constants_sql import *
 from typing import Any, Callable, Optional, Dict, List, Tuple
+import re, unicodedata as ud
 import logging, json
-
-
 logger = logging.getLogger(__name__)
 
 # -----------------------------------------------------------------------------
@@ -57,108 +56,6 @@ def get_date_range(days_back: int) -> Tuple[str, str]:
     date_from = today - timedelta(days=days_back)
     
     return (date_from.isoformat(), today.isoformat())
-
-"""
-Cast and Director search module - corregido y ordenado con constantes centralizadas.
-"""
-from __future__ import annotations
-from typing import Any, List, Dict, Tuple, Optional, Union
-from functools import lru_cache
-import json
-import logging
-
-from sql_db import db
-from .constants_sql import *
-from .db_utils_sql import *
-
-logger = logging.getLogger(__name__)
-
-# =============================================================================
-# UTILITY FUNCTIONS
-# =============================================================================
-
-def _normalize_name_input(name: Union[str, List[str], Any]) -> str:
-    """
-    Normaliza la entrada de nombre, manejando diferentes tipos de input.
-    
-    Args:
-        name: Nombre que puede ser string, lista, o cualquier tipo
-        
-    Returns:
-        String normalizado o cadena vacía si no se puede procesar
-    """
-    if not name:
-        return ""
-    
-    # Si es una lista, tomar el primer elemento
-    if isinstance(name, list):
-        if len(name) > 0:
-            name = name[0]
-        else:
-            return ""
-    
-    # Convertir a string y limpiar
-    try:
-        return str(name).strip()
-    except Exception:
-        return ""
-
-
-def _is_single_token(text: str) -> bool:
-    """
-    Verifica si el texto es una sola palabra/token.
-    
-    Args:
-        text: Texto a verificar
-        
-    Returns:
-        True si es una sola palabra, False en caso contrario
-    """
-    if not text or not isinstance(text, str):
-        return False
-    return len(text.strip().split()) == 1
-
-
-def _format_validation_options(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """
-    Formatea las opciones de validación para respuesta uniforme.
-    
-    Args:
-        rows: Filas de resultados de la base de datos
-        
-    Returns:
-        Lista de opciones formateadas
-    """
-    options: List[Dict[str, Any]] = []
-    for row in rows:
-        if not row:
-            continue
-        option = {
-            "id": row.get("id"),
-            "name": row.get("name") or row.get("clean_name") or str(row.get("id", "")),
-            "score": float(row.get("sim", 0.0) or row.get("n_titles", 0.0) or 0.0),
-            "n_titles": int(row.get("n_titles", 0) or 0),
-        }
-        options.append(option)
-    return options
-
-
-def _normalize_validation_threshold(threshold: Optional[float] = None) -> float:
-    """
-    Normaliza el umbral de validación.
-    
-    Args:
-        threshold: Umbral opcional
-        
-    Returns:
-        Umbral validado
-    """
-    if threshold is None:
-        return FUZZY_THRESHOLD
-    try:
-        return max(0.1, min(1.0, float(threshold)))
-    except (ValueError, TypeError):
-        return FUZZY_THRESHOLD
 
 
 # -----------------------------------------------------------------------------
@@ -203,7 +100,7 @@ def get_validation(field_name: str) -> List[Dict]:
         return [{"error": f"Error reading validation file: {str(e)}"}]
 
 
-def _normalize(s: Optional[str]) -> str:
+def normalize(s: Optional[str]) -> str:
     s = ud.normalize("NFKC", (s or "").casefold()).strip()
     s = (s or "").lower().strip()
     s = re.sub(r"[^\w\s-]", " ", s)     # quita puntuación
@@ -242,7 +139,7 @@ def as_tool_payload(rows: Any, *, ident: str = "") -> str:
     return json.dumps(payload, ensure_ascii=False)
 
 def _tokens(s: Optional[str]) -> List[str]:
-    norm = _normalize(s)
+    norm = normalize(s)
     if _CJK_RE.search(norm):
         return list(norm.replace(" ", ""))  # tokeniza por carácter para CJK
     return norm.split()
@@ -266,7 +163,7 @@ def resolve_value_rapidfuzz(
     Multilingüe: Unicode, diacríticos ignorados; CJK soportado con scorer/tokenización adaptativa.
     """
     user_text = user_text.lower()
-    q_norm = _normalize(user_text)
+    q_norm = normalize(user_text)
     q_tok  = _tokens(user_text)
 
     def get_val(r: Dict) -> Optional[str]:
@@ -281,7 +178,7 @@ def resolve_value_rapidfuzz(
     if not candidates:
         return "not_found", None
 
-    norm_map = { _normalize(c): c for c in candidates }
+    norm_map = { normalize(c): c for c in candidates }
     if q_norm and q_norm in norm_map:
         return "resolved", norm_map[q_norm]
 
@@ -314,3 +211,28 @@ def validate_limit(limit: Optional[int], default: int = 20, max_limit: int = 100
         return default
     return min(limit, max_limit)
 
+def clean_text(text: str) -> str:
+    if not text:
+        return ""
+    normalized = unicodedata.normalize("NFKD", text).lower()
+    return "".join(c for c in normalized if not unicodedata.combining(c))
+
+
+def normalize_input(input_data: Union[str, List[str], Any]) -> str:
+    if not input_data:
+        return ""
+    if isinstance(input_data, list):
+        return input_data[0] if input_data else ""
+    return str(input_data).strip() if input_data else ""
+
+
+def is_single_token(text: str) -> bool:
+    if not text or not isinstance(text, str):
+        return False
+    return len(text.strip().split()) == 1
+
+
+def normalize_threshold(threshold: Optional[float] = None) -> float:
+    if threshold is None:
+        return FUZZY_THRESHOLD
+    return max(0.1, min(1.0, float(threshold) if isinstance(threshold, (int, float)) else FUZZY_THRESHOLD))

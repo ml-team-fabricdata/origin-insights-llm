@@ -1,109 +1,87 @@
-from typing import Union
+import json
+import logging
+from typing import Union, List, Any, Dict
+
 from src.sql_db import db
-from queries import *
-from db_utils_sql import *
-from constants_sql import *
+from src.sql.talent.queries import *
+from src.sql.db_utils_sql import *
+from src.sql.constants_sql import *
+from src.sql.core.validation import validate_actor
+
+logger = logging.getLogger(__name__)
 
 
-def get_actor_filmography(actor_id: int, limit: int = DEFAULT_LIMIT) -> str:
-    """
-    Obtiene la filmografía de un actor.
-
-    Args:
-        actor_id: ID del actor
-        limit: Límite de resultados
-
-    Returns:
-        JSON string con la filmografía
-    """
-    validated_limit = validate_limit(limit)
-
-    try:
-        results = db.execute_query(
-            FILMOGRAPHY_SQL_ACTOR, (actor_id, validated_limit))
-        handled_results = handle_query_result(
-            results, "actor_filmography", str(actor_id))
-        return json.dumps(handled_results, indent=2)
-    except Exception as e:
-        logger.error(f"Error getting actor filmography for ID {actor_id}: {e}")
-        return json.dumps({"error": f"Failed to get filmography: {str(e)}"}, indent=2)
+async def get_actor_filmography(actor_id: str, limit: int = DEFAULT_LIMIT) -> Dict[str, Any]:
+    """Get an actor's filmography."""
+    
+    results = await db.execute_query(
+        FILMOGRAPHY_SQL_ACTOR, 
+        (actor_id, limit),
+        f"actor_filmography_{actor_id}"
+    )
+    return handle_query_result(results, "actor_filmography", actor_id)
 
 
-def get_actor_coactors(actor_id: int, limit: int = MAX_LIMIT) -> str:
-    """
-    Obtiene los co-actores de un actor.
-
-    Args:
-        actor_id: ID del actor
-        limit: Límite de resultados
-
-    Returns:
-        JSON string con los co-actores
-    """
-    validated_limit = validate_limit(limit, max_limit=MAX_LIMIT)
-
-    try:
-        results = db.execute_query(
-            COACTORS_SQL, (actor_id, actor_id, validated_limit))
-        handled_results = handle_query_result(
-            results, "actor_coactors", str(actor_id))
-        return json.dumps(handled_results, indent=2)
-    except Exception as e:
-        logger.error(f"Error getting actor coactors for ID {actor_id}: {e}")
-        return json.dumps({"error": f"Failed to get coactors: {str(e)}"}, indent=2)
+async def get_actor_coactors(actor_id: str, limit: int = MAX_LIMIT) -> Dict[str, Any]:
+    """Get an actor's co-actors."""
+    
+    results = await db.execute_query(
+        COACTORS_SQL, 
+        (actor_id, actor_id, limit),
+        f"actor_coactors_{actor_id}"
+    )
+    return handle_query_result(results, "actor_coactors", actor_id)
 
 
-def answer_actor_filmography(actor_name: Union[str, List[str], Any], limit: int = DEFAULT_LIMIT) -> str:
-    """
-    Flujo de alto nivel: validar → filmografía.
+def _format_actor_options(options: List[Dict[str, Any]]) -> str:
+    """Format actor validation options for display."""
+    return "\n".join(
+        f"- {opt['name']} (id: {opt['id']}" +
+        (f", score: {opt['score']:.2f}" if opt.get("score") else "") + ")"
+        for opt in options
+    )
 
-    Args:
-        actor_name: Nombre del actor
-        limit: Límite de resultados
 
-    Returns:
-        String con la filmografía o mensaje de ambigüedad/error
-    """
-    validation = validate_actor(actor_name)
+def _get_query_text(actor_name: Union[str, List[str], Any]) -> str:
+    """Extract normalized query text from actor name input."""
+    return normalize_input(actor_name)
 
+
+async def get_actor_filmography_by_name(
+    actor_name: Union[str, List[str], Any], 
+    limit: int = DEFAULT_LIMIT
+) -> str:
+    """Get actor filmography by name with validation."""
+    validation = await validate_actor(actor_name)
+    
     if validation["status"] == "ok":
-        return get_actor_filmography(validation["id"], limit)
-    elif validation["status"] == "ambiguous":
-        options_text = "\n".join(
-            f"- {opt['name']} (id {opt['id']}" +
-            (f", score {opt['score']:.2f}" if opt.get("score") else "") + ")"
-            for opt in validation["options"]
-        )
-        query_text = normalize_name_input(actor_name)
-        return f"Encontré varios posibles para {query_text}. Elige uno:\n{options_text}"
-    else:
-        query_text = normalize_name_input(actor_name)
-        return f"No encontré coincidencias para {query_text}."
+        filmography = await get_actor_filmography(validation["id"], limit)
+        return json.dumps(filmography, indent=2, ensure_ascii=False)
+    
+    query_text = _get_query_text(actor_name)
+    
+    if validation["status"] == "ambiguous":
+        options_text = _format_actor_options(validation["options"])
+        return f"Encontré varios posibles para '{query_text}'. Elige uno:\n{options_text}"
+    
+    return f"No encontré coincidencias para '{query_text}'."
 
 
-def answer_actor_coactors(actor_name: Union[str, List[str], Any], limit: int = 25) -> str:
-    """
-    Flujo de alto nivel: validar → co-actores.
-
-    Args:
-        actor_name: Nombre del actor
-        limit: Límite de resultados
-
-    Returns:
-        String con los co-actores o mensaje de ambigüedad/error
-    """
-    validation = validate_actor(actor_name)
-
+async def get_actor_coactors_by_name(
+    actor_name: Union[str, List[str], Any], 
+    limit: int = DEFAULT_LIMIT
+) -> str:
+    """Get actor co-actors by name with validation."""
+    validation = await validate_actor(actor_name)
+    
     if validation["status"] == "ok":
-        return get_actor_coactors(validation["id"], limit)
-    elif validation["status"] == "ambiguous":
-        options_text = "\n".join(
-            f"- {opt['name']} (id {opt['id']}" +
-            (f", score {opt['score']:.2f}" if opt.get("score") else "") + ")"
-            for opt in validation["options"]
-        )
-        query_text = _normalize_name_input(actor_name)
-        return f"Encontré varios posibles para {query_text}. Elige uno:\n{options_text}"
-    else:
-        query_text = _normalize_name_input(actor_name)
-        return f"No encontré coincidencias para {query_text}."
+        coactors = await get_actor_coactors(validation["id"], limit)
+        return json.dumps(coactors, indent=2, ensure_ascii=False)
+    
+    query_text = _get_query_text(actor_name)
+    
+    if validation["status"] == "ambiguous":
+        options_text = _format_actor_options(validation["options"])
+        return f"Encontré varios posibles para '{query_text}'. Elige uno:\n{options_text}"
+    
+    return f"No encontré coincidencias para '{query_text}'."

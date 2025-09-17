@@ -1,17 +1,13 @@
 
-"""
-Database utilities for SQL operations (helpers only; DB connection lives in common.sql_db).
-Refactor:
-  - Replace noisy prints with logging.debug
-  - Keep public API identical
-"""
 from __future__ import annotations
 
 # Standard library imports
+import asyncio
 from datetime import datetime, timedelta
+import concurrent
 from rapidfuzz import process, fuzz
 from src.sql.constants_sql import *
-from typing import Any, Callable, Optional, Dict, List, Tuple
+from typing import Any, Callable, Optional, Dict, List, Tuple, Union
 import re, unicodedata as ud
 import logging, json
 logger = logging.getLogger(__name__)
@@ -226,6 +222,7 @@ def normalize_input(input_data: Union[str, List[str], Any]) -> str:
     return str(input_data).strip() if input_data else ""
 
 
+
 def is_single_token(text: str) -> bool:
     if not text or not isinstance(text, str):
         return False
@@ -236,3 +233,18 @@ def normalize_threshold(threshold: Optional[float] = None) -> float:
     if threshold is None:
         return FUZZY_THRESHOLD
     return max(0.1, min(1.0, float(threshold) if isinstance(threshold, (int, float)) else FUZZY_THRESHOLD))
+
+
+def run_async_in_sync(coro):
+    """Helper para ejecutar funciones async desde contexto sync"""
+    try:
+        # Intenta obtener el loop actual
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        # No hay loop, crear uno nuevo
+        return asyncio.run(coro)
+    else:
+        # Ya hay un loop corriendo, usar ThreadPoolExecutor
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future = executor.submit(asyncio.run, coro)
+            return future.result()

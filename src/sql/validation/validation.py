@@ -114,7 +114,7 @@ def validate_title(title: str, threshold: Optional[float] = None) -> Dict[str, A
         logger.debug(f"Trying title fuzzy search with threshold {current_threshold}")
         
         try:
-            params = (normalized_title, current_threshold, current_threshold, current_threshold, DEFAULT_FUZZY_LIMIT)
+            params = (normalized_title, current_threshold, current_threshold, DEFAULT_FUZZY_LIMIT)
             fuzzy_results = db.execute_query(FUZZY_SEARCH_SQL, params)
             
             if fuzzy_results:
@@ -205,7 +205,7 @@ def validate_actor(name: Union[str, List[str], Any], threshold: Optional[float] 
         
         try:
             # Use ILIKE fallback which should work
-            fuzzy_results = db.execute_query(ACTOR_FUZZY_SQL_ILIKE, (query_text, query_text, query_text))
+            fuzzy_results = db.execute_query(ACTOR_FUZZY_SQL_ILIKE, (query_text, query_text))
             
             if fuzzy_results:
                 # Filter by manual similarity check (since ILIKE doesn't provide similarity scores)
@@ -312,7 +312,7 @@ def validate_director(name: Union[str, List[str], Any], threshold: Optional[floa
         
         try:
             # Use ILIKE fallback which should work
-            fuzzy_results = db.execute_query(DIRECTOR_FUZZY_SQL_ILIKE, (query_text, query_text, query_text))
+            fuzzy_results = db.execute_query(DIRECTOR_FUZZY_SQL_ILIKE, (query_text, query_text))
             
             if fuzzy_results:
                 # Filter by manual similarity check

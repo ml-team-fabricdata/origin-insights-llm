@@ -10,7 +10,7 @@ from __future__ import annotations
 # Standard library imports
 from datetime import datetime, timedelta
 from rapidfuzz import process, fuzz
-from constants_sql import *
+from src.sql.constants_sql import *
 from typing import Any, Callable, Optional, Dict, List, Tuple
 import re, unicodedata as ud
 import logging, json
@@ -214,8 +214,8 @@ def validate_limit(limit: Optional[int], default: int = 20, max_limit: int = 100
 def clean_text(text: str) -> str:
     if not text:
         return ""
-    normalized = unicodedata.normalize("NFKD", text).lower()
-    return "".join(c for c in normalized if not unicodedata.combining(c))
+    normalized = ud.normalize("NFKD", text).lower()
+    return "".join(c for c in normalized if not ud.combining(c))
 
 
 def normalize_input(input_data: Union[str, List[str], Any]) -> str:

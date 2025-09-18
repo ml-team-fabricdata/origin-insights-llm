@@ -1,20 +1,14 @@
-import json
-import logging
-from typing import Union, List, Any, Dict
-
+from typing import Union
 from src.sql_db import db
 from src.sql.talent.queries import *
 from src.sql.db_utils_sql import *
 from src.sql.constants_sql import *
-from src.sql.core.validation import validate_actor
+from src.sql.core.validation import *
 
-logger = logging.getLogger(__name__)
-
-
-async def get_actor_filmography(actor_id: str, limit: int = DEFAULT_LIMIT) -> Dict[str, Any]:
-    """Get an actor's filmography."""
+def get_actor_filmography(actor_id: str, limit: int = DEFAULT_LIMIT) -> Dict[str, Any]:
+    """Get an actor's filmography - sync version."""
     
-    results = await db.execute_query(
+    results = db.execute_query(
         FILMOGRAPHY_SQL_ACTOR, 
         (actor_id, limit),
         f"actor_filmography_{actor_id}"
@@ -22,10 +16,10 @@ async def get_actor_filmography(actor_id: str, limit: int = DEFAULT_LIMIT) -> Di
     return handle_query_result(results, "actor_filmography", actor_id)
 
 
-async def get_actor_coactors(actor_id: str, limit: int = MAX_LIMIT) -> Dict[str, Any]:
-    """Get an actor's co-actors."""
+def get_actor_coactors(actor_id: str, limit: int = MAX_LIMIT) -> Dict[str, Any]:
+    """Get an actor's co-actors - sync version."""
     
-    results = await db.execute_query(
+    results = db.execute_query(
         COACTORS_SQL, 
         (actor_id, actor_id, limit),
         f"actor_coactors_{actor_id}"
@@ -47,15 +41,15 @@ def _get_query_text(actor_name: Union[str, List[str], Any]) -> str:
     return normalize_input(actor_name)
 
 
-async def get_actor_filmography_by_name(
+def get_actor_filmography_by_name(
     actor_name: Union[str, List[str], Any], 
     limit: int = DEFAULT_LIMIT
 ) -> str:
-    """Get actor filmography by name with validation."""
-    validation = await validate_actor(actor_name)
+    """Get actor filmography by name with validation - sync version."""
+    validation = validate_actor(actor_name)
     
     if validation["status"] == "ok":
-        filmography = await get_actor_filmography(validation["id"], limit)
+        filmography = get_actor_filmography(validation["id"], limit)
         return json.dumps(filmography, indent=2, ensure_ascii=False)
     
     query_text = _get_query_text(actor_name)
@@ -67,15 +61,15 @@ async def get_actor_filmography_by_name(
     return f"No encontré coincidencias para '{query_text}'."
 
 
-async def get_actor_coactors_by_name(
+def get_actor_coactors_by_name(
     actor_name: Union[str, List[str], Any], 
     limit: int = DEFAULT_LIMIT
 ) -> str:
-    """Get actor co-actors by name with validation."""
-    validation = await validate_actor(actor_name)
+    """Get actor co-actors by name with validation - sync version."""
+    validation = validate_actor(actor_name)
     
     if validation["status"] == "ok":
-        coactors = await get_actor_coactors(validation["id"], limit)
+        coactors = get_actor_coactors(validation["id"], limit)
         return json.dumps(coactors, indent=2, ensure_ascii=False)
     
     query_text = _get_query_text(actor_name)

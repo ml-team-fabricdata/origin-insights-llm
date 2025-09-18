@@ -1,12 +1,17 @@
 
+"""
+Database utilities for SQL operations (helpers only; DB connection lives in common.sql_db).
+Refactor:
+  - Replace noisy prints with logging.debug
+  - Keep public API identical
+"""
 from __future__ import annotations
 
 # Standard library imports
-import asyncio
 from datetime import datetime, timedelta
 from rapidfuzz import process, fuzz
-from src.sql.constants_sql import *
-from typing import Any, Callable, Optional, Dict, List, Tuple, Union
+from constants_sql import *
+from typing import Any, Callable, Optional, Dict, List, Tuple
 import re, unicodedata as ud
 import logging, json
 logger = logging.getLogger(__name__)
@@ -219,7 +224,6 @@ def normalize_input(input_data: Union[str, List[str], Any]) -> str:
     if isinstance(input_data, list):
         return input_data[0] if input_data else ""
     return str(input_data).strip() if input_data else ""
-
 
 
 def is_single_token(text: str) -> bool:

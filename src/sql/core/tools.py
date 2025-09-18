@@ -1,6 +1,8 @@
 from langchain_core.tools import Tool
 from src.sql.core.validation import *
+from src.sql.core.title import *
 from typing import Optional, Dict, Any
+
 
 def sync_validate_title(title: str, threshold: Optional[float] = None) -> Dict[str, Any]:
     return run_async_in_sync(validate_title(title, threshold))
@@ -12,6 +14,10 @@ def sync_validate_actor(name: str) -> Dict[str, Any]:
 
 def sync_validate_director(name: str) -> Dict[str, Any]:
     return run_async_in_sync(validate_director(name))
+
+
+def sync_search_title(uid: str) -> Dict[str, Any]:
+    return run_async_in_sync(get_filmography_by_uid(uid))
 
 
 VALIDATE_TITLE_TOOL = Tool.from_function(
@@ -46,8 +52,16 @@ VALIDATE_DIRECTOR_TOOL = Tool.from_function(
     ),
 )
 
+ANSWER_FILMOGRAPHY_BY_UID = Tool(
+    name="answer_filmography_by_uid",
+    func=sync_search_title,
+    description="ONLY use after having UID confirmed by user. Returns filmography/profile information.",
+)
+
+
 ALL_CORE = [
     VALIDATE_TITLE_TOOL,
     VALIDATE_ACTOR_TOOL,
-    VALIDATE_DIRECTOR_TOOL
+    VALIDATE_DIRECTOR_TOOL,
+    ANSWER_FILMOGRAPHY_BY_UID
 ]

@@ -90,6 +90,7 @@ WHERE d.name ILIKE q.s
 ORDER BY t.n_titles DESC NULLS LAST, d.name ASC
 LIMIT {MAX_CANDIDATES}
 """
+
 DIRECTOR_FUZZY_SQL_ILIKE = f"""
 WITH q AS (SELECT %s::text AS s)
 SELECT 
@@ -110,4 +111,10 @@ ORDER BY
   t.n_titles DESC NULLS LAST, 
   d.name ASC
 LIMIT {MAX_CANDIDATES}
+"""
+
+FILMOGRAPHY_SQL = f"""
+SELECT *
+FROM {METADATA_TABLE} m
+WHERE m.uid = %s
 """

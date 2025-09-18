@@ -5,12 +5,18 @@ from __future__ import annotations
 import asyncio
 from datetime import datetime, timedelta
 import concurrent
+from functools import wraps
 from rapidfuzz import process, fuzz
 from src.sql.constants_sql import *
-from typing import Any, Callable, Optional, Dict, List, Tuple, Union
+from typing import Any, Callable, Optional, Dict, List, Tuple, Union, Literal
 import re, unicodedata as ud
 import logging, json
 logger = logging.getLogger(__name__)
+
+
+# Definir el tipo Status que falta
+Status = Tuple[Literal["resolved", "ambiguous", "not_found"], Optional[Union[str, List[str]]]]
+
 
 # -----------------------------------------------------------------------------
 # Validation helpers
@@ -235,16 +241,18 @@ def normalize_threshold(threshold: Optional[float] = None) -> float:
     return max(0.1, min(1.0, float(threshold) if isinstance(threshold, (int, float)) else FUZZY_THRESHOLD))
 
 
-def run_async_in_sync(coro):
-    """Helper para ejecutar funciones async desde contexto sync"""
-    try:
-        # Intenta obtener el loop actual
-        loop = asyncio.get_running_loop()
-    except RuntimeError:
-        # No hay loop, crear uno nuevo
-        return asyncio.run(coro)
-    else:
-        # Ya hay un loop corriendo, usar ThreadPoolExecutor
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            future = executor.submit(asyncio.run, coro)
-            return future.result()
+def async_to_sync(async_func):
+    """
+    Decorador genérico que convierte cualquier función asíncrona en síncrona
+    """
+    @wraps(async_func)
+    def sync_wrapper(*args, **kwargs):
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return asyncio.run(async_func(*args, **kwargs))
+        else:
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                future = executor.submit(asyncio.run, async_func(*args, **kwargs))
+                return future.result()
+    return sync_wrapper

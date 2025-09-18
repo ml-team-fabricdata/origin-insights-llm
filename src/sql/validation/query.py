@@ -1,19 +1,20 @@
 from src.sql.constants_sql import *
 
 # =============================================================================
-# TITLES
+# OPTIMIZED SQL QUERIES - TITLES
 # =============================================================================
 
 EXACT_SEARCH_SQL = f"""
 SELECT DISTINCT ON (m.uid)
   m.uid,
+  COALESCE(m.clean_title, LOWER(m.title)) AS clean_title,
   m.year,
   m.title,
   md.type,
   md.imdb_id
 FROM {AKAS_TABLE} m
 LEFT JOIN {METADATA_TABLE} md ON md.uid = m.uid
-WHERE LOWER(m.title) = LOWER(%s)
+WHERE LOWER(COALESCE(m.clean_title, m.title)) = LOWER(%s)
 ORDER BY m.uid, m.year NULLS LAST
 """
 
@@ -26,11 +27,13 @@ candidates AS (
     a.uid,
     a.title AS aka_title,
     a.year,
-    {PG_TRGM_SCHEMA}.similarity(LOWER(a.title), nq.query_lower) AS title_similarity
+    GREATEST(
+      {PG_TRGM_SCHEMA}.similarity(LOWER(a.title), nq.query_lower)
+    ) AS title_similarity
   FROM {AKAS_TABLE} a
   CROSS JOIN normalized_query nq
   WHERE (
-    {PG_TRGM_SCHEMA}.similarity(LOWER(a.title), nq.query_lower) >= %s
+    {PG_TRGM_SCHEMA}.similarity(LOWER(COALESCE(a.clean_title, a.title)), nq.query_lower) >= %s
     OR {PG_TRGM_SCHEMA}.similarity(LOWER(a.title), nq.query_lower) >= %s
   )
 ),
@@ -46,34 +49,44 @@ ORDER BY title_similarity DESC, year DESC NULLS LAST
 LIMIT %s
 """
 
+FILMOGRAPHY_SQL = f"""
+SELECT *
+FROM {METADATA_TABLE} m
+WHERE m.uid = %s
+"""
+
+
 # =============================================================================
 #  ACTORS
 # =============================================================================
 
+# FIXED: Permitir múltiples resultados exactos
 ACTOR_EXACT_SQL = f"""
-SELECT id, name
+SELECT id, name, clean_name
 FROM {CAST_TABLE}
-WHERE name ILIKE %s               
+WHERE LOWER(name) = LOWER(%s) OR LOWER(clean_name) = LOWER(%s)
 ORDER BY name ASC
 LIMIT {MAX_CANDIDATES}
 """
 
+
 ACTOR_FUZZY_SQL_ILIKE = f"""
-WITH q AS (SELECT %s::text AS s)
-SELECT id, name, 0.0 AS sim
-FROM {CAST_TABLE}, q
-WHERE name ILIKE '%%' || q.s || '%%'
+SELECT id, name, clean_name, 0.0 AS sim
+FROM {CAST_TABLE}
+WHERE LOWER(name) LIKE LOWER(CONCAT('%%', %s, '%%'))
 ORDER BY 
-  CASE WHEN name ILIKE q.s || '%%' THEN 1 ELSE 2 END, 
+  CASE WHEN LOWER(name) LIKE LOWER(CONCAT(%s, '%%')) THEN 1 ELSE 2 END,
   name ASC
 LIMIT {MAX_CANDIDATES}
 """
+
 
 # =============================================================================
 # DIRECTORS
 # =============================================================================
 
 DIRECTOR_EXACT_SQL = f"""
+<<<<<<< HEAD:src/sql/core/queries.py
 WITH q AS (SELECT %s::text AS s)
 SELECT 
   d.id, 
@@ -93,28 +106,49 @@ LIMIT {MAX_CANDIDATES}
 
 DIRECTOR_FUZZY_SQL_ILIKE = f"""
 WITH q AS (SELECT %s::text AS s)
+=======
+>>>>>>> parent of 9e0dc04 (update  validation and queries; add folder discovery and talent):src/sql/validation/query.py
 SELECT 
   d.id, 
   d.name, 
-  0.0 AS sim,
-  t.n_titles
+  d.clean_name,
+  (
+    SELECT COUNT(*)::integer 
+    FROM {DIRECTED_TABLE} db 
+    WHERE db.director_id = d.id
+  ) AS n_titles
 FROM {DIRECTOR_TABLE} d
-CROSS JOIN q
-LEFT JOIN LATERAL (
-  SELECT COUNT(*)::integer AS n_titles
-  FROM {DIRECTED_TABLE} db 
-  WHERE db.director_id = d.id
-) t ON TRUE
-WHERE d.name ILIKE '%%' || q.s || '%%'
+WHERE LOWER(d.name) = LOWER(%s) OR LOWER(d.clean_name) = LOWER(%s)
+ORDER BY n_titles DESC NULLS LAST, d.name ASC
+LIMIT {MAX_CANDIDATES}
+"""
+
+DIRECTOR_FUZZY_SQL_ILIKE = f"""
+SELECT 
+  d.id, 
+  d.name, 
+  d.clean_name,
+  0.0 AS sim,
+  (
+    SELECT COUNT(*)::integer 
+    FROM {DIRECTED_TABLE} db 
+    WHERE db.director_id = d.id
+  ) AS n_titles
+FROM {DIRECTOR_TABLE} d
+WHERE LOWER(d.name) LIKE LOWER(CONCAT('%%', %s, '%%'))
 ORDER BY 
-  CASE WHEN d.name ILIKE q.s || '%%' THEN 1 ELSE 2 END,
-  t.n_titles DESC NULLS LAST, 
+  CASE WHEN LOWER(d.name) LIKE LOWER(CONCAT(%s, '%%')) THEN 1 ELSE 2 END,
+  n_titles DESC, 
   d.name ASC
 LIMIT {MAX_CANDIDATES}
 """
 
+<<<<<<< HEAD:src/sql/core/queries.py
 FILMOGRAPHY_SQL = f"""
 SELECT *
 FROM {METADATA_TABLE} m
 WHERE m.uid = %s
 """
+=======
+
+>>>>>>> parent of 9e0dc04 (update  validation and queries; add folder discovery and talent):src/sql/validation/query.py

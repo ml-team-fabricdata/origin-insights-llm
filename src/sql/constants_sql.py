@@ -1,3 +1,7 @@
+# constants_sql.py
+# Centralized constants and safe whitelists for SQL-facing tools/builders.
+# Mantener este módulo SIN dependencias de la DB.
+
 from __future__ import annotations
 from typing import Dict, Tuple, FrozenSet
 

@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 ﻿awesome-slugify==1.6.5
 asgiref==3.8.1
 boto3>=1.39.7
@@ -17,3 +18,13 @@ uvicorn[standard]>=0.27
 pydantic>=2.5
 tiktoken
 asyncpg
+=======
+﻿fastapi==0.112.2
+uvicorn==0.30.6
+boto3>=1.34.0
+botocore>=1.34.0
+psycopg2-binary>=2.9.9
+unidecode>=1.3.8
+langdetect>=1.0.9
+redis>=5.0.0
+>>>>>>> parent of 9e0dc04 (update  validation and queries; add folder discovery and talent)

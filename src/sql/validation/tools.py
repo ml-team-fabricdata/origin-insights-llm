@@ -3,6 +3,34 @@ import asyncio
 import concurrent.futures
 from src.sql.core.validation import validate_title, validate_actor, validate_director
 
+def run_async_safe(coro):
+    """
+    Ejecuta corrutina de forma segura, manejando tanto contextos 
+    con loop activo como sin loop.
+    """
+    try:
+        # Intentar obtener el loop actual
+        loop = asyncio.get_running_loop()
+        
+        # Si hay loop activo, ejecutar en thread separado
+        def run_in_new_thread():
+            return asyncio.run(coro)
+        
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(run_in_new_thread)
+            try:
+                return future.result(timeout=30)  # Timeout de seguridad
+            except concurrent.futures.TimeoutError:
+                return {"status": "error", "message": "Operation timed out"}
+                
+    except RuntimeError:
+        # No hay loop activo, usar asyncio.run directamente
+        try:
+            return asyncio.run(coro)
+        except Exception as e:
+            return {"status": "error", "message": f"Async execution failed: {str(e)}"}
+    except Exception as e:
+        return {"status": "error", "message": f"Unexpected error: {str(e)}"}
 
 def validate_title_sync(title: str) -> str:
     """Wrapper síncrono para validar títulos"""

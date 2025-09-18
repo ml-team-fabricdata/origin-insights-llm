@@ -138,9 +138,3 @@ ORDER BY
   d.name ASC
 LIMIT {MAX_CANDIDATES}
 """
-
-FILMOGRAPHY_SQL = f"""
-SELECT *
-FROM {METADATA_TABLE} m
-WHERE m.uid = %s
-"""

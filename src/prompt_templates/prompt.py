@@ -39,6 +39,7 @@ DECISION FLOW
    - If a resolver/validator is ambiguous/not_found → present options or ask for clarification and STOP.
 4) DETAIL tools (require UID/ID)
    - Only call after a validator has confirmed the specific UID/ID.
+   - Examples: get_title_rating, query_platforms_for_uid_by_country, etc.
 6) STOP CRITERIA
    - Stop as soon as you have enough validated info to answer the users intent.
    - Do NOT call multiple similar tools redundantly. One good result set is enough.

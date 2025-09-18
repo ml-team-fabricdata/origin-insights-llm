@@ -1,36 +1,18 @@
 from langchain_core.tools import Tool
-import asyncio
-import concurrent.futures
-from src.sql.core.validation import validate_title, validate_actor, validate_director
+from src.sql.core.validation import *
+from typing import Optional, Dict, Any
+
+def sync_validate_title(title: str, threshold: Optional[float] = None) -> Dict[str, Any]:
+    return run_async_in_sync(validate_title(title, threshold))
 
 
-def validate_title_sync(title: str) -> str:
-    """Wrapper síncrono para validar títulos"""
-    try:
-        result = run_async_safe(validate_title(title))
-        return str(result) if result else '{"status": "error", "message": "No result returned"}'
-    except Exception as e:
-        return f'{{"status": "error", "message": "Title validation failed: {str(e)}"}}'
+def sync_validate_actor(name: str) -> Dict[str, Any]:
+    return run_async_in_sync(validate_actor(name))
 
-def validate_actor_sync(name: str) -> str:
-    """Wrapper síncrono para validar actores"""
-    try:
-        result = run_async_safe(validate_actor(name))
-        return str(result) if result else '{"status": "error", "message": "No result returned"}'
-    except Exception as e:
-        return f'{{"status": "error", "message": "Actor validation failed: {str(e)}"}}'
 
-def validate_director_sync(name: str) -> str:
-    """Wrapper síncrono para validar directores"""
-    try:
-        result = run_async_safe(validate_director(name))
-        return str(result) if result else '{"status": "error", "message": "No result returned"}'
-    except Exception as e:
-        return f'{{"status": "error", "message": "Director validation failed: {str(e)}"}}'
+def sync_validate_director(name: str) -> Dict[str, Any]:
+    return run_async_in_sync(validate_director(name))
 
-# =============================================================================
-# VALIDATION TOOLS
-# =============================================================================
 
 VALIDATE_TITLE_TOOL = Tool.from_function(
     func=validate_title_sync,
@@ -58,18 +40,14 @@ VALIDATE_DIRECTOR_TOOL = Tool.from_function(
     func=validate_director_sync,
     name="validate_director",
     description=(
-        "MANDATORY: Validates DIRECTOR names and returns validation status. "
-        "CRITICAL: If status='ambiguous', you MUST show the list of options to the user "
-        "and STOP processing until the user selects one. Do NOT continue until user chooses. "
-        "If status='resolved' or status='ok', you can continue with the returned ID."
-    )
+        "MANDATORY: Validates DIRECTORS by name and returns status. If "
+        "status='ambiguous': SHOW list of options to user and STOP. Do NOT "
+        "continue until user chooses. If status='resolved': can continue with "
+        "returned UID."
+    ),
 )
 
-# =============================================================================
-# ALL TOOLS EXPORT
-# =============================================================================
-
-ALL_SQL_TOOLS = [
+ALL_CORE = [
     VALIDATE_TITLE_TOOL,
     VALIDATE_ACTOR_TOOL,
     VALIDATE_DIRECTOR_TOOL

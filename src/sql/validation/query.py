@@ -86,7 +86,6 @@ LIMIT {MAX_CANDIDATES}
 # =============================================================================
 
 DIRECTOR_EXACT_SQL = f"""
-<<<<<<< HEAD:src/sql/core/queries.py
 WITH q AS (SELECT %s::text AS s)
 SELECT 
   d.id, 
@@ -103,11 +102,8 @@ WHERE d.name ILIKE q.s
 ORDER BY t.n_titles DESC NULLS LAST, d.name ASC
 LIMIT {MAX_CANDIDATES}
 """
-
 DIRECTOR_FUZZY_SQL_ILIKE = f"""
 WITH q AS (SELECT %s::text AS s)
-=======
->>>>>>> parent of 9e0dc04 (update  validation and queries; add folder discovery and talent):src/sql/validation/query.py
 SELECT 
   d.id, 
   d.name, 
@@ -143,12 +139,8 @@ ORDER BY
 LIMIT {MAX_CANDIDATES}
 """
 
-<<<<<<< HEAD:src/sql/core/queries.py
 FILMOGRAPHY_SQL = f"""
 SELECT *
 FROM {METADATA_TABLE} m
 WHERE m.uid = %s
 """
-=======
-
->>>>>>> parent of 9e0dc04 (update  validation and queries; add folder discovery and talent):src/sql/validation/query.py

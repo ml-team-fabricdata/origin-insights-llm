@@ -1,16 +1,9 @@
-
-"""
-Database utilities for SQL operations (helpers only; DB connection lives in common.sql_db).
-Refactor:
-  - Replace noisy prints with logging.debug
-  - Keep public API identical
-"""
 from __future__ import annotations
 
 # Standard library imports
 from datetime import datetime, timedelta
 from rapidfuzz import process, fuzz
-from constants_sql import *
+from src.sql.constants_sql import *
 from typing import Any, Callable, Optional, Dict, List, Tuple
 import re, unicodedata as ud
 import logging, json
@@ -25,7 +18,7 @@ def validate_limit(
     max_limit: int = 500,
     *,
     lo: int | None = None,
-    hi: int | None = None,  # ✅ Definir como parámetro explícito
+    hi: int | None = None,
     **_ignored,
 ) -> int:
     # Lógica corregida para manejar lo/hi
@@ -125,18 +118,42 @@ _CJK_RE = re.compile(r"[\u4E00-\u9FFF\u3040-\u30FF\uAC00-\uD7AF]")
 
 def as_tool_payload(rows: Any, *, ident: str = "") -> str:
     """
-    Convierte cualquier resultado en un string JSON NO vacío para Bedrock/Anthropic.
-    - Si rows está vacío, devuelve un mensaje informativo.
-    - Si rows no es string, lo serializa a JSON.
+    Convierte resultados a JSON para herramientas, garantizando respuesta no vacía.
+    
+    Args:
+        rows: Resultado de query (lista, dict, etc.)
+        ident: Identificador para contexto en mensajes vacíos
+        
+    Returns:
+        String JSON válido, nunca vacío
     """
-    if rows in (None, [], ()):
-        payload = [{"message": f"No results{f' for {ident}' if ident else ''}"}]
-    else:
-        payload = rows
-    if isinstance(payload, str):
-        # Garantiza no vaciar
-        return payload if payload.strip() else '{"message":"ok"}'
-    return json.dumps(payload, ensure_ascii=False)
+    # Casos de resultados vacíos
+    if rows in (None, [], (), {}):
+        message = f"No results found"
+        if ident:
+            message += f" for {ident}"
+        return json.dumps({"message": message, "count": 0}, ensure_ascii=False)
+    
+    # Si ya es string JSON válido, devolverlo
+    if isinstance(rows, str):
+        rows = rows.strip()
+        if not rows:
+            return json.dumps({"message": "Empty result", "count": 0}, ensure_ascii=False)
+        # Verificar si es JSON válido
+        try:
+            json.loads(rows)
+            return rows
+        except json.JSONDecodeError:
+            # Si no es JSON válido, encapsularlo
+            return json.dumps({"data": rows}, ensure_ascii=False)
+    
+    # Casos normales: serializar a JSON
+    try:
+        result = json.dumps(rows, ensure_ascii=False, default=str)
+        return result if result.strip() else json.dumps({"message": "Empty serialization"}, ensure_ascii=False)
+    except (TypeError, ValueError) as e:
+        # Fallback en caso de error de serialización
+        return json.dumps({"error": f"Serialization failed: {str(e)}"}, ensure_ascii=False)
 
 def _tokens(s: Optional[str]) -> List[str]:
     norm = normalize(s)

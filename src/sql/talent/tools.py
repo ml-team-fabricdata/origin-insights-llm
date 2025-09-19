@@ -10,8 +10,7 @@ from src.sql.talent.collaborations import *
 ACTOR_FILMOGRAPHY_BY_NAME_TOOL = Tool.from_function(
     name="get_actor_filmography_by_name",
     description=(
-        "Filmography of an ACTOR (by name). Validates the name; if ambiguous, "
-        "returns options instead of guessing."
+        "Filmography of an ACTOR (by name). Validates the name; if ambiguous, returns options instead of guessing."
     ),
     func=get_actor_filmography_by_name
 )
@@ -19,8 +18,7 @@ ACTOR_FILMOGRAPHY_BY_NAME_TOOL = Tool.from_function(
 ACTOR_COACTORS_BY_NAME_TOOL = Tool.from_function(
     name="answer_actor_coactors",
     description=(
-        "List of CO-ACTORS who worked with an ACTOR (by name). Validates the "
-        "name; if ambiguous, returns options."
+        "List of CO-ACTORS who worked with an ACTOR (by name). Validates the name; if ambiguous, returns options."
     ),
     func=get_actor_coactors_by_name
 )
@@ -51,8 +49,7 @@ ACTOR_COACTORS_BY_ID_TOOL = Tool.from_function(
 DIRECTOR_FILMOGRAPHY_BY_NAME_TOOL = Tool.from_function(
     name="get_director_filmography_by_name",
     description=(
-        "Filmography of a DIRECTOR (by name). Validates the name; if "
-        "ambiguous, returns options."
+        "Filmography of a DIRECTOR (by name). Validates the name; if ambiguous, returns options."
     ),
     func=get_director_filmography_by_name
 )
@@ -60,8 +57,7 @@ DIRECTOR_FILMOGRAPHY_BY_NAME_TOOL = Tool.from_function(
 DIRECTOR_FILMOGRAPHY_BY_ID_TOOL = Tool.from_function(
     name="get_director_filmography",
     description=(
-        "Filmography of a DIRECTOR by ID (efficient path, no hits). Use if you "
-        "already resolved the director_id."
+        "Filmography of a DIRECTOR by ID (efficient path, no hits). Use if you already resolved the director_id."
     ),
     func=get_director_filmography
 )

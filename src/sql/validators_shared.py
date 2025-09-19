@@ -55,7 +55,7 @@ def resolve_country_iso(country: Optional[str]) -> Optional[str]:
         country, validation_rows, field_name="platform_name_iso", cutoff=0
     )
     
-    return iso_code if iso_code else None
+    return iso_code.upper() if iso_code else None
 
 
 def resolve_region_isos(region: Optional[str]) -> List[str]:

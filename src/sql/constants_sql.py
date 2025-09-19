@@ -1,10 +1,3 @@
-"""
-SQL Constants Module - Organized Configuration
-==============================================
-This module contains all SQL-related constants, configurations, and mappings
-organized by functional areas.
-"""
-
 from __future__ import annotations
 from typing import Dict, Tuple, FrozenSet
 

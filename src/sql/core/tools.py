@@ -1,5 +1,4 @@
 from langchain_core.tools import Tool
-from sql.discovery.discovery import *
 from src.sql.core.validation import *
 from langchain_core.tools import Tool
 
@@ -20,8 +19,6 @@ VALIDATE_DIRECTOR_TOOL = Tool.from_function(
     name="validate_director",
     description="Validates directors. Status='ambiguous': show options and STOP."
 )
-
-
 
 
 ALL_VALIDATION_TOOLS = [

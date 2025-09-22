@@ -10,17 +10,20 @@ FROM {METADATA_TABLE} m
 WHERE m.uid = %s
 """
 
-RATING_QUERY_COUNTRY = f""" SELECT
-                m.uid,
-                m.title,
-                m.year,
-                m.type,
-                h.hits
-            FROM {META_TBL} m
-            LEFT JOIN {HITS_PRESENCE_TBL} h ON m.uid = h.uid
-            WHERE m.uid = %s
-            AND m.countries ILIKE %s
-            GROUP BY m.uid, m.title, m.year, m.type, h.hits
+RATING_QUERY_COUNTRY = f"""
+    SELECT
+        m.uid,
+        m.title,
+        m.year,
+        m.type,
+        SUM(h.hits) AS total_hits,
+        AVG(h.hits) AS avg_hits,
+        COUNT(h.hits) AS hit_count
+    FROM {META_TBL} m
+    LEFT JOIN {HITS_PRESENCE_TBL} h ON m.uid = h.uid
+    WHERE m.uid = %s
+    AND m.country ILIKE %s
+    GROUP BY m.uid, m.title, m.year, m.type
 """
 
 RATING_QUERY_GLOBAL = f""" SELECT
@@ -28,7 +31,9 @@ RATING_QUERY_GLOBAL = f""" SELECT
                 m.title,
                 m.year,
                 m.type,
-                h.hits
+            SUM(h.hits) AS total_hits,
+            AVG(h.hits) AS avg_hits,
+            COUNT(h.hits) AS hit_count
             FROM {META_TBL} m
             LEFT JOIN {HITS_GLOBAL_TBL} h ON m.uid = h.uid
             WHERE m.uid = %s
@@ -46,7 +51,7 @@ FROM {table_name}
 """
 
 METADATA_LIST_SQL = """
-SELECT uid, title, type, year, duration, primary_country_iso
+SELECT uid, title, type, year, duration, countries_iso
 FROM {table_name}
 {where_clause}
 ORDER BY {order_by} {order_dir}, uid

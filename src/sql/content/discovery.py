@@ -122,7 +122,7 @@ def get_multiple_titles_info(uids: List[str]) -> List[Dict[str, Any]]:
     # Construir query con placeholders para IN clause
     placeholders = ','.join(['%s'] * len(valid_uids))
     sql = f"""
-        SELECT uid, title, type, year, duration, primary_country_iso
+        SELECT uid, title, type, year, duration, countries_iso
         FROM {META_TBL}
         WHERE uid IN ({placeholders})
         ORDER BY title

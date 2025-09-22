@@ -16,6 +16,7 @@ __pycache__/
 .venv
 dist/
 build/
+*.ipynb
 
 # Node (solo si se suma frontend)
 node_modules/
@@ -30,8 +31,11 @@ node_modules/
 # Entornos
 .env.local
 .env.*
+.vs
 
 # Python packaging artifacts
 *.egg-info/
 dist/
 build/
+.pytest_cache
+.github

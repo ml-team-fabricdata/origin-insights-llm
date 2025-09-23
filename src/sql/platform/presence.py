@@ -25,26 +25,26 @@ def build_where_clause(filters: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
     if filters.get("country"):
         country_iso = resolve_country_iso(filters["country"])
         if country_iso:
-            conditions.append("UPPER(p.iso_alpha2) = %(country_iso)s")
+            conditions.append("p.iso_alpha2 = %(country_iso)s")
             params["country_iso"] = country_iso.upper()
 
     # Platform filters
     if filters.get("platform_name"):
         platform = resolve_platform_name(filters["platform_name"])
         if platform:
-            conditions.append("LOWER(p.platform_name) = %(platform_name)s")
-            params["platform_name"] = platform.lower()
+            conditions.append("p.platform_name = %(platform_name)s")
+            params["platform_name"] = platform
 
     if filters.get("platform_code"):
-        conditions.append("LOWER(p.platform_code) = %(platform_code)s")
-        params["platform_code"] = filters["platform_code"].lower()
+        conditions.append("p.platform_code = %(platform_code)s")
+        params["platform_code"] = filters["platform_code"]
 
     # Content filters
     if filters.get("type"):
         content_type = resolve_content_type(filters["type"])
         if content_type:
-            conditions.append("LOWER(p.type) = %(type)s")
-            params["type"] = content_type.lower()
+            conditions.append("p.type = %(type)s")
+            params["type"] = content_type
 
     if filters.get("title_like"):
         conditions.append("p.clean_title ILIKE %(title_like)s")

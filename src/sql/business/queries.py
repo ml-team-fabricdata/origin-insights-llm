@@ -1,0 +1,773 @@
+from src.sql.constants_sql import *
+
+# =============================================================================
+# PRICE QUERIES S
+# =============================================================================
+
+# Uso de DISTINCT ON en lugar de ROW_NUMBER para mejor performance
+SQL_LATEST_PRICE = f"""
+WITH prices_filtered AS (
+  SELECT DISTINCT ON (pr.hash_unique)
+    pr.hash_unique, 
+    pr.platform_code, 
+    pr.price_type, 
+    pr.price, 
+    pr.currency,
+    pr.definition, 
+    pr.license, 
+    pr.out_on, 
+    pr.created_at
+  FROM {PRICES_TBL} pr
+  {{JOIN_PRES}}
+  WHERE {{WHERE_SCOPES}}
+  ORDER BY pr.hash_unique, pr.created_at DESC
+)
+SELECT *
+FROM prices_filtered
+WHERE {{EXTRA_FILTERS}}
+ORDER BY created_at DESC
+LIMIT %s;
+"""
+
+# Simplificado para evitar CTEs innecesarios cuando es posible
+SQL_PRICE_HISTORY = f"""
+SELECT
+  pr.hash_unique, 
+  pr.platform_code, 
+  pr.price_type, 
+  pr.price, 
+  pr.currency,
+  pr.definition, 
+  pr.license, 
+  pr.out_on, 
+  pr.created_at
+FROM {PRICES_TBL} pr
+{{JOIN_CONDITIONS}}
+WHERE {{WHERE_CLAUSE}}
+ORDER BY pr.created_at DESC
+LIMIT %s;
+"""
+
+# Optimizado con índices de ventana más eficientes
+SQL_PRICE_CHANGES = f"""
+WITH price_windows AS (
+  SELECT 
+    pr.hash_unique,
+    pr.platform_code,
+    pr.price_type,
+    pr.definition,
+    pr.license,
+    pr.currency,
+    pr.price,
+    pr.created_at,
+    LAG(pr.price, 1) OVER w AS prev_price,
+    LAG(pr.created_at, 1) OVER w AS prev_ts
+  FROM {PRICES_TBL} pr
+  {{JOIN_PRES}}
+  WHERE {{WHERE_SCOPES}}
+    AND pr.created_at >= CURRENT_DATE - %s::interval
+  WINDOW w AS (
+    PARTITION BY pr.hash_unique, pr.platform_code, pr.price_type, 
+                 pr.definition, pr.license, pr.currency
+    ORDER BY pr.created_at
+  )
+)
+SELECT 
+  hash_unique,
+  platform_code,
+  price_type,
+  definition,
+  license,
+  currency,
+  prev_price,
+  price,
+  (price - prev_price) AS delta,
+  created_at AS current_ts,
+  prev_ts AS previous_ts
+FROM price_windows
+WHERE prev_price IS NOT NULL
+  {{DIRECTION_FILTER}}
+ORDER BY ABS(price - prev_price) DESC, created_at DESC
+LIMIT %s;
+"""
+
+# Estadísticas con una sola pasada
+SQL_PRICE_STATS = f"""
+SELECT
+  pr.platform_code,
+  pr.price_type,
+  pr.currency,
+  pr.definition,
+  pr.license,
+  COUNT(*) AS samples,
+  MIN(pr.price) AS min_price,
+  MAX(pr.price) AS max_price,
+  AVG(pr.price)::numeric(10,2) AS avg_price,
+  PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY pr.price)::numeric(10,2) AS median_price
+FROM {PRICES_TBL} pr
+{{JOIN_PRES}}
+WHERE {{WHERE_SCOPES}}
+GROUP BY ROLLUP(
+  pr.platform_code, 
+  pr.price_type, 
+  pr.currency, 
+  pr.definition, 
+  pr.license
+)
+HAVING pr.platform_code IS NOT NULL
+ORDER BY pr.platform_code, pr.price_type, pr.definition, pr.license;
+"""
+
+# =============================================================================
+# PLATFORM & AVAILABILITY QUERIES S
+# =============================================================================
+
+# Eliminado COUNT(*) OVER() que es costoso
+QUERY_PLATFORMS_FOR_TITLE = f"""
+SELECT 
+    p.uid,
+    p.platform_name,
+    p.platform_country,
+    p.iso_alpha2 AS country,
+    p.out_on
+FROM {PRES_TBL} p
+WHERE p.uid = %s 
+  AND p.out_on IS NULL
+ORDER BY p.platform_name, p.iso_alpha2
+LIMIT %s;
+"""
+
+# CTE optimizado con filtrado temprano
+QUERY_AVAILABILITY_WITH_PRICES = f"""
+WITH active_presence AS (
+  SELECT 
+    p.platform_name,
+    p.iso_alpha2 AS country_iso2,
+    p.permalink,
+    p.uid,
+    p.hash_unique,
+    p.is_exclusive,
+    p.plan_name
+  FROM {PRES_TBL} p
+  WHERE p.uid = %(uid)s
+    AND p.out_on IS NULL
+    {{country_condition}}
+),
+latest_prices AS (
+  SELECT DISTINCT ON (pr.hash_unique)
+    pr.hash_unique,
+    pr.price,
+    pr.currency,
+    pr.price_type,
+    pr.definition,
+    pr.license,
+    pr.created_at
+  FROM {PRICES_TBL} pr
+  WHERE pr.hash_unique IN (SELECT hash_unique FROM active_presence)
+    AND (pr.active_only_price IS NULL OR pr.active_only_price = TRUE)
+  ORDER BY pr.hash_unique, pr.created_at DESC
+)
+SELECT 
+  ap.*,
+  lp.price,
+  lp.currency,
+  lp.price_type,
+  lp.definition,
+  lp.license,
+  lp.created_at AS price_updated_at
+FROM active_presence ap
+LEFT JOIN latest_prices lp ON lp.hash_unique = ap.hash_unique
+ORDER BY ap.platform_name, lp.price NULLS LAST;
+"""
+
+# =============================================================================
+# PREMIERES QUERY 
+# =============================================================================
+
+# Uso de EXISTS en lugar de JOIN para mejor performance
+QUERY_RECENT_PREMIERES_BY_COUNTRY = f"""
+SELECT 
+  m.uid,
+  m.title,
+  m.type,
+  m.year,
+  m.release_date,
+  (
+    SELECT STRING_AGG(DISTINCT platform_name, ', ' ORDER BY platform_name)
+    FROM {PRES_TBL} p
+    WHERE p.uid = m.uid 
+      AND p.iso_alpha2 = %(country)s
+      AND p.out_on IS NULL
+  ) AS platforms
+FROM {META_ALL} m
+WHERE m.release_date BETWEEN %(date_from)s AND %(date_to)s
+  AND EXISTS (
+    SELECT 1 FROM {PRES_TBL} p
+    WHERE p.uid = m.uid 
+      AND p.iso_alpha2 = %(country)s
+      AND p.out_on IS NULL
+  )
+ORDER BY m.release_date DESC
+LIMIT %(limit)s;
+"""
+
+# =============================================================================
+# PRESENCE STATISTICS 
+# =============================================================================
+
+# Uso de filtros agregados para una sola pasada
+QUERY_PRESENCE_STATISTICS = f"""
+SELECT
+  COUNT(*) AS total_records,
+  COUNT(DISTINCT p.platform_name) AS unique_platforms,
+  COUNT(DISTINCT p.iso_alpha2) AS unique_countries,
+  COUNT(DISTINCT p.uid) AS unique_content,
+  AVG(p.duration)::numeric(10,2) AS avg_duration,
+  PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY p.duration) AS median_duration,
+  COUNT(*) FILTER (WHERE p.is_exclusive = 'true') AS exclusive_count,
+  COUNT(*) FILTER (WHERE p.is_kids = 'true') AS kids_content_count,
+  COUNT(*) FILTER (WHERE p.type = 'Movie') AS movie_count,
+  COUNT(*) FILTER (WHERE p.type = 'Series') AS series_count
+FROM {PRES_TBL} p
+{{where_clause}};
+"""
+
+# =============================================================================
+# COUNTRY SUMMARY 
+# =============================================================================
+
+# Agregación más eficiente con GROUP BY
+QUERY_COUNTRY_PLATFORM_SUMMARY = f"""
+SELECT 
+  p.iso_alpha2 AS country,
+  COUNT(DISTINCT p.platform_name) AS unique_platforms,
+  COUNT(DISTINCT p.uid) AS unique_content,
+  COUNT(*) AS total_records,
+  COUNT(*) FILTER (WHERE p.type = 'Movie') AS movies,
+  COUNT(*) FILTER (WHERE p.type = 'Series') AS series,
+  COUNT(*) FILTER (WHERE p.is_exclusive = 'true') AS exclusive_content,
+  STRING_AGG(DISTINCT p.platform_name, ',' ORDER BY p.platform_name) AS platforms_list
+FROM {PRES_TBL} p
+WHERE p.out_on IS NULL
+  {{country_condition}}
+GROUP BY p.iso_alpha2
+ORDER BY unique_platforms DESC, unique_content DESC;
+"""
+
+# =============================================================================
+# HITS WITH QUALITY 
+# =============================================================================
+
+# Uso de EXISTS para filtrado más eficiente
+SQL_HITS_OPTIMIZED = f"""
+WITH platform_hashes AS (
+  SELECT DISTINCT 
+    p.platform_name,
+    p.hash_unique,
+    p.iso_alpha2
+  FROM {PRES_TBL} p
+  WHERE p.uid = %(uid)s
+    {{country_filter}}
+)
+SELECT 
+  ph.platform_name,
+  {{aggregation}}
+FROM platform_hashes ph
+WHERE EXISTS (
+  SELECT 1 
+  FROM {PRICES_TBL} pr
+  WHERE pr.hash_unique = ph.hash_unique
+    {{quality_filters}}
+)
+GROUP BY ph.platform_name
+ORDER BY ph.platform_name
+LIMIT %(limit)s;
+"""
+
+# =============================================================================
+# PRESENCE WITH PRICE - VERSIÓN CT
+# =============================================================================
+
+SQL_PRESENCE_WITH_PRICE_OPTIMIZED = f"""
+WITH filtered_presence AS (
+  SELECT 
+    p.*,
+    ROW_NUMBER() OVER (ORDER BY p.clean_title, p.platform_name) AS rn
+  FROM {PRES_TBL} p
+  WHERE {{WHERE_CONDITIONS}}
+  LIMIT {{LIMIT}} OFFSET {{OFFSET}}
+),
+latest_prices AS (
+  SELECT DISTINCT ON (pr.hash_unique)
+    pr.hash_unique,
+    pr.price,
+    pr.currency,
+    pr.price_type,
+    pr.definition,
+    pr.license,
+    pr.created_at
+  FROM {PRICES_TBL} pr
+  WHERE pr.hash_unique IN (SELECT hash_unique FROM filtered_presence)
+    {{PRICE_CONDITIONS}}
+  ORDER BY pr.hash_unique, pr.created_at DESC
+)
+SELECT 
+  fp.*,
+  lp.price AS price_amount,
+  lp.currency AS price_currency,
+  lp.price_type,
+  lp.definition AS price_definition,
+  lp.license AS price_license,
+  lp.created_at AS price_created_at
+FROM filtered_presence fp
+LEFT JOIN latest_prices lp ON lp.hash_unique = fp.hash_unique
+ORDER BY fp.rn;
+"""
+
+# =============================================================================
+# UTILITY QUERIES S
+# =============================================================================
+
+# Uso de EXISTS es más rápido que SELECT 1
+SQL_CHECK_EXISTS = f"""
+SELECT EXISTS(
+  SELECT 1 FROM {{TABLE}} WHERE {{COLUMN}} = %s
+) AS exists;
+"""
+
+# Obtener hashes con límite para evitar explosión de memoria
+SQL_GET_HASHES_BY_UID = f"""
+SELECT p.hash_unique
+FROM {PRES_TBL} p
+WHERE {{WHERE_CONDITIONS}}
+  AND p.hash_unique IS NOT NULL
+ORDER BY p.created_at DESC
+LIMIT 1000;
+"""
+
+# =============================================================================
+# BATCH OPERATIONS - NUEVAS QUERIES
+# =============================================================================
+
+# Para operaciones batch más eficientes
+SQL_BATCH_PRICES = f"""
+SELECT 
+  unnest(%(hashes)s::text[]) AS hash_unique,
+  pr.*
+FROM {PRICES_TBL} pr
+WHERE pr.hash_unique = ANY(%(hashes)s::text[])
+  {{CONDITIONS}}
+ORDER BY pr.hash_unique, pr.created_at DESC;
+"""
+
+# Query para análisis de tendencias de precios
+SQL_PRICE_TRENDS = f"""
+WITH daily_prices AS (
+  SELECT 
+    DATE(created_at) AS price_date,
+    platform_code,
+    currency,
+    AVG(price) AS avg_price,
+    COUNT(*) AS sample_count
+  FROM {PRICES_TBL}
+  WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
+    {{CONDITIONS}}
+  GROUP BY DATE(created_at), platform_code, currency
+)
+SELECT 
+  price_date,
+  platform_code,
+  currency,
+  avg_price,
+  sample_count,
+  avg_price - LAG(avg_price) OVER (
+    PARTITION BY platform_code, currency 
+    ORDER BY price_date
+  ) AS daily_change
+FROM daily_prices
+ORDER BY price_date DESC, platform_code;
+"""
+
+
+SQL_HITS_Q_GLOBAL = """
+WITH pres AS (
+  SELECT platform_name, hash_unique
+  FROM {PRES}
+  WHERE uid = %s
+  GROUP BY platform_name, hash_unique
+),
+filtered_prices AS (
+  SELECT DISTINCT x.hash_unique
+  FROM {PRICES} x
+  WHERE x.hash_unique IN (SELECT hash_unique FROM pres)
+  {DEF_FILTER}
+  {LIC_FILTER}
+)
+SELECT p.platform_name,
+       ARRAY_AGG(DISTINCT pr.iso_alpha2 ORDER BY pr.iso_alpha2) AS countries
+FROM {PRES} pr
+JOIN pres p USING (platform_name, hash_unique)
+WHERE pr.hash_unique IN (SELECT hash_unique FROM filtered_prices)
+GROUP BY p.platform_name
+ORDER BY p.platform_name
+LIMIT %s;
+"""
+
+SQL_HITS_Q_BY_COUNTRY = """
+WITH pres AS (
+  SELECT pr.platform_name, pr.hash_unique, pr.iso_alpha2
+  FROM {PRES} pr
+  WHERE pr.iso_alpha2 = %s
+    AND pr.uid = %s
+  GROUP BY pr.platform_name, pr.hash_unique, pr.iso_alpha2
+),
+filtered_prices AS (
+  SELECT DISTINCT x.hash_unique
+  FROM {PRICES} x
+  WHERE x.hash_unique IN (SELECT hash_unique FROM pres)
+  {DEF_FILTER}
+  {LIC_FILTER}
+)
+SELECT p.platform_name,
+       p.iso_alpha2 AS country
+FROM pres p
+JOIN filtered_prices fp USING (hash_unique)
+ORDER BY p.platform_name
+LIMIT %s;
+"""
+
+# =============================================================================
+# SQL QUERIES AS GLOBAL VARIABLES
+# =============================================================================
+
+# Get recent premieres available in a country
+QUERY_RECENT_PREMIERES = f"""
+    SELECT 
+        m.uid,
+        m.title,
+        m.type,
+        m.year,
+        STRING_AGG(DISTINCT p.platform_name, ', ') AS platforms,
+        STRING_AGG(DISTINCT p.platform_country, ', ') AS platform_countries
+    FROM {META_ALL} m
+    JOIN {PRES_TBL} p ON p.uid = m.uid
+    WHERE LOWER(p.iso_alpha2) = LOWER(%(country)s)
+      AND (p.out_on IS NULL OR p.registry_status = 'active')
+      AND m.release_date BETWEEN %(date_from)s AND %(date_to)s
+    GROUP BY m.uid, m.title, m.type, m.year, m.release_date
+    ORDER BY m.release_date DESC NULLS LAST
+    LIMIT %(limit)s;
+""".strip()
+
+# Get recent premieres ranked by peak hits
+QUERY_RECENT_TOP_PREMIERES = f"""
+    WITH base AS (
+        SELECT 
+            m.uid,
+            m.title,
+            m.type,
+            m.year,
+            m.release_date,
+            STRING_AGG(DISTINCT p.platform_name, ', ') AS platforms,
+            STRING_AGG(DISTINCT p.platform_country, ', ') AS platform_countries
+        FROM {META_TBL} m
+        JOIN {PRES_TBL} p ON p.uid = m.uid
+        WHERE {{where_clauses}}
+        GROUP BY m.uid, m.title, m.type, m.year, m.release_date
+    ),
+    scored AS (
+        SELECT
+            b.*,
+            MAX(h.hits) AS peak_hits,
+            MAX(h.date) FILTER (
+                WHERE h.hits = (
+                    SELECT MAX(h2.hits) FROM {HITS_GLOBAL_TBL} h2
+                    WHERE h2.uid = b.uid AND h2.date BETWEEN %s AND %s
+                )
+            ) AS peak_hits_date
+        FROM base b
+        LEFT JOIN {HITS_GLOBAL_TBL} h
+          ON h.uid = b.uid
+         AND h.date BETWEEN %s AND %s
+        GROUP BY b.uid, b.title, b.type, b.year, b.release_date, 
+                 b.platforms, b.platform_countries
+    )
+    SELECT *
+    FROM scored
+    ORDER BY peak_hits DESC NULLS LAST, release_date DESC NULLS LAST, 
+             title ASC
+    LIMIT {{limit}}
+""".strip()
+
+# Get genre ranking by growth between current and previous periods
+QUERY_GENRE_MOMENTUM = f"""
+    WITH cur AS (
+        SELECT m.primary_genre, SUM(h.hits) AS hits_now
+        FROM {HITS_PRESENCE_TBL} h
+        JOIN {META_TBL} m ON m.uid = h.uid
+        WHERE {{where_hits_cur}}{{meta_join}}
+        GROUP BY m.primary_genre
+    ),
+    prv AS (
+        SELECT m.primary_genre, SUM(h.hits) AS hits_prev
+        FROM {HITS_PRESENCE_TBL} h
+        JOIN {META_TBL} m ON m.uid = h.uid
+        WHERE {{where_hits_prev}}{{meta_join}}
+        GROUP BY m.primary_genre
+    )
+    SELECT
+        COALESCE(c.primary_genre, p.primary_genre) AS primary_genre,
+        COALESCE(c.hits_now, 0) AS hits_now,
+        COALESCE(p.hits_prev, 0) AS hits_prev,
+        COALESCE(c.hits_now, 0) - COALESCE(p.hits_prev, 0) AS delta,
+        CASE 
+            WHEN COALESCE(p.hits_prev,0) = 0 THEN NULL
+            ELSE ROUND(
+                ((COALESCE(c.hits_now,0) - COALESCE(p.hits_prev,0))::numeric 
+                 / NULLIF(p.hits_prev,0)) * 100, 2
+            )
+        END AS pct_change
+    FROM cur c
+    FULL OUTER JOIN prv p ON c.primary_genre = p.primary_genre
+    ORDER BY delta DESC NULLS LAST, hits_now DESC NULLS LAST, 
+             primary_genre ASC
+    LIMIT {{limit}}
+""".strip()
+
+# Get platform exclusives within a country scope
+QUERY_PLATFORM_EXCLUSIVITY = f"""
+    WITH scoped AS (
+        SELECT LOWER(p.platform_name) AS platform_name, p.uid
+        FROM {PRES_TBL} p
+        WHERE LOWER(p.iso_alpha2) = %s
+          AND (p.registry_status = 'active')
+    ), agg AS (
+        SELECT
+            uid,
+            COUNT(DISTINCT platform_name) AS n_platforms,
+            MAX(CASE WHEN LOWER(platform_name) = LOWER(%s) THEN 1 ELSE 0 END) AS on_target
+        FROM scoped
+        GROUP BY uid
+    ), exclusives AS (
+        SELECT uid
+        FROM agg
+        WHERE on_target = 1 AND n_platforms = 1
+    )
+    SELECT
+        m.uid, m.title, m.type, m.year,
+        (SELECT COUNT(*) FROM exclusives) AS exclusive_titles,
+        (SELECT COUNT(DISTINCT uid) FROM scoped 
+         WHERE LOWER(platform_name) = LOWER(%s)) AS total_titles_on_platform,
+        ROUND(
+            ( (SELECT COUNT(*) FROM exclusives)::numeric * 100 ) /
+            NULLIF( (SELECT COUNT(DISTINCT uid) FROM scoped 
+                    WHERE LOWER(platform_name) = LOWER(%s)), 0 ),
+            2
+        ) AS exclusivity_pct
+    FROM exclusives e
+    JOIN {META_TBL} m ON m.uid = e.uid
+    ORDER BY m.year DESC NULLS LAST, m.title ASC
+    LIMIT {{limit}}
+""".strip()
+
+# Get all platforms carrying a specific title
+QUERY_PLATFORMS_FOR_TITLE = f"""
+    SELECT 
+        p.uid,
+        p.platform_name,
+        p.platform_country,
+        p.iso_alpha2 AS country,
+        p.registry_status,
+        p.out_on,
+        COUNT(*) OVER() AS total_count
+    FROM {PRES_TBL} p
+    WHERE p.uid = %s 
+      AND (p.out_on IS NULL OR p.registry_status = 'active')
+    ORDER BY p.platform_name ASC, p.platform_country ASC, p.iso_alpha2 ASC
+    LIMIT %s
+""".strip()
+
+# Get platforms for a UID within a specific country
+QUERY_PLATFORMS_FOR_TITLE_BY_COUNTRY = f"""
+    SELECT 
+        p.uid,
+        p.platform_name,
+        p.platform_country,
+        p.iso_alpha2 AS country,
+        p.registry_status,
+        p.in_on,
+        p.out_on
+    FROM {PRES_TBL} p
+    WHERE p.uid = %s 
+      AND LOWER(p.iso_alpha2) = LOWER(%s)
+      AND (p.out_on IS NULL OR p.registry_status = 'active')
+    ORDER BY p.platform_name ASC, p.platform_country ASC
+""".strip()
+
+# Get maximum date from hits table
+QUERY_MAX_DATE = f"SELECT MAX(date_hits) AS max_date FROM {HITS_GLOBAL_TBL}"
+
+# Get top titles using presence data (with metadata)
+QUERY_TOP_PRESENCE_WITH_METADATA = f"""
+    SELECT
+        h.uid,
+        h.title,
+        h.year AS hit_year,
+        m.primary_genre,
+        SUM(h.hits) AS hits
+    FROM {HITS_PRESENCE_TBL} h
+    {{joins_clause}}
+    {{where_clause}}
+    GROUP BY h.uid, h.title, h.year, m.primary_genre
+    ORDER BY hits DESC
+    LIMIT %s
+""".strip()
+
+# Get top titles using presence data (without metadata)
+QUERY_TOP_PRESENCE_NO_METADATA = f"""
+    SELECT
+        h.uid,
+        h.title,
+        h.year AS hit_year,
+        SUM(h.hits) AS hits
+    FROM {HITS_PRESENCE_TBL} h
+    {{joins_clause}}
+    {{where_clause}}
+    GROUP BY h.uid, h.title, h.year
+    ORDER BY hits DESC
+    LIMIT %s
+""".strip()
+
+# Get top titles using global hits data (with genre)
+QUERY_TOP_GLOBAL_WITH_GENRE = f"""
+    SELECT
+        h.uid,
+        m.title,
+        m.year AS hit_year,
+        m.primary_genre,
+        SUM(h.hits) AS hits
+    FROM {HITS_GLOBAL_TBL} h
+    {{joins_clause}}
+    {{where_clause}}
+    GROUP BY h.uid, m.title, m.year, m.primary_genre
+    ORDER BY hits DESC
+    LIMIT %s
+""".strip()
+
+# Get top titles using global hits data (without genre)
+QUERY_TOP_GLOBAL_NO_GENRE = f"""
+    SELECT
+        h.uid,
+        m.title,
+        m.year AS hit_year,
+        SUM(h.hits) AS hits
+    FROM {HITS_GLOBAL_TBL} h
+    {{joins_clause}}
+    {{where_clause}}
+    GROUP BY h.uid, m.title, m.year
+    ORDER BY hits DESC
+    LIMIT %s
+""".strip()
+
+# Exclusivity by country for a given platform
+SQL_PLATFORM_EXCLUSIVITY_BY_COUNTRY = """
+WITH scoped AS (
+    SELECT LOWER(p.platform_name) AS platform_name, p.uid
+    FROM {PRES_TBL} p
+    WHERE LOWER(p.iso_alpha2) = %s
+      AND p.registry_status = 'active'
+      AND (p.out_on IS NULL OR p.out_on >= CURRENT_DATE)
+),
+agg AS (
+    SELECT
+        uid,
+        COUNT(DISTINCT platform_name) AS n_platforms,
+        MAX(CASE WHEN LOWER(platform_name) = LOWER(%s) THEN 1 ELSE 0 END) AS on_target
+    FROM scoped
+    GROUP BY uid
+),
+exclusives AS (
+    SELECT uid
+    FROM agg
+    WHERE on_target = 1 AND n_platforms = 1
+),
+counts AS (
+    SELECT COUNT(*)::numeric AS exclusive_titles FROM exclusives
+),
+platform_totals AS (
+    SELECT COUNT(DISTINCT uid)::numeric AS total_titles_on_platform
+    FROM scoped
+    WHERE LOWER(platform_name) = LOWER(%s)
+)
+SELECT
+    m.uid, m.title, m.type, m.year,
+    counts.exclusive_titles::int AS exclusive_titles,
+    platform_totals.total_titles_on_platform::int AS total_titles_on_platform,
+    ROUND(counts.exclusive_titles * 100.0 / NULLIF(platform_totals.total_titles_on_platform, 0), 2)
+      AS exclusivity_pct
+FROM exclusives e
+JOIN {META_TBL} m ON m.uid = e.uid
+CROSS JOIN counts
+CROSS JOIN platform_totals
+ORDER BY m.year DESC NULLS LAST, m.title ASC
+LIMIT %s;
+"""
+
+# Catalog similarity (country A vs B) for a platform, using presence table only
+SQL_CATALOG_SIMILARITY_FOR_PLATFORM = """
+WITH country_a_titles AS (
+    SELECT DISTINCT p.uid
+    FROM {PRES_TBL} p
+    WHERE LOWER(p.platform_name) = LOWER(%s)
+      AND LOWER(p.iso_alpha2) = LOWER(%s)
+      AND p.registry_status = 'active'
+      AND (p.out_on IS NULL OR p.out_on >= CURRENT_DATE)
+),
+country_b_titles AS (
+    SELECT DISTINCT p.uid
+    FROM {PRES_TBL} p
+    WHERE LOWER(p.platform_name) = LOWER(%s)
+      AND LOWER(p.iso_alpha2) = LOWER(%s)
+      AND p.registry_status = 'active'
+      AND (p.out_on IS NULL OR p.out_on >= CURRENT_DATE)
+),
+shared_titles AS (
+    SELECT a.uid
+    FROM country_a_titles a
+    INNER JOIN country_b_titles b ON a.uid = b.uid
+)
+SELECT 
+    (SELECT COUNT(*) FROM country_a_titles) AS total_a,
+    (SELECT COUNT(*) FROM country_b_titles) AS total_b,
+    (SELECT COUNT(*) FROM shared_titles) AS shared,
+    (SELECT COUNT(*) FROM country_a_titles WHERE uid NOT IN (SELECT uid FROM country_b_titles)) AS unique_a,
+    (SELECT COUNT(*) FROM country_b_titles WHERE uid NOT IN (SELECT uid FROM country_a_titles)) AS unique_b;
+"""
+
+# Titles in A not in B (optional platform filter placeholders)
+SQL_TITLES_IN_A_NOT_IN_B = """
+SELECT
+  m.uid,
+  m.title,
+  INITCAP(m.type) AS type,
+  STRING_AGG(DISTINCT p_in.platform_name, ', ' ORDER BY p_in.platform_name) AS platforms_in
+FROM {META_TBL} m
+JOIN {PRES_TBL} p_in
+  ON p_in.uid = m.uid
+ AND p_in.registry_status = 'active'
+ AND (p_in.out_on IS NULL OR p_in.out_on >= CURRENT_DATE)
+ AND LOWER(p_in.iso_alpha2) = LOWER(%s)
+ {PIN_FILTER}
+WHERE NOT EXISTS (
+  SELECT 1
+  FROM {PRES_TBL} p_out
+  WHERE p_out.uid = m.uid
+    AND p_out.registry_status = 'active'
+    AND (p_out.out_on IS NULL OR p_out.out_on >= CURRENT_DATE)
+    AND LOWER(p_out.iso_alpha2) = LOWER(%s)
+    {POUT_FILTER}
+)
+GROUP BY m.uid, m.title, m.type
+ORDER BY LOWER(m.title)
+LIMIT %s;
+"""

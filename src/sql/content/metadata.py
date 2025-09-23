@@ -206,7 +206,7 @@ def tool_metadata_stats(*args, **kwargs):
     filter_desc = ", ".join(applied_filters) or "no-filters"
     return as_tool_payload(rows, ident=f"metadata_simple_all.stats | {filter_desc}")
 
-_DEF_SEP = _re.compile(r"[\s,;/]+")
+_DEF_SEP = re.compile(r"[\s,;/]+")
 
 def _parse_arg1_basic(a1: str, kwargs: dict) -> dict:
     s = (a1 or "").strip()
@@ -226,7 +226,7 @@ def _parse_arg1_basic(a1: str, kwargs: dict) -> dict:
             if resolved_iso:
                 out["countries_iso"] = resolved_iso
 
-    year_pattern = _re.compile(r'\b(19|20)\d{2}\b')
+    year_pattern = re.compile(r'\b(19|20)\d{2}\b')
     years = [int(m.group()) for m in year_pattern.finditer(s)]
     if len(years) >= 2:
         out.setdefault("year_from", min(years))

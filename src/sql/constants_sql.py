@@ -369,3 +369,29 @@ POLICY_PARAMS = (
     "Validate and sanitize numeric params (limit, days_back) with built-in\n"
     "caps. Never pass raw user strings to SQL."
 )
+
+# =============================================================================
+# PRESENCE COLUMNS
+# =============================================================================
+
+PRESENCE_ALLOWED_SELECT = {
+    "id","sql_unique","out_on","global_id",
+    "iso_alpha2","iso_global","platform_name","platform_code",
+    "package_code","package_code2","content_id","hash_unique",
+    "uid","type","clean_title","is_original","is_kids","is_local",
+    "isbranded","is_exclusive","imdb_id","tmdb_id","tvdb_id",
+    "duration","content_status","registry_status","uid_updated",
+    "created_at","plan_name","permalink","active_episodes",
+    "active_seasons","season_count","episode_count"
+}
+
+PRESENCE_PRICE_DERIVED_SELECT = {
+    "price_amount","price_currency","price_type",
+    "price_definition","price_license","price_out_on","price_created_at"
+}
+
+PRESENCE_DEFAULT_SELECT = [
+    "uid","clean_title","type","platform_name","platform_code","iso_alpha2",
+    "hash_unique","permalink",
+    "price_amount","price_currency","price_type","price_definition","price_license","price_created_at"
+]

@@ -1,8 +1,23 @@
 # Source Code Directory Structure
 
-This document provides an overview of the src directory structure and its components.
+This document provides an overview of the src directory structure and its components, with a focus on organization and avoiding redundancy.
 
-## SQL Module Functions Documentation
+## Project Organization
+
+### Main Components
+```
+src/
+├── sql/                  # SQL and Database Operations
+│   ├── core/            # Core functionality
+│   ├── modules/         # Domain-specific modules
+│   ├── queries/         # Centralized SQL queries
+│   └── utils/           # Shared utilities
+├── data/                # Reference data files
+├── embedding/           # Embedding operations
+└── prompt_templates/    # Prompt configurations
+```
+
+## SQL Module Documentation
 
 ### Core Module (`sql/core/`)
 
@@ -109,39 +124,44 @@ Shared validation utilities:
 ### Core Components
 
 #### `/sql` - SQL Related Modules
-The SQL directory contains all database-related operations and queries organized by domain:
+The SQL directory is organized to maximize code reuse and minimize redundancy:
 
+##### Core Module
+- **core/**
+  - `admin.py` - Administrative operations and system management
+  - `validation.py` - Central validation logic for all entities
+  - `queries.py` - Core system SQL queries
+
+##### Domain-Specific Modules
 - **business/**
-  - `intelligence.py` - Business intelligence related queries and analytics
-  - `pricing.py` - Pricing related operations and queries
-  - `rankings.py` - Content ranking and performance metrics
-  - `queries.py` - Business domain specific SQL queries
-  - `tools.py` - Utility tools for business operations
+  - `intelligence.py` - Business analytics and insights
+  - `pricing.py` - Pricing analysis and strategies
+  - `rankings.py` - Performance metrics and rankings
 
 - **content/**
-  - `discovery.py` - Content discovery and recommendation logic
-  - `metadata.py` - Content metadata handling and processing
-  - `queries.py` - Content-related SQL queries
-  - `tools.py` - Utilities for content operations
-
-- **core/**
-  - `admin.py` - Administrative operations and utilities
-  - `queries.py` - Core system SQL queries
-  - `tools.py` - Core utility functions
-  - `validation.py` - Data validation and verification logic
+  - `discovery.py` - Content recommendation engine
+  - `metadata.py` - Content information management
 
 - **platform/**
-  - `availability.py` - Platform content availability checks
-  - `presence.py` - Platform presence validation
-  - `queries.py` - Platform-specific queries
-  - `tools.py` - Platform-related utilities
+  - `availability.py` - Content availability services
+  - `presence.py` - Platform presence tracking
 
 - **talent/**
-  - `actors.py` - Actor-related operations and queries
-  - `collaborations.py` - Collaboration analysis and tracking
-  - `directors.py` - Director-related operations
-  - `queries.py` - Talent-specific SQL queries
-  - `tools.py` - Talent management utilities
+  - `actors.py` - Actor management and tracking
+  - `directors.py` - Director information handling
+  - `collaborations.py` - Talent relationship analysis
+
+##### Shared Components
+- **utils/**
+  - `db_utils.py` - Database operations and connection management
+  - `validators.py` - Common validation utilities
+  - `constants.py` - System-wide constants
+
+##### Query Management
+- **queries/**
+  - Centralized location for all SQL queries
+  - Organized by domain (business, content, platform, talent)
+  - Reduces query duplication across modules
 
 #### `/data` - Data Files
 Contains essential data files in JSONL format:
@@ -159,15 +179,23 @@ Directory for embedding-related operations and models
 
 ### Utility Components
 
-#### `/sql/utils` - Shared Utilities
-- `constants_sql.py` - SQL-related constants
-- `db_utils_sql.py` - Database utility functions
-- `default_import.py` - Default import configurations
-- `sql_db.py` - Database connection and core operations
-- `validators_shared.py` - Shared validation utilities
+#### Shared Utilities (`/sql/utils/`)
+Centralized utilities to avoid code duplication:
 
-#### `/sql/tools`
-- `tools.py` - General purpose tools and utilities
+- **Database Operations**
+  - `db_utils.py` - Connection management and query execution
+  - `sql_db.py` - Core database operations
+  - `connection_pool.py` - Database connection pooling
+
+- **Validation & Processing**
+  - `validators.py` - Common validation functions
+  - `formatters.py` - Data formatting utilities
+  - `sanitizers.py` - Input sanitization
+
+- **Configuration**
+  - `constants.py` - System-wide constants
+  - `config.py` - Configuration management
+  - `defaults.py` - Default settings and imports
 
 ## Key Features
 
@@ -198,9 +226,9 @@ The system includes robust validation for:
 Each module is designed to be imported and used independently while maintaining integration with the overall system. For example:
 
 ```python
-from src.sql.core.validation import validate_director
-from src.sql.content.discovery import discover_content
-from src.sql.business.pricing import analyze_pricing
+from src.sql.modules.common.validation import validate_director
+from src.sql.modules.content.discovery import discover_content
+from src.sql.modules.business.pricing import analyze_pricing
 ```
 
 For more specific implementation details, refer to the individual module docstrings and comments.

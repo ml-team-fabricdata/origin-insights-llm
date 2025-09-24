@@ -1,8 +1,7 @@
-from typing import Union
-from sql.utils.sql_db import db
 from src.sql.talent.queries import *
-from src.sql.db_utils_sql import *
-from src.sql.constants_sql import *
+from src.sql.utils.db_utils_sql import *
+from src.sql.utils.constants_sql import *
+from src.sql.utils.default_import import *
 from src.sql.core.validation import *
 
 def get_actor_filmography(actor_id: str, limit: int = DEFAULT_LIMIT) -> Dict[str, Any]:

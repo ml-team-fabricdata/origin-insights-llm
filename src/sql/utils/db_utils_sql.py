@@ -1,6 +1,6 @@
 from __future__ import annotations
-from src.sql.default_import import *
-from src.sql.constants_sql import *
+from src.sql.utils.default_import import *
+from src.sql.utils.constants_sql import *
 
 Status = Tuple[str, Union[str, List[str], None]]
 

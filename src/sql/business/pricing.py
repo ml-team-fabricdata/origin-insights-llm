@@ -1,8 +1,8 @@
 
-from src.sql.db_utils_sql import *
-from src.sql.default_import import *
+from src.sql.utils.db_utils_sql import *
+from src.sql.utils.default_import import *
 from src.sql.business.queries import *
-from src.sql.validators_shared import *
+from src.sql.utils.validators_shared import *
 
 # ================================================================
 # Helpers de normalización y validación
@@ -715,7 +715,7 @@ def tool_prices_stats(*args, **kwargs):
             iso or plat_name) else ""
     )
 
-    scopes, params: List[str] = [], []
+    scopes, params = [], []
     if iso:
         scopes.append("p.iso_alpha2 = %s")
         params.append(iso)

@@ -1,7 +1,7 @@
-from src.sql.default_import import *
-from src.sql.db_utils_sql import *
-from src.sql.constants_sql import *
-from src.sql.validators_shared import *
+from src.sql.utils.default_import import *
+from src.sql.utils.db_utils_sql import *
+from src.sql.utils.constants_sql import *
+from src.sql.utils.validators_shared import *
 from src.sql.business.queries import *
 
 

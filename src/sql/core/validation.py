@@ -1,14 +1,8 @@
 from __future__ import annotations
-
-import logging
-from typing import Any, Dict, List, Optional, Union, Callable
-from dataclasses import dataclass
-
-from sql.utils.sql_db import db
-from src.sql.db_utils_sql import *
+from src.sql.utils.default_import import *
+from src.sql.utils.db_utils_sql import *
 from src.sql.core.queries import *
 
-logger = logging.getLogger(__name__)
 
 # Constants
 MAX_OPTIONS_DISPLAY = 8
@@ -29,22 +23,22 @@ class ValidationResult:
 
 class ValidationResponseBuilder:
     """Builder for standardized validation responses."""
-    
+
     @staticmethod
     def not_found() -> Dict[str, Any]:
         """Returns a not found response."""
         return {"status": "not_found"}
-    
+
     @staticmethod
     def resolved(result: Dict[str, Any]) -> Dict[str, Any]:
         """Returns a resolved response with a single result."""
         return {"status": "resolved", "result": result}
-    
+
     @staticmethod
     def ambiguous(options: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Returns an ambiguous response with multiple options."""
         return {"status": "ambiguous", "options": options}
-    
+
     @staticmethod
     def ok(entity_id: str, name: str) -> Dict[str, Any]:
         """Returns an OK response for person validation."""
@@ -75,7 +69,7 @@ def _build_title_result(row: Dict, is_fuzzy: bool = False) -> Dict[str, Any]:
     """Builds a standardized title result dictionary."""
     title_key = 'aka_title' if is_fuzzy else 'title'
     default_similarity = 1.0 if not is_fuzzy else 0.0
-    
+
     return {
         "uid": row.get('uid'),
         "title": row.get(title_key),
@@ -91,7 +85,7 @@ def _build_title_options(results: List[Dict], is_fuzzy: bool = False) -> List[Di
     """Builds a list of title options from search results."""
     options = []
     title_key = 'aka_title' if is_fuzzy else 'title'
-    
+
     for result in results[:MAX_OPTIONS_DISPLAY]:
         option = {
             "uid": result.get('uid'),
@@ -101,9 +95,10 @@ def _build_title_options(results: List[Dict], is_fuzzy: bool = False) -> List[Di
             "imdb_id": result.get('imdb_id')
         }
         if is_fuzzy:
-            option["title_similarity"] = _safe_float(result.get('title_similarity'))
+            option["title_similarity"] = _safe_float(
+                result.get('title_similarity'))
         options.append(option)
-    
+
     return options
 
 
@@ -111,7 +106,7 @@ def _calculate_name_similarity(query_text: str, name: str) -> float:
     """Calculates similarity score between query text and a name."""
     normalized_query = query_text.lower()
     normalized_name = (name or '').lower()
-    
+
     if normalized_name == normalized_query:
         return 1.0
     elif normalized_name.startswith(normalized_query):
@@ -127,7 +122,7 @@ def _normalize_and_validate_input(input_data: Union[str, List[str], Any]) -> Opt
     normalized = normalize_input(input_data)
     if not normalized:
         return None
-    
+
     cleaned = clean_text(normalized)
     return cleaned if cleaned else None
 
@@ -144,58 +139,62 @@ def _perform_fuzzy_search(sql_query: str, params: tuple, search_type: str, thres
 
 def _try_exact_title_search(normalized_title: str) -> Optional[Dict[str, Any]]:
     """Attempts exact title search and returns appropriate response."""
-    exact_results = _perform_exact_search(EXACT_SEARCH_SQL, (normalized_title,), "title")
-    
+    exact_results = _perform_exact_search(
+        EXACT_SEARCH_SQL, (normalized_title,), "title")
+
     if not exact_results:
         return None
-    
+
     if len(exact_results) == 1:
         return ValidationResponseBuilder.resolved(_build_title_result(exact_results[0]))
-    
+
     return ValidationResponseBuilder.ambiguous(_build_title_options(exact_results))
 
 
 def _try_fuzzy_title_search(normalized_title: str, threshold: Optional[float]) -> Dict[str, Any]:
     """Attempts fuzzy title search with fallback thresholds."""
     threshold = normalize_threshold(threshold)
-    
+
     for current_threshold in [threshold] + DEFAULT_FALLBACK_THRESHOLDS:
-        logger.debug(f"Trying title fuzzy search with threshold {current_threshold}")
-        
-        params = (normalized_title, current_threshold, current_threshold, current_threshold, DEFAULT_FUZZY_LIMIT)
-        fuzzy_results = _perform_fuzzy_search(FUZZY_SEARCH_SQL, params, "title", current_threshold)
-        
+        logger.debug(
+            f"Trying title fuzzy search with threshold {current_threshold}")
+
+        params = (normalized_title, current_threshold,
+                  current_threshold, current_threshold, DEFAULT_FUZZY_LIMIT)
+        fuzzy_results = _perform_fuzzy_search(
+            FUZZY_SEARCH_SQL, params, "title", current_threshold)
+
         if fuzzy_results:
             return _process_fuzzy_title_results(fuzzy_results, normalized_title, current_threshold)
-    
+
     return ValidationResponseBuilder.not_found()
 
 
 def _process_fuzzy_title_results(results: List[Dict], query_text: str, threshold: float) -> Dict[str, Any]:
     """Processes fuzzy title search results."""
     is_single_token_query = is_single_token(query_text)
-    
+
     if len(results) == 1 and not is_single_token_query:
         result = results[0]
         similarity = _safe_float(result.get('title_similarity'))
-        
+
         if similarity >= threshold:
             return ValidationResponseBuilder.resolved(_build_title_result(result, is_fuzzy=True))
-    
+
     return ValidationResponseBuilder.ambiguous(_build_title_options(results, is_fuzzy=True))
 
 
 def _filter_results_by_similarity(results: List[Dict], query_text: str, threshold: float) -> List[Dict]:
     """Filters fuzzy search results by similarity threshold."""
     valid_results = []
-    
+
     for result in results:
         similarity = _calculate_name_similarity(query_text, result.get('name'))
         if similarity >= threshold:
             result_copy = dict(result)
             result_copy['similarity_score'] = similarity
             valid_results.append(result_copy)
-    
+
     return valid_results
 
 
@@ -210,7 +209,7 @@ def _sort_person_results(results: List[Dict], sort_by_titles: bool = False) -> L
 def _build_person_options(results: List[Dict], include_titles_count: bool = False) -> List[Dict]:
     """Builds options list for person validation results."""
     options = []
-    
+
     for result in results[:MAX_VALIDATION_OPTIONS]:
         option = {
             "id": result.get('id'),
@@ -219,9 +218,9 @@ def _build_person_options(results: List[Dict], include_titles_count: bool = Fals
         }
         if include_titles_count:
             option["n_titles"] = _safe_int(result.get('n_titles'))
-        
+
         options.append(option)
-    
+
     return options
 
 
@@ -237,50 +236,56 @@ def _validate_person_entity(
     normalized_query = _normalize_and_validate_input(query_text)
     if not normalized_query:
         return ValidationResponseBuilder.not_found()
-    
+
     threshold = normalize_threshold(threshold)
-    logger.debug(f"Validating {entity_type}: '{normalized_query}' with threshold {threshold}")
-    
+    logger.debug(
+        f"Validating {entity_type}: '{normalized_query}' with threshold {threshold}")
+
     # Try exact search first
-    exact_results = _perform_exact_search(exact_sql, (normalized_query,), entity_type)
+    exact_results = _perform_exact_search(
+        exact_sql, (normalized_query,), entity_type)
     if exact_results:
         if len(exact_results) == 1:
             result = exact_results[0]
             return ValidationResponseBuilder.ok(result.get('id'), result.get('name'))
-        
+
         # Multiple exact matches - build options
         exact_options = []
         for result in exact_results[:MAX_VALIDATION_OPTIONS]:
-            option = {"id": result.get('id'), "name": result.get('name'), "score": 1.0}
+            option = {"id": result.get(
+                'id'), "name": result.get('name'), "score": 1.0}
             if sort_by_titles:
                 option["n_titles"] = _safe_int(result.get('n_titles'))
             exact_options.append(option)
-        
+
         return ValidationResponseBuilder.ambiguous(exact_options)
-    
+
     # Try fuzzy search with fallback thresholds
     for current_threshold in [threshold] + DEFAULT_FALLBACK_THRESHOLDS:
-        logger.debug(f"Trying {entity_type} fuzzy search with threshold {current_threshold}")
-        
-        fuzzy_results = _perform_fuzzy_search(fuzzy_sql, (normalized_query,), entity_type, current_threshold)
+        logger.debug(
+            f"Trying {entity_type} fuzzy search with threshold {current_threshold}")
+
+        fuzzy_results = _perform_fuzzy_search(
+            fuzzy_sql, (normalized_query,), entity_type, current_threshold)
         if not fuzzy_results:
             continue
-        
-        valid_results = _filter_results_by_similarity(fuzzy_results, normalized_query, current_threshold)
+
+        valid_results = _filter_results_by_similarity(
+            fuzzy_results, normalized_query, current_threshold)
         if not valid_results:
             continue
-        
+
         sorted_results = _sort_person_results(valid_results, sort_by_titles)
-        
+
         # Single result for non-single-token queries
         if len(sorted_results) == 1 and not is_single_token(normalized_query):
             result = sorted_results[0]
             return ValidationResponseBuilder.ok(result.get('id'), result.get('name'))
-        
+
         # Multiple results - return options
         options = _build_person_options(sorted_results, sort_by_titles)
         return ValidationResponseBuilder.ambiguous(options)
-    
+
     return ValidationResponseBuilder.not_found()
 
 
@@ -288,11 +293,11 @@ def search_title_exact(title: str) -> List[Dict[str, Any]]:
     """Performs exact title search."""
     if not title:
         return []
-    
+
     normalized_title = clean_text(title)
     if not normalized_title:
         return []
-    
+
     return db.execute_query(EXACT_SEARCH_SQL, (normalized_title,), "exact search")
 
 
@@ -304,11 +309,11 @@ def search_title_fuzzy(
     """Performs fuzzy title search."""
     if not title:
         return []
-    
+
     normalized_title = clean_text(title)
     if not normalized_title:
         return []
-    
+
     params = (normalized_title, threshold, threshold, threshold, limit)
     return db.execute_query(FUZZY_SEARCH_SQL, params, "fuzzy search")
 
@@ -323,14 +328,15 @@ def validate_title(title: str, threshold: Optional[float] = None) -> Dict[str, A
     normalized_query = _normalize_and_validate_input(title)
     if not normalized_query:
         return ValidationResponseBuilder.not_found()
-    
-    logger.debug(f"Validating title: '{title}' (normalized: '{normalized_query}')")
-    
+
+    logger.debug(
+        f"Validating title: '{title}' (normalized: '{normalized_query}')")
+
     # Try exact search first
     exact_result = _try_exact_title_search(normalized_query)
     if exact_result:
         return exact_result
-    
+
     # Fallback to fuzzy search
     return _try_fuzzy_title_search(normalized_query, threshold)
 
@@ -357,4 +363,3 @@ def validate_director(name: Union[str, List[str], Any], threshold: Optional[floa
         threshold=threshold,
         sort_by_titles=True
     )
-                                              

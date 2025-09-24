@@ -1,4 +1,4 @@
-from src.sql.default_import import *
+from src.sql.utils.default_import import *
 from src.sql.business.pricing import *
 from src.sql.business.rankings import *
 from src.sql.business.intelligence import *

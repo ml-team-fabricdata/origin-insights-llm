@@ -1,9 +1,9 @@
 from typing import List, Dict, Any, Optional
-from src.sql.constants_sql import *
+from src.sql.utils.constants_sql import *
 from src.sql.content.queries import *
-from sql.utils.sql_db import db
-from src.sql.db_utils_sql import *
-from src.sql.validators_shared import *
+from src.sql.utils.sql_db import db
+from src.sql.utils.db_utils_sql import *
+from src.sql.utils.validators_shared import *
 
 def get_filmography_by_uid(uid: str) -> List[Dict[str, Any]]:
     """

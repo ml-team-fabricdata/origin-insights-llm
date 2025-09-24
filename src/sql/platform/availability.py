@@ -1,7 +1,7 @@
-from src.sql.db_utils_sql import *
-from src.sql.default_import import *
+from src.sql.utils.db_utils_sql import *
+from src.sql.utils.default_import import *
 from src.sql.platform.queries import *
-from src.sql.validators_shared import *
+from src.sql.utils.validators_shared import *
 
 def get_availability_by_uid(uid: str = None, country: str = None, with_prices: bool = False) -> List[Dict]:
     """

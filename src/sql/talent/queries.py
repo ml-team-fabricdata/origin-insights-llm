@@ -1,4 +1,4 @@
-from src.sql.constants_sql import *
+from src.sql.utils.constants_sql import *
 
 
 # =============================================================================

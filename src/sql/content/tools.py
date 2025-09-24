@@ -1,6 +1,6 @@
 from langchain_core.tools import Tool
 
-from src.sql.constants_sql import *
+from src.sql.utils.constants_sql import *
 from src.sql.content.metadata import *
 from src.sql.content.discovery import *
 

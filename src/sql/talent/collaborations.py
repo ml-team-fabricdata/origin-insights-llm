@@ -1,15 +1,8 @@
-from typing import Union, Dict, Any, List, Optional, Tuple
-from functools import wraps
-import json
-import logging
-
-from sql.utils.sql_db import db
 from src.sql.talent.queries import *
-from src.sql.db_utils_sql import *
-from src.sql.constants_sql import *
+from src.sql.utils.db_utils_sql import *
+from src.sql.utils.constants_sql import *
+from src.sql.utils.default_import import *
 from src.sql.core.validation import *
-
-logger = logging.getLogger(__name__)
 
 # =============================================================================
 # GENERIC COMBINED ID PARSER

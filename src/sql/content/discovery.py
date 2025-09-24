@@ -1,7 +1,7 @@
 from typing import List, Dict, Any, Optional
 from src.sql.constants_sql import *
 from src.sql.content.queries import *
-from src.sql_db import db
+from sql.utils.sql_db import db
 from src.sql.db_utils_sql import *
 from src.sql.validators_shared import *
 

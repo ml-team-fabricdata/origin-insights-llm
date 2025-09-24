@@ -1,5 +1,5 @@
 from typing import Union
-from src.sql_db import db
+from sql.utils.sql_db import db
 from src.sql.talent.queries import *
 from src.sql.db_utils_sql import *
 from src.sql.constants_sql import *

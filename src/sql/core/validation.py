@@ -4,7 +4,7 @@ import logging
 from typing import Any, Dict, List, Optional, Union, Callable
 from dataclasses import dataclass
 
-from src.sql_db import db
+from sql.utils.sql_db import db
 from src.sql.db_utils_sql import *
 from src.sql.core.queries import *
 

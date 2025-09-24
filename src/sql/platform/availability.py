@@ -105,7 +105,6 @@ def query_platforms_for_title(uid: str, limit: int = 50) -> List[Dict]:
     logger.info(f"Platforms queried for {uid}, results: {len(result) if result else 0}")
     return handle_query_result(result, "platforms for title (uid)", uid)
 
-
 def query_platforms_for_uid_by_country(uid: str, country: str = None) -> List[Dict]:
     """
     Get platforms for a UID within a specific country.
@@ -135,7 +134,6 @@ def query_platforms_for_uid_by_country(uid: str, country: str = None) -> List[Di
     
     return handle_query_result(result, "platforms for title by country", f"{uid} @ {resolved_country}")
 
-
 def get_platform_exclusives(platform_name: str, country: str = "US", limit: int = 30) -> List[Dict]:
     """
     Get titles exclusive to a platform within a country.
@@ -161,8 +159,6 @@ def get_platform_exclusives(platform_name: str, country: str = "US", limit: int 
     
     return handle_query_result(result, "platform exclusives", ident)
 
-
-
 def compare_platforms_for_title(title_: str) -> List[Dict]:
     """
     Compare which platforms carry a given title (exact match).
@@ -182,8 +178,6 @@ def compare_platforms_for_title(title_: str) -> List[Dict]:
     
     logger.info(f"Platforms queried for {title_}, results: {result}")
     return handle_query_result(result, "compare platforms for title", title_)
-
-
 
 def get_recent_premieres_by_country(country: str, days_back: int = 7, limit: int = 30) -> List[Dict]:
     """

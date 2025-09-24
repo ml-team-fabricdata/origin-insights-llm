@@ -574,138 +574,89 @@ LIMIT %s;
 # EXCLUSIVITY & SIMILARITY
 # =============================================================================
 
-# Exclusividad por país (cálculo robusto con CROSS JOIN totals)
+# Exclusividad por país 
 SQL_PLATFORM_EXCLUSIVITY_BY_COUNTRY = f"""
-WITH scoped AS (
-  SELECT p.platform_name AS platform_name, p.uid
+WITH platform_analysis AS (
+  SELECT 
+    p.uid,
+    COUNT(DISTINCT p.platform_name) AS n_platforms,
+    BOOL_OR(p.platform_name = %s) AS on_target_platform,
+    -- Precalcular estadísticas globales con window functions
+    COUNT(*) FILTER (WHERE p.platform_name = %s) OVER () AS total_on_platform,
+    COUNT(DISTINCT p.uid) FILTER (WHERE p.platform_name = %s) OVER () AS unique_on_platform
   FROM {PRES_TBL} p
-  WHERE p.iso_alpha2 = %s
-    AND p.registry_status = 'active'
-    AND (p.out_on IS NULL OR p.out_on >= CURRENT_DATE)
+  WHERE p.iso_alpha2 = %s 
+    AND (p.out_on IS NULL)
+  GROUP BY p.uid
 ),
-agg AS (
-  SELECT
+exclusives_with_stats AS (
+  SELECT 
     uid,
-    COUNT(DISTINCT platform_name) AS n_platforms,
-    MAX(CASE WHEN platform_name = %s THEN 1 ELSE 0 END) AS on_target
-  FROM scoped
-  GROUP BY uid
-),
-exclusives AS (
-  SELECT uid
-  FROM agg
-  WHERE on_target = 1 AND n_platforms = 1
-),
-counts AS (
-  SELECT COUNT(*)::numeric AS exclusive_titles FROM exclusives
-),
-platform_totals AS (
-  SELECT COUNT(DISTINCT uid)::numeric AS total_titles_on_platform
-  FROM scoped
-  WHERE platform_name = %s
+    -- Usar la estadística precalculada
+    COUNT(*) OVER () AS exclusive_count,
+    unique_on_platform,
+    ROUND(COUNT(*) OVER () * 100.0 / NULLIF(unique_on_platform, 0), 2) AS exclusivity_pct
+  FROM platform_analysis
+  WHERE on_target_platform AND n_platforms = 1
 )
-SELECT
-  m.uid, m.title, m.type, m.year,
-  counts.exclusive_titles::int AS exclusive_titles,
-  platform_totals.total_titles_on_platform::int AS total_titles_on_platform,
-  ROUND(counts.exclusive_titles * 100.0 / NULLIF(platform_totals.total_titles_on_platform, 0), 2)
-    AS exclusivity_pct
-FROM exclusives e
+SELECT 
+  m.uid, 
+  m.title, 
+  m.type, 
+  m.year,
+  e.exclusive_count::int AS exclusive_titles,
+  e.unique_on_platform::int AS total_titles_on_platform,
+  e.exclusivity_pct
+FROM exclusives_with_stats e
 JOIN {META_TBL} m ON m.uid = e.uid
-CROSS JOIN counts
-CROSS JOIN platform_totals
 ORDER BY m.year DESC NULLS LAST, m.title ASC
 LIMIT %s;
 """
 
-# Exclusividad (versión compacta)
-QUERY_PLATFORM_EXCLUSIVITY = f"""
-WITH scoped AS (
-  SELECT p.platform_name AS platform_name, p.uid
-  FROM {PRES_TBL} p
-  WHERE p.iso_alpha2 = %s
-    AND (p.registry_status = 'active')
-), agg AS (
-  SELECT
-    uid,
-    COUNT(DISTINCT platform_name) AS n_platforms,
-    MAX(CASE WHEN platform_name = %s THEN 1 ELSE 0 END) AS on_target
-  FROM scoped
-  GROUP BY uid
-), exclusives AS (
-  SELECT uid
-  FROM agg
-  WHERE on_target = 1 AND n_platforms = 1
-)
-SELECT
-  m.uid, m.title, m.type, m.year,
-  (SELECT COUNT(*) FROM exclusives) AS exclusive_titles,
-  (SELECT COUNT(DISTINCT uid) FROM scoped 
-   WHERE platform_name = %s) AS total_titles_on_platform,
-  ROUND(
-    ( (SELECT COUNT(*) FROM exclusives)::numeric * 100 ) /
-    NULLIF( (SELECT COUNT(DISTINCT uid) FROM scoped 
-            WHERE platform_name = %s), 0 ),
-    2
-  ) AS exclusivity_pct
-FROM exclusives e
-JOIN {META_TBL} m ON m.uid = e.uid
-ORDER BY m.year DESC NULLS LAST, m.title ASC
-LIMIT {{limit}};
-"""
-
 # Similitud de catálogo entre países para una plataforma
 SQL_CATALOG_SIMILARITY_FOR_PLATFORM = f"""
-WITH country_a_titles AS (
-  SELECT DISTINCT p.uid
+WITH combined_presence AS (
+  SELECT 
+    p.uid,
+    CASE WHEN p.iso_alpha2 = %s THEN 1 ELSE 0 END AS in_country_a,
+    CASE WHEN p.iso_alpha2 = %s THEN 1 ELSE 0 END AS in_country_b
   FROM {PRES_TBL} p
   WHERE p.platform_name = %s
-    AND p.iso_alpha2 = %s
-    AND p.registry_status = 'active'
-    AND (p.out_on IS NULL OR p.out_on >= CURRENT_DATE)
-),
-country_b_titles AS (
-  SELECT DISTINCT p.uid
-  FROM {PRES_TBL} p
-  WHERE p.platform_name = %s
-    AND p.iso_alpha2 = %s
-    AND p.registry_status = 'active'
-    AND (p.out_on IS NULL OR p.out_on >= CURRENT_DATE)
-),
-shared_titles AS (
-  SELECT a.uid
-  FROM country_a_titles a
-  INNER JOIN country_b_titles b ON a.uid = b.uid
+    AND p.iso_alpha2 IN (%s, %s)
+    AND (p.out_on IS NULL)
+  GROUP BY p.uid  -- Elimina duplicados si un título está múltiples veces
+  HAVING MAX(CASE WHEN p.iso_alpha2 = %s THEN 1 ELSE 0 END) = 1 
+      OR MAX(CASE WHEN p.iso_alpha2 = %s THEN 1 ELSE 0 END) = 1
 )
-SELECT 
-  (SELECT COUNT(*) FROM country_a_titles) AS total_a,
-  (SELECT COUNT(*) FROM country_b_titles) AS total_b,
-  (SELECT COUNT(*) FROM shared_titles) AS shared,
-  (SELECT COUNT(*) FROM country_a_titles WHERE uid NOT IN (SELECT uid FROM country_b_titles)) AS unique_a,
-  (SELECT COUNT(*) FROM country_b_titles WHERE uid NOT IN (SELECT uid FROM country_a_titles)) AS unique_b;
+SELECT
+  SUM(in_country_a) AS total_a,
+  SUM(in_country_b) AS total_b,  
+  SUM(in_country_a * in_country_b) AS shared,
+  SUM(in_country_a * (1 - in_country_b)) AS unique_a,
+  SUM(in_country_b * (1 - in_country_a)) AS unique_b
+FROM combined_presence;
 """
+
 PIN_FILTER, POUT_FILTER = "", ""
 
 # Títulos en A que no están en B (con filtros opcionales por plataforma)
 SQL_TITLES_IN_A_NOT_IN_B = f"""
-SELECT
+SELECT 
   m.uid,
   m.title,
   INITCAP(m.type) AS type,
   STRING_AGG(DISTINCT p_in.platform_name, ', ' ORDER BY p_in.platform_name) AS platforms_in
 FROM {META_TBL} m
-JOIN {PRES_TBL} p_in
-  ON p_in.uid = m.uid
- AND (p_in.out_on IS NULL OR p_in.out_on >= CURRENT_DATE)
- AND p_in.iso_alpha2 = %s 
- {PIN_FILTER}
+JOIN {PRES_TBL} p_in ON p_in.uid = m.uid
+  AND p_in.iso_alpha2 = %s
+  AND (p_in.out_on IS NULL)
+  {PIN_FILTER}
 WHERE NOT EXISTS (
   SELECT 1
   FROM {PRES_TBL} p_out
   WHERE p_out.uid = m.uid
-    AND p_out.registry_status = 'active'
-    AND (p_out.out_on IS NULL OR p_out.out_on >= CURRENT_DATE)
     AND p_out.iso_alpha2 = %s
+    AND (p_out.out_on IS NULL)
     {POUT_FILTER}
 )
 GROUP BY m.uid, m.title, m.type

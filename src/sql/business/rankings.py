@@ -291,28 +291,6 @@ def get_genre_momentum(
     ident = f"{resolved_country} cur[{cur_from}..{cur_to}] vs prev[{prev_from}..{prev_to}]"
     return handle_query_result(rows, "genre momentum", ident)
 
-
-def get_platform_exclusivity_by_country(platform_name: str, country: str, limit: int = 100) -> List[Dict]:
-    """Get platform exclusives within a country scope."""
-    logger.info(
-        f"get_platform_exclusivity_by_country called with platform_name={platform_name}, country={country}, limit={limit}")
-
-    if not platform_name or not country:
-        return [{"message": "platform_name and country (ISO-2) required."}]
-
-    resolved_country = resolve_country_iso(country)
-    resolved_platform = resolve_platform_name(platform_name)
-
-    query_template = QUERY_PLATFORM_EXCLUSIVITY
-    query = query_template.format(limit=limit)
-
-    params = (resolved_country, resolved_platform,
-              resolved_platform, resolved_platform)
-    rows = db.execute_query(query, params)
-    ident = f"{resolved_platform} @ {resolved_country}"
-    return handle_query_result(rows, "platform exclusivity (country)", ident)
-
-
 # =============================================================================
 # PRESENCE (PLATFORM) FUNCTIONS
 # =============================================================================
@@ -370,7 +348,6 @@ def get_platform_exclusives(platform_name: str, country: str = "US", limit: int 
 
     rows = db.execute_query(PLATFORM_EXCLUSIVES_SQL, (resolved_platform, resolved_country, limit))
     return handle_query_result(rows, "platform exclusives", ident)
-
 
 
 def compare_platforms_for_title(title_: str):

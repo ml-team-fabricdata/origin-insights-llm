@@ -7,9 +7,9 @@ from langgraph.checkpoint.postgres import PostgresSaver
 
 import psycopg
 
-from src.sql_db import SQLConnectionManager  
+from sql.utils.sql_db import SQLConnectionManager  
 from src.prompt_templates.prompt import prompt as SYSTEM_PROMPT
-from src.sql.tools import ALL_SQL_TOOLS
+from sql.tools.tools import ALL_SQL_TOOLS
 
 VERBOSE = True
 

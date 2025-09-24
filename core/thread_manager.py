@@ -5,7 +5,7 @@ import hashlib
 from datetime import datetime
 from typing import Optional, Dict, List
 import psycopg
-from src.sql_db import SQLConnectionManager
+from sql.utils.sql_db import SQLConnectionManager
 
 class ThreadManager:
     """Gestor de thread_ids únicos para sesiones"""

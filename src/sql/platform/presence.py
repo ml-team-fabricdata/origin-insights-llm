@@ -79,7 +79,7 @@ def get_select_fields(requested_fields: Optional[List[str]] = None) -> List[str]
     return validated or ["p.uid", "p.clean_title"]
 
 # =============================================================================
-# CORE FUNCTIONS
+# FUNCTIONS
 # =============================================================================
 
 def presence_count(country: str = None, platform_name: str = None, uid: str = None, 
@@ -102,7 +102,6 @@ def presence_count(country: str = None, platform_name: str = None, uid: str = No
 
     result = db.execute_query(sql, query_params)
     return result if result else [{"message": "No results found"}]
-
 
 def presence_list(country: str = None, platform_name: str = None, type: str = None,
                  title_like: str = None, limit: int = 25, offset: int = 0,
@@ -146,7 +145,6 @@ def presence_list(country: str = None, platform_name: str = None, type: str = No
     result = db.execute_query(sql, query_params)
     return result if result else [{"message": "No results found"}]
 
-
 def presence_distinct(column: str, country: str = None, platform_name: str = None,
                      type: str = None, limit: int = 100) -> List[Dict]:
     """Get distinct values from content presence table columns"""
@@ -181,7 +179,6 @@ def presence_distinct(column: str, country: str = None, platform_name: str = Non
     result = db.execute_query(sql, query_params)
     return result if result else [{"message": "No results found", "column": column}]
 
-
 def presence_statistics(country: str = None, platform_name: str = None, type: str = None) -> List[Dict]:
     """Get statistical summary of presence data"""
     
@@ -199,7 +196,6 @@ def presence_statistics(country: str = None, platform_name: str = None, type: st
 
     result = db.execute_query(sql, query_params)
     return result if result else [{"message": "No results found"}]
-
 
 def get_availability_by_uid(uid: str, country: str = None, with_prices: bool = False) -> List[Dict]:
     """Get availability information for a specific UID"""
@@ -266,7 +262,6 @@ def get_availability_by_uid(uid: str, country: str = None, with_prices: bool = F
 
     return [response_data]
 
-
 def platform_count_by_country(country: str = None) -> List[Dict]:
     """Get count of platforms by country or for a specific country"""
     
@@ -284,7 +279,6 @@ def platform_count_by_country(country: str = None) -> List[Dict]:
 
     result = db.execute_query(sql, query_params)
     return result if result else [{"message": "No results found"}]
-
 
 def country_platform_summary(country: str = None) -> List[Dict]:
     """Get summary statistics of platforms and content by country"""
@@ -305,7 +299,7 @@ def country_platform_summary(country: str = None) -> List[Dict]:
 
 
 # =============================================================================
-# LEGACY COMPATIBILITY
+# COMPATIBILITY
 # =============================================================================
 
 def new_cp_presence_count(*args, **kwargs) -> List[Dict]:

@@ -6,6 +6,7 @@ from datetime import date, datetime, timedelta
 from src.sql_db import db
 import unicodedata as ud
 import logging
+from langchain_core.tools import Tool, StructuredTool
 import re
 import json
 

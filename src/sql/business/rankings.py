@@ -356,57 +356,52 @@ def query_platforms_for_uid_by_country(uid: str, country: str = None) -> List[Di
     return handle_query_result(result, "platforms for title by country", f"{uid} @ {resolved_country}")
 
 
-def get_platform_exclusives(platform_name: str, country: str = "US", limit: int = 30) -> List[Dict]:
-    """Get titles exclusive to a platform within a country."""
-    logger.info(
-        f"get_platform_exclusives called with platform_name={platform_name}, country={country}, limit={limit}")
-
+def get_platform_exclusives(platform_name: str, country: str = "US", limit: int = 30):
+    """
+    Get titles exclusive to a platform within a country.
+    """
+    logger.info(f"get_platform_exclusives called with platform_name={platform_name}, country={country}, limit={limit}")
     if not platform_name:
         return [{"message": "Platform name required"}]
 
-    resolved_country = resolve_country_iso(country)
+    resolved_country  = resolve_country_iso(country)
     resolved_platform = resolve_platform_name(platform_name)
     ident = f"exclusives {resolved_platform} @ {resolved_country}"
 
-    query = PresenceQueryBuilder.build_platform_exclusives_query(limit=limit)
-    result = db.execute_query(query, (resolved_platform, resolved_country))
-    return handle_query_result(result, "platform exclusives", ident)
+    rows = db.execute_query(PLATFORM_EXCLUSIVES_SQL, (resolved_platform, resolved_country, limit))
+    return handle_query_result(rows, "platform exclusives", ident)
 
 
-def compare_platforms_for_title(title_: str) -> List[Dict]:
-    """Compare which platforms carry a given title (exact match)."""
+
+def compare_platforms_for_title(title_: str):
+    """
+    Compare which platforms carry a given title (exact match).
+    """
     logger.info(f"compare_platforms_for_title called with title_={title_}")
-
     if not title_:
         return [{"message": "Title required"}]
 
-    query = PresenceQueryBuilder.build_compare_platforms_for_title_query()
-    result = db.execute_query(query, (title_,))
-    logger.info(f"Platforms queried for {title_}, results: {result}")
-    return handle_query_result(result, "compare platforms for title", title_)
+    rows = db.execute_query(COMPARE_PLATFORMS_FOR_TITLE_SQL, (title_,))
+    logger.info(f"Platforms queried for {title_}, results: {len(rows) if rows else 0}")
+    return handle_query_result(rows, "compare platforms for title", title_)
 
 
 # =============================================================================
 # TOP GLOBAL FUNCTIONS
 # =============================================================================
 
-def get_top_by_uid(uid: str) -> List[Dict]:
-    """Get top/rating information for a title by UID."""
-    logger.info(f"get_top_by_uid called with uid={uid}")
-    query = QUERY_RATING_BY_UID()
-    result = db.execute_query(query, (uid,))
-    return handle_query_result(result, "Rating by uid", f"{uid}")
+def get_top_by_uid(uid: str):
+    if not uid:
+        return [{"message": "UID required"}]
+    rows = db.execute_query(UID_RATING_SQL, (uid,))
+    return handle_query_result(rows, "Rating by uid", f"{uid}")
 
 
-def get_top_by_country(
-    country_input: str = None,
-    year: Optional[int] = None,
-    date_range: Optional[Tuple[str, str]] = None,
-    limit: int = 20
-) -> List[Dict]:
-    """Get top titles by country with optional year filter."""
-    logger.info(
-        f"get_top_by_country called with country_input={country_input}, year={year}, date_range={date_range}, limit={limit}")
+def get_top_by_country(country_input: str = None, year: int | None = None, date_range=None, limit: int = 20):
+    """
+    Get top titles by country with optional year filter.
+    """
+    logger.info(f"get_top_by_country called with country_input={country_input}, year={year}, date_range={date_range}, limit={limit}")
 
     if not country_input:
         return [{"message": "Valid country required."}]
@@ -414,17 +409,17 @@ def get_top_by_country(
     resolved_country = resolve_country_iso(country_input)
     logger.debug(f"Resolved country: {resolved_country}")
 
-    if resolved_country:
-        if year is not None:
-            query = HitsQueryBuilder.build_top_by_country_query(limit=limit)
-            result = db.execute_query(query, (resolved_country, year))
-        else:
-            query = HitsQueryBuilder.build_top_by_country_no_year_query(
-                limit=limit)
-            result = db.execute_query(query, (resolved_country,))
-        return handle_query_result(result, "top by country", f"{country_input}")
-    else:
+    if not resolved_country:
         return [{"message": f"No valid country found for '{country_input}'. Try: US, UK, CA, etc."}]
+
+    if year is not None:
+        # con año
+        rows = db.execute_query(TOP_BY_COUNTRY_SQL, (resolved_country, year, limit))
+    else:
+        # sin año
+        rows = db.execute_query(TOP_BY_COUNTRY_NO_YEAR_SQL, (resolved_country, limit))
+
+    return handle_query_result(rows, "top by country", f"{country_input}")
 
 
 def get_top_generic(

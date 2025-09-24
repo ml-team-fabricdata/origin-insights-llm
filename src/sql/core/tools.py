@@ -1,8 +1,9 @@
 from langchain_core.tools import Tool
 from src.sql.core.validation import *
-from langchain_core.tools import Tool
 
-
+# =============================================================================
+# Validation Tools
+# =============================================================================
 VALIDATE_TITLE_TOOL = Tool.from_function(
     func=validate_title,
     name="validate_title",

@@ -188,8 +188,8 @@ def get_recent_top_premieres_by_country(
 
     params = [resolved_country, date_from, date_to]
     where_clauses = [
-        "LOWER(p.iso_alpha2) = LOWER(%s)",
-        "(p.out_on IS NULL OR p.registry_status = 'active')",
+        "p.iso_alpha2 = %s",
+        "(p.out_on IS NULL)",
         "m.release_date BETWEEN %s AND %s",
     ]
 
@@ -250,12 +250,12 @@ def get_genre_momentum(
         if ct is None:
             return [{"message": f"Unknown type: '{content_type}'. Use movie/series."}]
         ct_meta = ct
-        ct_hits = ct.lower()  # hits_presence_2 uses lowercase
+        ct_hits = ct
 
     # Build WHERE clauses and parameters
-    where_hits_cur = ["LOWER(h.country) = LOWER(%s)",
+    where_hits_cur = ["h.country = %s",
                       "h.date_hits BETWEEN %s AND %s"]
-    where_hits_prev = ["LOWER(h.country) = LOWER(%s)",
+    where_hits_prev = ["h.country = %s",
                        "h.date_hits BETWEEN %s AND %s"]
 
     params_cur = [resolved_country, cur_from.isoformat(), cur_to.isoformat()]
@@ -540,8 +540,8 @@ def get_top_presence(
         params.append(resolve_platform_name(platform))
 
     if genre:
-        where.append("lower(m.primary_genre) = %s")
-        params.append(resolve_primary_genre(genre).lower())
+        where.append("m.primary_genre ILIKE %s")
+        params.append(resolve_primary_genre(genre))
 
     # Temporal filters integrated
     if days_back is not None:
@@ -623,18 +623,18 @@ def get_top_global(
         if isinstance(content_type, list):
             placeholders = ",".join(["%s"] * len(content_type))
             where.append(f"h.content_type IN ({placeholders})")
-            params.extend([resolve_content_type(ct).lower()
+            params.extend([resolve_content_type(ct)
                           for ct in content_type])
         else:
             where.append("h.content_type = %s")
-            params.append(resolve_content_type(content_type).lower())
+            params.append(resolve_content_type(content_type))
 
     if platform:
-        where.append("LOWER(p.platform_name) = LOWER(%s)")
+        where.append("p.platform_name = %s")
         params.append(resolve_platform_name(platform))
 
     if genre:
-        where.append("LOWER(m.primary_genre) = %s")
+        where.append("m.primary_genre ILIKE %s")
         params.append(resolve_primary_genre(genre))
 
     # Temporal filters integrated

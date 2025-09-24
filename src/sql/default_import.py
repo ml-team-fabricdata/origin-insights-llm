@@ -1,6 +1,6 @@
 from pathlib import Path
 from rapidfuzz import process, fuzz
-from typing import Optional, List, Any, Dict, Tuple, Union
+from typing import Optional, List, Any, Dict, Tuple, Union, Callable, Sequence, Mapping
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from src.sql_db import db

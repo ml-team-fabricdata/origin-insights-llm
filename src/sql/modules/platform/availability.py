@@ -3,23 +3,25 @@ from src.sql.utils.default_import import *
 from src.sql.queries.platform.queries_platform import *
 from src.sql.utils.validators_shared import *
 
-def get_availability_by_uid(uid: str = None, country: str = None, with_prices: bool = False) -> List[Dict]:
+def get_availability_by_uid(uid: str, country: Optional[str] = None, with_prices: bool = False) -> List[Dict]:
     """
     Get availability information for a specific UID
     
     Args:
-        uid: Unique identifier for the title
+        uid: Unique identifier for the title (required)
         country: Country ISO-2 code (optional)
         with_prices: Include price information (default: False)
         
     Returns:
         List containing availability data or error message
     """
-    
-    # Extract UID from args if passed positionally
+    # Clean and validate UID
+    if not uid or '?' in uid:  # Remove any query parameters if present
+        uid = uid.split('?')[0] if uid else None
+        
     if not uid:
         return [{"message": "UID parameter is required"}]
-
+        
     # Resolve country if provided
     country_iso = None
     if country:
@@ -40,8 +42,10 @@ def get_availability_by_uid(uid: str = None, country: str = None, with_prices: b
         sql = QUERY_AVAILABILITY_WITH_PRICES.format(country_condition=country_condition)
     else:
         sql = QUERY_AVAILABILITY_WITHOUT_PRICES.format(country_condition=country_condition)
+    print(sql)
 
     result = db.execute_query(sql, query_params)
+    logger.info(f"Availability queried for {uid} (country={country_iso}, with_prices={with_prices}), results: {len(result) if result else 0}")
 
     if not result:
         error_context = {"uid": uid, "message": "No availability found"}

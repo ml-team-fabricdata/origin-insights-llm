@@ -317,46 +317,46 @@ def get_genre_momentum(
 # =============================================================================
 
 
-def query_platforms_for_title(uid: str, limit: int = 50) -> List[Dict]:
-    """Get all platforms carrying a specific title."""
-    logger.info(
-        f"query_platforms_for_title called with uid={uid}, limit={limit}")
+# def query_platforms_for_title(uid: str, limit: int = 50) -> List[Dict]:
+#     """Get all platforms carrying a specific title."""
+#     logger.info(
+#         f"query_platforms_for_title called with uid={uid}, limit={limit}")
 
-    if not uid:
-        return [{"message": "uid required"}]
+#     if not uid:
+#         return [{"message": "uid required"}]
 
-    query = QUERY_PLATFORMS_FOR_TITLE
-    result = db.execute_query(query, (uid, limit))
+#     query = QUERY_PLATFORMS_FOR_TITLE
+#     result = db.execute_query(query, (uid, limit))
 
-    logger.info(
-        f"Platforms queried for {uid}, results: {len(result) if result else 0}")
-    return handle_query_result(result, "platforms for title (uid)", uid)
+#     logger.info(
+#         f"Platforms queried for {uid}, results: {len(result) if result else 0}")
+#     return handle_query_result(result, "platforms for title (uid)", uid)
 
 
-def query_platforms_for_uid_by_country(uid: str, country: str = None) -> List[Dict]:
-    """Get platforms for a UID within a specific country."""
-    logger.info(
-        f"query_platforms_for_uid_by_country called with uid={uid}, country={country}"
-    )
+# def query_platforms_for_uid_by_country(uid: str, country: str = None) -> List[Dict]:
+#     """Get platforms for a UID within a specific country."""
+#     logger.info(
+#         f"query_platforms_for_uid_by_country called with uid={uid}, country={country}"
+#     )
 
-    if not uid:
-        return [{"message": "uid required"}]
+#     if not uid:
+#         return [{"message": "uid required"}]
 
-    # If no country provided, fall back to generic platforms query
-    if not country:
-        logger.info(
-            "No country provided, falling back to generic platforms query")
-        return query_platforms_for_title(uid)
+#     # If no country provided, fall back to generic platforms query
+#     if not country:
+#         logger.info(
+#             "No country provided, falling back to generic platforms query")
+#         return query_platforms_for_title(uid)
 
-    resolved_country = resolve_country_iso(country)
-    if not resolved_country:
-        return [{"message": f"Invalid country code: {country}"}]
+#     resolved_country = resolve_country_iso(country)
+#     if not resolved_country:
+#         return [{"message": f"Invalid country code: {country}"}]
 
-    query = QUERY_PLATFORMS_FOR_TITLE_BY_COUNTRY
-    result = db.execute_query(query, (uid, resolved_country))
-    return handle_query_result(
-        result, "platforms for title by country", f"{uid} @ {resolved_country}"
-    )
+#     query = QUERY_PLATFORMS_FOR_TITLE_BY_COUNTRY
+#     result = db.execute_query(query, (uid, resolved_country))
+#     return handle_query_result(
+#         result, "platforms for title by country", f"{uid} @ {resolved_country}"
+#     )
 
 
 def get_platform_exclusives(platform_name: str, country: str = "US", limit: int = 30):

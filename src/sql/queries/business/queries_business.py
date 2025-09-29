@@ -213,7 +213,6 @@ latest_prices AS (
     pr.created_at
   FROM {PRICES_TBL} pr
   WHERE pr.hash_unique IN (SELECT hash_unique FROM active_presence)
-    AND (pr.active_only_price IS NULL OR pr.active_only_price = TRUE)
   ORDER BY pr.hash_unique, pr.created_at DESC
 )
 SELECT 

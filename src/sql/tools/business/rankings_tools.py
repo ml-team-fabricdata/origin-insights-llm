@@ -11,18 +11,18 @@ GENRE_MOMENTUM_TOOL = Tool.from_function(
 )
 
 
-PLATFORMS_FOR_TITLE_QUERY_TOOL = Tool.from_function(
-    name="platforms_for_title_query",
-    description="[advanced] Plataformas por UID (consulta directa, no wrapper).",
-    func=query_platforms_for_title,
-)
+# PLATFORMS_FOR_TITLE_QUERY_TOOL = Tool.from_function(
+#     name="platforms_for_title_query",
+#     description="[advanced] Plataformas por UID (consulta directa, no wrapper).",
+#     func=query_platforms_for_title,
+# )
 
 
-PLATFORMS_FOR_UID_BY_COUNTRY_QUERY_TOOL = Tool.from_function(
-    name="platforms_for_uid_by_country_query",
-    description="[advanced] Plataformas por UID+país (consulta directa).",
-    func=query_platforms_for_uid_by_country,
-)
+# PLATFORMS_FOR_UID_BY_COUNTRY_QUERY_TOOL = Tool.from_function(
+#     name="platforms_for_uid_by_country_query",
+#     description="[advanced] Plataformas por UID y país (consulta directa).",
+#     func=query_platforms_for_uid_by_country,
+# )
 
 
 PLATFORM_EXCLUSIVES_QUERY_TOOL = Tool.from_function(
@@ -95,8 +95,8 @@ TOP_BY_GENRE_IN_PLATFORM_COUNTRY_TOOL = Tool.from_function(
 ALL_RANKING_TOOLS = [
     # Rankings Tools
     GENRE_MOMENTUM_TOOL,
-    PLATFORMS_FOR_TITLE_QUERY_TOOL,
-    PLATFORMS_FOR_UID_BY_COUNTRY_QUERY_TOOL,
+    # PLATFORMS_FOR_TITLE_QUERY_TOOL,
+    # PLATFORMS_FOR_UID_BY_COUNTRY_QUERY_TOOL,
     PLATFORM_EXCLUSIVES_QUERY_TOOL,
     COMPARE_PLATFORMS_FOR_TITLE_TOOL,
     TOP_BY_UID_TOOL,

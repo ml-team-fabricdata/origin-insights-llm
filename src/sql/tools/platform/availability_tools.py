@@ -1,25 +1,26 @@
-from langchain_core.tools import Tool
+from langchain_core.tools import StructuredTool
+from typing import Optional, Dict, List, Any, Union
 from src.sql.modules.platform.availability import *
 
 # =============================================================================
 # Availability
 # =============================================================================
 
-GET_AVAILABILITY_BY_UID_TOOL = Tool.from_function(
-    name="get_availability_by_uid",
-    description=(
-        "Disponibilidad por UID; si se indica 'country' restringe por país. "
-        "Con 'with_prices'=True agrega resumen de precios."
-    ),
-    func=get_availability_by_uid,
-)
+# GET_AVAILABILITY_BY_UID_TOOL = StructuredTool.from_function(
+#     name="get_availability_by_uid",
+#     description=(
+#         "Disponibilidad por UID; si se indica 'country' restringe por país. "
+#         "Con 'with_prices'=True agrega resumen de precios."
+#     ),
+#     func=get_availability_by_uid,
+# )
 
 
-QUERY_PLATFORMS_FOR_TITLE_TOOL = Tool.from_function(
-    name="query_platforms_for_title",
-    description="Plataformas que llevan un UID (con límite configurable)",
-    func=query_platforms_for_title,
-)
+# QUERY_PLATFORMS_FOR_TITLE_TOOL = Tool.from_function(
+#     name="query_platforms_for_title",
+#     description="Plataformas que llevan un UID (con límite configurable)",
+#     func=query_platforms_for_title,
+# )
 
 
 # QUERY_PLATFORMS_FOR_UID_BY_COUNTRY_TOOL = Tool.from_function(
@@ -54,8 +55,8 @@ GET_RECENT_PREMIERES_BY_COUNTRY_TOOL = Tool.from_function(
 
 ALL_AVAILABILITY_TOOLS = [
     # Availability
-    GET_AVAILABILITY_BY_UID_TOOL,
-    QUERY_PLATFORMS_FOR_TITLE_TOOL,
+    # GET_AVAILABILITY_BY_UID_TOOL,
+    # QUERY_PLATFORMS_FOR_TITLE_TOOL,
     # QUERY_PLATFORMS_FOR_UID_BY_COUNTRY_TOOL,
     GET_PLATFORM_EXCLUSIVES_TOOL,
     COMPARE_PLATFORMS_FOR_TITLE_TOOL,

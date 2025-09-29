@@ -197,7 +197,7 @@ def presence_statistics(country: str = None, platform_name: str = None, type: st
     result = db.execute_query(sql, query_params)
     return result if result else [{"message": "No results found"}]
 
-def get_availability_by_uid(uid: str, country: str = None, with_prices: bool = False) -> List[Dict]:
+def get_availability_by_uid_price(uid: str, country: str = None, with_prices: bool = False) -> List[Dict]:
     """Get availability information for a specific UID"""
     
     if not uid:

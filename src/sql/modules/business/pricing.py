@@ -211,7 +211,6 @@ class PresenceWithPriceQuery:
     duration_max: Optional[int] = None
 
     # Filtros de precio
-    active_only_price: bool = True
     price_type: Optional[List[str]] = None
     definition: Optional[List[str]] = None
     license_: Optional[List[str]] = None
@@ -275,9 +274,6 @@ def build_presence_with_price_query(q: PresenceWithPriceQuery) -> Tuple[str, Dic
 
     # Filtros de precio
     price_where: List[str] = []
-    if q.active_only_price:
-        price_where.append(
-            "(pp.active_only_price IS NULL OR pp.active_only_price = TRUE)")
     if q.price_type:
         price_where.append("pp.price_type = ANY(%(ptype)s)")
         params["ptype"] = q.price_type

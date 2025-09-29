@@ -10,8 +10,6 @@ QUERY_PLATFORMS_FOR_TITLE = f"""
         p.platform_name,
         p.platform_country,
         p.iso_alpha2 AS country,
-        p.registry_status,
-        p.out_on,
         COUNT(*) OVER() AS total_count
     FROM {PRES_TBL} p
     WHERE p.uid = %s 
@@ -25,8 +23,6 @@ QUERY_PLATFORMS_FOR_UID_BY_COUNTRY = f"""
         p.uid,
         p.platform_name,
         p.platform_country,
-        p.iso_alpha2 AS country,
-        p.registry_status,
         p.in_on,
         p.out_on
     FROM {PRES_TBL} p
@@ -43,10 +39,8 @@ QUERY_RECENT_PREMIERES_BY_COUNTRY = f"""
             m.title,
             m.type,
             m.year,
-            m.release_date
         FROM {META_ALL} m
         WHERE m.release_date BETWEEN %(date_from)s AND %(date_to)s
-        ORDER BY m.release_date DESC
         LIMIT %(limit)s
     )
     SELECT 
@@ -76,7 +70,6 @@ QUERY_AVAILABILITY_WITH_PRICES = f"""
             license,
             created_at
         FROM {PRICES_TBL}
-        WHERE active_only_price IS NULL OR active_only_price = TRUE
         ORDER BY hash_unique, created_at DESC
     )
     SELECT
@@ -105,13 +98,8 @@ QUERY_AVAILABILITY_WITH_PRICES = f"""
 
 QUERY_AVAILABILITY_WITHOUT_PRICES = f"""
     SELECT
-        p.platform_name AS platform,
-        p.iso_alpha2 AS country_iso2,
-        p.permalink,
-        p.uid,
-        p.hash_unique,
-        p.is_exclusive,
-        p.plan_name
+        p.platform_name,
+        p.title
     FROM {PRES_TBL} p
     WHERE p.uid = %(uid)s
         {{country_condition}}

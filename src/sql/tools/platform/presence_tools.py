@@ -38,13 +38,13 @@ PRESENCE_STATISTICS_TOOL = Tool.from_function(
 )
 
 
-GET_AVAILABILITY_BY_UID_TOOL = Tool.from_function(
-    name="get_availability_by_uid",
+GET_AVAILABILITY_BY_UID_PRICE_TOOL = Tool.from_function(
+    name="get_availability_by_uid_price",
     description=(
-        "Disponibilidad por UID (opcionalmente scoping por país) y, si 'with_prices' es True, "
+        "Disponibilidad por UID (opcionalmente scoping por país) con precios, si 'with_prices' es True, "
         "incluye resumen de precios (rango, monedas, conteos)."
     ),
-    func=get_availability_by_uid,
+    func=get_availability_by_uid_price,
 )
 
 
@@ -69,7 +69,7 @@ ALL_PRESENCE_TOOLS = [
     PRESENCE_LIST_TOOL,
     PRESENCE_DISTINCT_TOOL,
     PRESENCE_STATISTICS_TOOL,
-    GET_AVAILABILITY_BY_UID_TOOL,
+    GET_AVAILABILITY_BY_UID_PRICE_TOOL,
     PLATFORM_COUNT_BY_COUNTRY_TOOL,
     COUNTRY_PLATFORM_SUMMARY_TOOL,
 ]

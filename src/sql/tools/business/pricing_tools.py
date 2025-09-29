@@ -10,7 +10,6 @@ PRESENCE_WITH_PRICE_TOOL = Tool.from_function(
         "Returns availability from ms.new_cp_presence along with LATEST valid "
         "price from ms.new_cp_presence_prices (JOIN by hash_unique using LEFT "
         "JOIN LATERAL). By default: active_only_presence=True and "
-        "active_only_price=True."
     ),
     func=query_presence_with_price,
 )

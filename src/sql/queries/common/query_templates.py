@@ -1,4 +1,4 @@
-# src/sql/queries/common/query_templates.py
+# src/src.sql.queries/common/query_templates.py
 from typing import Dict, List, Any, Optional
 from src.sql.utils.constants_sql import *
 

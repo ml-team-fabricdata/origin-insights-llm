@@ -13,7 +13,7 @@ SELECT DISTINCT ON (m.uid)
   md.imdb_id
 FROM {AKAS_TABLE} m
 LEFT JOIN {METADATA_TABLE} md ON md.uid = m.uid
-WHERE m.title) = LOWER(%s)
+WHERE m.title = LOWER(%s)
 ORDER BY m.uid, m.year NULLS LAST
 """
 

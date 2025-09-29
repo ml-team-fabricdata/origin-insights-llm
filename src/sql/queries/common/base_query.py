@@ -1,4 +1,4 @@
-# src/sql/queries/common/base_query.py
+# src/src.sql.queries/common/base_query.py
 from typing import Dict, List, Any, Optional
 from abc import ABC, abstractmethod
 from table_constants import DatabaseSchema, TableInfo

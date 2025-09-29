@@ -22,11 +22,11 @@ QUERY_PLATFORMS_FOR_TITLE_TOOL = Tool.from_function(
 )
 
 
-QUERY_PLATFORMS_FOR_UID_BY_COUNTRY_TOOL = Tool.from_function(
-    name="query_platforms_for_uid_by_country",
-    description="Plataformas para un UID dentro de un país (si no hay país, cae a consulta genérica)",
-    func=query_platforms_for_uid_by_country,
-)
+# QUERY_PLATFORMS_FOR_UID_BY_COUNTRY_TOOL = Tool.from_function(
+#     name="query_platforms_for_uid_by_country",
+#     description="Plataformas para un UID dentro de un país (si no hay país, cae a consulta genérica)",
+#     func=query_platforms_for_uid_by_country,
+# )
 
 
 GET_PLATFORM_EXCLUSIVES_TOOL = Tool.from_function(
@@ -56,7 +56,7 @@ ALL_AVAILABILITY_TOOLS = [
     # Availability
     GET_AVAILABILITY_BY_UID_TOOL,
     QUERY_PLATFORMS_FOR_TITLE_TOOL,
-    QUERY_PLATFORMS_FOR_UID_BY_COUNTRY_TOOL,
+    # QUERY_PLATFORMS_FOR_UID_BY_COUNTRY_TOOL,
     GET_PLATFORM_EXCLUSIVES_TOOL,
     COMPARE_PLATFORMS_FOR_TITLE_TOOL,
     GET_RECENT_PREMIERES_BY_COUNTRY_TOOL,

@@ -10,7 +10,7 @@ src/
 ├── sql/                  # SQL and Database Operations
 │   ├── core/            # Core functionality
 │   ├── modules/         # Domain-specific modules
-│   ├── queries/         # Centralized SQL queries
+│   ├── queries/         # Centralized src.sql.queries
 │   └── utils/           # Shared utilities
 ├── data/                # Reference data files
 ├── embedding/           # Embedding operations
@@ -29,7 +29,7 @@ src/
 - `search_title_fuzzy(title: str, threshold: float, limit: int)` - Performs fuzzy title search with configurable parameters
 
 #### Queries (`queries.py`)
-Core SQL queries and database operations for the main functionality of the system.
+Core src.sql.queries and database operations for the main functionality of the system.
 
 ### Business Module (`sql/business/`)
 
@@ -103,7 +103,7 @@ Collaboration analysis:
 
 #### Database Utilities (`db_utils_sql.py`)
 Core database functions:
-- `run_sql(sql: str, params: Optional[Union[Dict[str, Any], Tuple[Any, ...]]])` - Executes SQL queries safely
+- `run_sql(sql: str, params: Optional[Union[Dict[str, Any], Tuple[Any, ...]]])` - Executes src.sql.queries safely
 - Connection pool management
 - Query execution handlers
 
@@ -130,7 +130,7 @@ The SQL directory is organized to maximize code reuse and minimize redundancy:
 - **core/**
   - `admin.py` - Administrative operations and system management
   - `validation.py` - Central validation logic for all entities
-  - `queries.py` - Core system SQL queries
+  - `queries.py` - Core system src.sql.queries
 
 ##### Domain-Specific Modules
 - **business/**
@@ -159,7 +159,7 @@ The SQL directory is organized to maximize code reuse and minimize redundancy:
 
 ##### Query Management
 - **queries/**
-  - Centralized location for all SQL queries
+  - Centralized location for all src.sql.queries
   - Organized by domain (business, content, platform, talent)
   - Reduces query duplication across modules
 

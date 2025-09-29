@@ -1,4 +1,4 @@
-# src/sql/queries/talent/specialized_queries.py
+# src/src.sql.queries/talent/specialized_queries.py
 from typing import List, Any, Optional
 from src.sql.queries.common.base_query import BaseJoinQuery, BaseSearchQuery
 from src.sql.queries.common.table_constants import DatabaseSchema

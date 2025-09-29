@@ -1,4 +1,4 @@
-# src/sql/queries/common/query_builder.py
+# src/src.sql.queries/common/query_builder.py
 from typing import Dict, List, Any, Optional
 from .base_query import BaseQuery
 from .table_constants import DatabaseSchema

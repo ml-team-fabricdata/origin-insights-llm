@@ -1,4 +1,4 @@
-# src/sql/queries/common/table_constants.py
+# src/src.sql.queries/common/table_constants.py
 from dataclasses import dataclass
 from typing import Dict, List
 

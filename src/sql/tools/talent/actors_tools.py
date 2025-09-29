@@ -8,7 +8,7 @@ from src.sql.modules.talent.actors import *
 ACTOR_FILMOGRAPHY_BY_NAME_TOOL = Tool.from_function(
     name="get_actor_filmography_by_name",
     description=(
-        "Filmography of an ACTOR (by name). Validates the name; if ambiguous, returns options instead of guessing."
+        "Obtiene la filmografía completa de un actor buscando por nombre.\n"
     ),
     func=get_actor_filmography_by_name
 )
@@ -16,7 +16,7 @@ ACTOR_FILMOGRAPHY_BY_NAME_TOOL = Tool.from_function(
 ACTOR_COACTORS_BY_NAME_TOOL = Tool.from_function(
     name="answer_actor_coactors",
     description=(
-        "List of CO-ACTORS who worked with an ACTOR (by name). Validates the name; if ambiguous, returns options."
+        "Encuentra actores que han trabajado con un actor específico buscando por nombre.\n"
     ),
     func=get_actor_coactors_by_name
 )
@@ -24,8 +24,7 @@ ACTOR_COACTORS_BY_NAME_TOOL = Tool.from_function(
 ACTOR_FILMOGRAPHY_BY_ID_TOOL = Tool.from_function(
     name="get_actor_filmography",
     description=(
-        "Filmography of an ACTOR by ID (efficient path, no hits). Use if you "
-        "already resolved the actor_id."
+        "Obtiene la filmografía de un actor usando su ID (método eficiente).\n"
     ),
     func=get_actor_filmography
 )
@@ -33,8 +32,7 @@ ACTOR_FILMOGRAPHY_BY_ID_TOOL = Tool.from_function(
 ACTOR_COACTORS_BY_ID_TOOL = Tool.from_function(
     name="get_actor_coactors",
     description=(
-        "Co-actors of an ACTOR by ID. Use if you already resolved the "
-        "actor_id."
+        "Encuentra co-actores usando el ID del actor (método eficiente).\n"
     ),
     func=get_actor_coactors
 )

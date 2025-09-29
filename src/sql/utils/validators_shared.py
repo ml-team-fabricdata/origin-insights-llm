@@ -70,7 +70,7 @@ def resolve_content_type(content_type: Optional[str]) -> Optional[str]:
         return "Series"
     
     # Return original if not recognized (might be special type)
-    return content_type
+    return None
 
 # =============================================================================
 # GEOGRAPHIC VALIDATORS
@@ -311,39 +311,40 @@ def resolve_primary_genre(genre: Optional[str]) -> Optional[str]:
     """
     Normalize content genre to standard classification.
     
-    Maps various genre names and aliases to standard genres.
-    
     Args:
         genre: Raw genre name
         
     Returns:
         Normalized genre name, or None if not found
-        
-    Examples:
-        >>> resolve_primary_genre("Sci-Fi")
-        'science_fiction'
-        >>> resolve_primary_genre("Rom-Com")
-        'romantic_comedy'
     """
     if not genre:
         return None
     
-    # Get validation data
+    # Ahora el validation_rows es tu JSONL cargado
     validation_rows = get_validation("primary_genre")
     if not validation_rows:
         return None
     
-    # Use fuzzy matching
-    status, result = resolve_value_rapidfuzz(
-        user_text=genre,
-        rows=validation_rows,
-        field_name="primary_genre",
-        cutoff=75
-    )
+    # Aplanamos todas las opciones de alias con su canónico
+    alias_map = {}
+    for row in validation_rows:
+        canonical = row.get("primary_genre")
+        terms = row.get("terms", []) + [canonical]
+        for t in terms:
+            alias_map[t] = canonical
     
-    if status == "resolved" and result:
-        # Return lowercase for consistency
-        return result.lower()
+    # 1) Exact match rápido
+    if genre in alias_map:
+        return alias_map[genre]
+    
+    # 2) Fuzzy matching con RapidFuzz sobre los alias
+    match, _ , _ = process.extractOne(
+        genre,
+        alias_map.keys(),
+        score_cutoff=75
+    )
+    if match:
+        return alias_map[match]
     
     return None
 

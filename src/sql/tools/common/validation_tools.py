@@ -7,18 +7,25 @@ from src.sql.modules.common.validation import *
 VALIDATE_TITLE_TOOL = Tool.from_function(
     func=validate_title,
     name="validate_title",
-    description="Validates titles. Status='ambiguous': show options and STOP. Status='resolved': continue with UID."
+    description=(
+        "Valida y resuelve títulos para asegurar una identificación única.\n"
+    )
 )
+
 VALIDATE_ACTOR_TOOL = Tool.from_function(
     func=validate_actor,
     name="validate_actor",
-    description="Validates actors. Status='ambiguous': show options and STOP."
+    description=(
+        "Valida y resuelve nombres de actores para identificación única.\n"
+    )
 )
 
 VALIDATE_DIRECTOR_TOOL = Tool.from_function(
     func=validate_director,
     name="validate_director",
-    description="Validates directors. Status='ambiguous': show options and STOP."
+    description=(
+        "Valida y resuelve nombres de directores para identificación única.\n"
+    )
 )
 
 

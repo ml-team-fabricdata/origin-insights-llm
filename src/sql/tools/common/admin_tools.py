@@ -43,7 +43,7 @@ SCHEMA_INFO_TOOL = Tool.from_function(
 )
 
 
-ALL_SQL_TOOLS = [
+ALL_ADMIN_TOOLS = [
     # RUN SQL
     BUILD_SQL_TOOL,
     RUN_SQL_TOOL,

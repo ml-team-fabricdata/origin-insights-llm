@@ -9,7 +9,7 @@ import psycopg
 
 from src.sql.utils.sql_db import SQLConnectionManager  
 from src.prompt_templates.prompt import prompt as SYSTEM_PROMPT
-from sql.tools.all_tools import ALL_SQL_TOOLS
+from src.sql.tools.all_tools import ALL_SQL_TOOLS
 
 VERBOSE = True
 

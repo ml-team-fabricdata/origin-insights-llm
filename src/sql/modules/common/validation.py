@@ -1,7 +1,7 @@
 from __future__ import annotations
 from src.sql.utils.default_import import *
 from src.sql.utils.db_utils_sql import *
-from sql.queries.common.queries_validation import *
+from src.sql.queries.common.queries_validation import *
 
 
 # Constants

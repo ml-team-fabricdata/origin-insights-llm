@@ -2,7 +2,7 @@ from src.sql.utils.default_import import *
 from src.sql.utils.db_utils_sql import *
 from src.sql.utils.constants_sql import *
 from src.sql.utils.validators_shared import *
-from sql.queries.content.queries_content import *
+from src.sql.queries.content.queries_content import *
 
 
 def _normalize_tool_call(args, kwargs):

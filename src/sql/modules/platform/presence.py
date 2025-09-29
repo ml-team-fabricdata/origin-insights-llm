@@ -1,7 +1,7 @@
 from src.sql.utils.constants_sql import *
 from src.sql.utils.db_utils_sql import *
 from src.sql.utils.default_import import *
-from sql.queries.platform.queries_platform import *
+from src.sql.queries.platform.queries_platform import *
 from src.sql.utils.validators_shared import *
 
 def build_where_clause(filters: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:

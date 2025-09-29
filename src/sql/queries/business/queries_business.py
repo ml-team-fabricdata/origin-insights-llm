@@ -439,7 +439,7 @@ QUERY_TOP_PRESENCE_WITH_METADATA = f"""
 SELECT
   h.uid,
   h.title,
-  h.year AS hit_year,
+  h.year,
   m.primary_genre,
   SUM(h.hits) AS hits
 FROM {HITS_PRESENCE_TBL} h
@@ -455,7 +455,7 @@ QUERY_TOP_PRESENCE_NO_METADATA = f"""
 SELECT
   h.uid,
   h.title,
-  h.year AS hit_year,
+  h.year,
   SUM(h.hits) AS hits
 FROM {HITS_PRESENCE_TBL} h
 {{joins_clause}}
@@ -470,7 +470,7 @@ QUERY_TOP_GLOBAL_WITH_GENRE = f"""
 SELECT
   h.uid,
   m.title,
-  m.year AS hit_year,
+  m.year,
   m.primary_genre,
   SUM(h.hits) AS hits
 FROM {HITS_GLOBAL_TBL} h
@@ -486,7 +486,7 @@ QUERY_TOP_GLOBAL_NO_GENRE = f"""
 SELECT
   h.uid,
   m.title,
-  m.year AS hit_year,
+  m.year,
   SUM(h.hits) AS hits
 FROM {HITS_GLOBAL_TBL} h
 {{joins_clause}}

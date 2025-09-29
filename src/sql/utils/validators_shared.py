@@ -132,7 +132,7 @@ def resolve_country_iso(country: Optional[str]) -> Optional[str]:
         user_text=country,
         rows=validation_rows,
         field_name="platform_name_iso",
-        cutoff=75  # Use reasonable cutoff for country matching
+        cutoff=75
     )
     
     if status == "resolved" and result:

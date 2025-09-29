@@ -10,9 +10,9 @@ def normalize_langgraph_params(*args, **kwargs) -> dict:
     Handles nested kwargs format: {'kwargs': {'param1': 'value1', ...}}
     """
     # Handle LangGraph nested kwargs format
-    if 'kwargs' in kwargs and isinstance(kwargs['kwargs'], dict):
-        nested_kwargs = kwargs['kwargs']
-        other_params = {k: v for k, v in kwargs.items() if k != 'kwargs'}
+    if "kwargs" in kwargs and isinstance(kwargs["kwargs"], dict):
+        nested_kwargs = kwargs["kwargs"]
+        other_params = {k: v for k, v in kwargs.items() if k != "kwargs"}
         merged = dict(nested_kwargs)
         merged.update(other_params)
         kwargs = merged
@@ -26,7 +26,7 @@ def normalize_langgraph_params(*args, **kwargs) -> dict:
                 merged.update(kwargs)
                 return merged
             elif isinstance(arg, str):
-                parsed = json.loads(arg) if arg.startswith('{') else None
+                parsed = json.loads(arg) if arg.startswith("{") else None
                 if isinstance(parsed, dict):
                     parsed.update(kwargs)
                     return parsed
@@ -47,28 +47,40 @@ def safe_tool_response(result: Any, operation_name: str = "operation") -> str:
     Ensure tool response is never empty for Bedrock API compliance.
     """
     if result is None or (isinstance(result, list) and len(result) == 0):
-        return json.dumps({
-            "status": "no_results",
-            "message": f"No data found for {operation_name}.",
-            "data": [],
-            "count": 0
-        }, ensure_ascii=False, indent=2)
+        return json.dumps(
+            {
+                "status": "no_results",
+                "message": f"No data found for {operation_name}.",
+                "data": [],
+                "count": 0,
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
 
     if isinstance(result, str) and not result.strip():
-        return json.dumps({
-            "status": "empty_response",
-            "message": f"Empty response from {operation_name}.",
-            "data": [],
-            "count": 0
-        }, ensure_ascii=False, indent=2)
+        return json.dumps(
+            {
+                "status": "empty_response",
+                "message": f"Empty response from {operation_name}.",
+                "data": [],
+                "count": 0,
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
 
     if isinstance(result, (list, dict)):
-        return json.dumps({
-            "status": "success",
-            "data": result,
-            "count": len(result) if isinstance(result, list) else 1,
-            "operation": operation_name
-        }, ensure_ascii=False, indent=2)
+        return json.dumps(
+            {
+                "status": "success",
+                "data": result,
+                "count": len(result) if isinstance(result, list) else 1,
+                "operation": operation_name,
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
 
     return str(result) or f"No content from {operation_name}."
 
@@ -102,14 +114,14 @@ def parse_genres(genres_in: Optional[object]) -> Optional[List[str]]:
         return None
 
     # Try parsing as JSON array
-    if s.startswith('[') and s.endswith(']'):
+    if s.startswith("[") and s.endswith("]"):
         arr = json.loads(s) if s else None
         if isinstance(arr, list):
             out = [str(g).strip() for g in arr if str(g).strip()]
             return out or None
 
     # Fallback: split by comma or semicolon
-    parts = [p.strip() for p in s.replace(';', ',').split(',')]
+    parts = [p.strip() for p in s.replace(";", ",").split(",")]
     out = [p for p in parts if p]
     return out or None
 
@@ -137,11 +149,15 @@ def compute_window_anchored_to_table(days_back: int) -> Optional[Tuple[str, str]
     date_to = max_dt.isoformat()
     return date_from, date_to
 
+
 # =============================================================================
 # GENRE AND PREMIERE FUNCTIONS
 # =============================================================================
 
-def get_recent_premieres_by_country(country: str, days_back: int = 7, limit: int = 30) -> List[Dict]:
+
+def get_recent_premieres_by_country(
+    country: str, days_back: int = 7, limit: int = 30
+) -> List[Dict]:
     """Get recent premieres available in a country within the last N days."""
     if not country:
         return [{"message": "Valid country (ISO-2) required."}]
@@ -156,7 +172,8 @@ def get_recent_premieres_by_country(country: str, days_back: int = 7, limit: int
 
     logger.debug(f"Date range: {date_from} → {date_to}")
     logger.debug(
-        f"[recent_premieres] country={resolved_country}, days_back={days_back}, range=({date_from},{date_to}), limit={limit}")
+        f"[recent_premieres] country={resolved_country}, days_back={days_back}, range=({date_from},{date_to}), limit={limit}"
+    )
 
     params = {
         "country": resolved_country,
@@ -203,14 +220,17 @@ def get_recent_top_premieres_by_country(
     if genre:
         resolved_genre = resolve_primary_genre(genre)
         if resolved_genre is None:
-            return [{"message": f"Unknown genre: '{genre}'. Try Horror, Action, Comedy, Drama..."}]
+            return [
+                {
+                    "message": f"Unknown genre: '{genre}'. Try Horror, Action, Comedy, Drama..."
+                }
+            ]
         where_clauses.append("m.primary_genre = %s")
         params.append(resolved_genre)
 
     query_template = QUERY_RECENT_TOP_PREMIERES
     query = query_template.format(
-        where_clauses=" AND ".join(where_clauses),
-        limit=limit
+        where_clauses=" AND ".join(where_clauses), limit=limit
     )
 
     params_scored = params + [date_from, date_to, date_from, date_to]
@@ -253,10 +273,8 @@ def get_genre_momentum(
         ct_hits = ct
 
     # Build WHERE clauses and parameters
-    where_hits_cur = ["h.country = %s",
-                      "h.date_hits BETWEEN %s AND %s"]
-    where_hits_prev = ["h.country = %s",
-                       "h.date_hits BETWEEN %s AND %s"]
+    where_hits_cur = ["h.country = %s", "h.date_hits BETWEEN %s AND %s"]
+    where_hits_prev = ["h.country = %s", "h.date_hits BETWEEN %s AND %s"]
 
     params_cur = [resolved_country, cur_from.isoformat(), cur_to.isoformat()]
     params_prev = [resolved_country,
@@ -282,18 +300,22 @@ def get_genre_momentum(
         where_hits_cur=" AND ".join(where_hits_cur),
         where_hits_prev=" AND ".join(where_hits_prev),
         meta_join=meta_join,
-        limit=limit
+        limit=limit,
     )
 
     all_params = tuple(params_cur + params_meta + params_prev + params_meta)
     rows = db.execute_query(query, all_params)
 
-    ident = f"{resolved_country} cur[{cur_from}..{cur_to}] vs prev[{prev_from}..{prev_to}]"
+    ident = (
+        f"{resolved_country} cur[{cur_from}..{cur_to}] vs prev[{prev_from}..{prev_to}]"
+    )
     return handle_query_result(rows, "genre momentum", ident)
+
 
 # =============================================================================
 # PRESENCE (PLATFORM) FUNCTIONS
 # =============================================================================
+
 
 def query_platforms_for_title(uid: str, limit: int = 50) -> List[Dict]:
     """Get all platforms carrying a specific title."""
@@ -314,7 +336,8 @@ def query_platforms_for_title(uid: str, limit: int = 50) -> List[Dict]:
 def query_platforms_for_uid_by_country(uid: str, country: str = None) -> List[Dict]:
     """Get platforms for a UID within a specific country."""
     logger.info(
-        f"query_platforms_for_uid_by_country called with uid={uid}, country={country}")
+        f"query_platforms_for_uid_by_country called with uid={uid}, country={country}"
+    )
 
     if not uid:
         return [{"message": "uid required"}]
@@ -331,22 +354,28 @@ def query_platforms_for_uid_by_country(uid: str, country: str = None) -> List[Di
 
     query = QUERY_PLATFORMS_FOR_TITLE_BY_COUNTRY
     result = db.execute_query(query, (uid, resolved_country))
-    return handle_query_result(result, "platforms for title by country", f"{uid} @ {resolved_country}")
+    return handle_query_result(
+        result, "platforms for title by country", f"{uid} @ {resolved_country}"
+    )
 
 
 def get_platform_exclusives(platform_name: str, country: str = "US", limit: int = 30):
     """
     Get titles exclusive to a platform within a country.
     """
-    logger.info(f"get_platform_exclusives called with platform_name={platform_name}, country={country}, limit={limit}")
+    logger.info(
+        f"get_platform_exclusives called with platform_name={platform_name}, country={country}, limit={limit}"
+    )
     if not platform_name:
         return [{"message": "Platform name required"}]
 
-    resolved_country  = resolve_country_iso(country)
+    resolved_country = resolve_country_iso(country)
     resolved_platform = resolve_platform_name(platform_name)
     ident = f"exclusives {resolved_platform} @ {resolved_country}"
 
-    rows = db.execute_query(PLATFORM_EXCLUSIVES_SQL, (resolved_platform, resolved_country, limit))
+    rows = db.execute_query(
+        PLATFORM_EXCLUSIVES_SQL, (resolved_platform, resolved_country, limit)
+    )
     return handle_query_result(rows, "platform exclusives", ident)
 
 
@@ -359,13 +388,15 @@ def compare_platforms_for_title(title_: str):
         return [{"message": "Title required"}]
 
     rows = db.execute_query(COMPARE_PLATFORMS_FOR_TITLE_SQL, (title_,))
-    logger.info(f"Platforms queried for {title_}, results: {len(rows) if rows else 0}")
+    logger.info(
+        f"Platforms queried for {title_}, results: {len(rows) if rows else 0}")
     return handle_query_result(rows, "compare platforms for title", title_)
 
 
 # =============================================================================
 # TOP GLOBAL FUNCTIONS
 # =============================================================================
+
 
 def get_top_by_uid(uid: str):
     if not uid:
@@ -374,11 +405,15 @@ def get_top_by_uid(uid: str):
     return handle_query_result(rows, "Rating by uid", f"{uid}")
 
 
-def get_top_by_country(country_input: str = None, year: int | None = None, date_range=None, limit: int = 20):
+def get_top_by_country(
+    country_input: str = None, year: int | None = None, date_range=None, limit: int = 20
+):
     """
     Get top titles by country with optional year filter.
     """
-    logger.info(f"get_top_by_country called with country_input={country_input}, year={year}, date_range={date_range}, limit={limit}")
+    logger.info(
+        f"get_top_by_country called with country_input={country_input}, year={year}, date_range={date_range}, limit={limit}"
+    )
 
     if not country_input:
         return [{"message": "Valid country required."}]
@@ -387,14 +422,20 @@ def get_top_by_country(country_input: str = None, year: int | None = None, date_
     logger.debug(f"Resolved country: {resolved_country}")
 
     if not resolved_country:
-        return [{"message": f"No valid country found for '{country_input}'. Try: US, UK, CA, etc."}]
+        return [
+            {
+                "message": f"No valid country found for '{country_input}'. Try: US, UK, CA, etc."
+            }
+        ]
 
     if year is not None:
         # con año
-        rows = db.execute_query(TOP_BY_COUNTRY_SQL, (resolved_country, year, limit))
+        rows = db.execute_query(
+            TOP_BY_COUNTRY_SQL, (resolved_country, year, limit))
     else:
         # sin año
-        rows = db.execute_query(TOP_BY_COUNTRY_NO_YEAR_SQL, (resolved_country, limit))
+        rows = db.execute_query(
+            TOP_BY_COUNTRY_NO_YEAR_SQL, (resolved_country, limit))
 
     return handle_query_result(rows, "top by country", f"{country_input}")
 
@@ -414,25 +455,35 @@ def get_top_generic(
     *,
     region: Optional[str] = None,
     countries_list: Optional[List[str]] = None,
-    # Aliases que suelen venir desde el wrapper/tool
+    # Aliases
     type: Optional[str] = None,   # alias de content_type
     year: Optional[int] = None,   # alias de currentyear
 ) -> List[Dict[str, Any]]:
-    """Generic top titles query with flexible filtering."""
+    """Generic top titles query with flexible filtering, sin helpers extra."""
 
-    content_type = resolve_content_type(content_type) or resolve_content_type(type) 
+    # -------- Normalizaciones únicas --------
+    normalized_content_type = resolve_content_type(
+        content_type) or resolve_content_type(type)
 
+    resolved_currentyear = (
+        int(currentyear) if currentyear is not None
+        else (int(year) if year is not None else None)
+    )
 
-    # Resolver alias de año: year -> currentyear
-    resolved_currentyear = currentyear
-    if currentyear is None and year is not None:
-        resolved_currentyear = int(year)
+    normalized_platform = resolve_platform_name(platform) if platform else None
+    normalized_genre = resolve_primary_genre(genre) if genre else None
 
-    print(
-        f"[DEBUG] get_top_generic - year: {year}, currentyear: {currentyear}, resolved_currentyear: {resolved_currentyear}")
-    if genre:
-        genre = resolve_primary_genre(genre)
-    # Geographic resolution
+    # Límite seguro inline
+    try:
+        limit_val = int(limit) if limit is not None else 20
+    except (TypeError, ValueError):
+        limit_val = 20
+    if limit_val < 1:
+        limit_val = 1
+    if limit_val > 200:
+        limit_val = 200
+
+    # Geografía inline
     resolved_country = resolve_country_iso(country) if country else None
     iso_set: List[str] = []
     if not resolved_country and (region or countries_list):
@@ -441,19 +492,42 @@ def get_top_generic(
         if not iso_set and countries_list:
             iso_set = [c.strip().upper()
                        for c in countries_list if isinstance(c, str) and c.strip()]
-            
+
+    print(
+        f"[DEBUG] get_top_generic | ct={normalized_content_type} platform={normalized_platform} "
+        f"genre={normalized_genre} country={resolved_country} iso_set={iso_set} "
+        f"year={resolved_currentyear} y_from={year_from} y_to={year_to} "
+        f"days_back={days_back} date_from={date_from} date_to={date_to} limit={limit_val}"
+    )
 
     # Routing
     if resolved_country or iso_set:
         return get_top_presence(
-            resolved_country, iso_set, platform, genre, content_type,
-            limit, days_back, date_from, date_to,
-            year, year_from, year_to
+            resolved_country=resolved_country,
+            iso_set=iso_set,
+            platform=normalized_platform,
+            genre=normalized_genre,
+            content_type=normalized_content_type,
+            limit=limit_val,
+            days_back=days_back,
+            date_from=date_from,
+            date_to=date_to,
+            currentyear=resolved_currentyear,
+            year_from=year_from,
+            year_to=year_to,
         )
     else:
         return get_top_global(
-            platform, genre, content_type, limit, days_back,
-            date_from, date_to, year, year_from, year_to
+            platform=normalized_platform,
+            genre=normalized_genre,
+            content_type=normalized_content_type,
+            limit=limit_val,
+            days_back=days_back,
+            date_from=date_from,
+            date_to=date_to,
+            currentyear=resolved_currentyear,
+            year_from=year_from,
+            year_to=year_to,
         )
 
 
@@ -471,7 +545,7 @@ def get_top_presence(
     year_from: Optional[int],
     year_to: Optional[int],
 ) -> List[Dict[str, Any]]:
-    """Optimized version that applies filters in JOINs for maximum performance."""
+    """Optimized version that applies filters in JOINs for maximum performance (sin helpers)."""
 
     params: List[Any] = []
     where: List[str] = []
@@ -479,10 +553,9 @@ def get_top_presence(
 
     needs_metadata = bool(resolved_country or iso_set or genre)
     if needs_metadata:
-        joins.append(
-            f"INNER JOIN {PRES_TBL} p ON h.uid = p.uid INNER JOIN {META_TBL} m ON h.uid = m.uid")
+        joins.append(f"INNER JOIN {META_TBL} m ON h.uid = m.uid")
 
-    # Geographic filters
+    # Geográfico
     if resolved_country:
         where.append("m.countries_iso = %s")
         params.append(resolved_country)
@@ -496,27 +569,21 @@ def get_top_presence(
                 conds.append("m.countries_iso LIKE %s")
                 params.append(f"%{iso}%")
             if conds:
-                where.append(f"({' OR '.join(conds)})")
+                where.append("(" + " OR ".join(conds) + ")")
 
-    # Content filters
+    # Contenido
     if content_type:
-        if isinstance(content_type, list):
-            placeholders = ",".join(["%s"] * len(content_type))
-            where.append(f"h.content_type IN ({placeholders})")
-            params.extend([resolve_content_type(ct) for ct in content_type])
-        else:
-            where.append("h.content_type = %s")
-            params.append(resolve_content_type(content_type))
-
+        where.append("h.content_type = %s")
+        params.append(content_type)
     if platform:
         where.append("h.platform_name = %s")
-        params.append(resolve_platform_name(platform))
-
+        params.append(platform)
     if genre:
-        where.append("m.primary_genre ILIKE %s")
-        params.append(resolve_primary_genre(genre))
+        # Mantengo ILIKE si esperás variantes
+        where.append("m.primary_genre = %s")
+        params.append(genre)
 
-    # Temporal filters integrated
+    # Temporal inline (columna de presence: h.date_hits)
     if days_back is not None:
         validated = validate_days_back(days_back, default=7)
         window = compute_window_anchored_to_table(validated)
@@ -532,24 +599,18 @@ def get_top_presence(
             where.append("h.date_hits <= %s")
             params.append(date_to)
 
-    # Year filters
+    # Año inline (presence usa h.year)
     if currentyear is not None:
         where.append("h.year = %s")
-        params.append(currentyear)
-
+        params.append(int(currentyear))
     if year_from is not None:
         where.append("h.year >= %s")
-        params.append(year_from)
-
+        params.append(int(year_from))
     if year_to is not None:
         where.append("h.year <= %s")
-        params.append(year_to)
+        params.append(int(year_to))
 
-    print(f"[DEBUG presence] where: {where}")
-    print(f"[DEBUG presence] params: {tuple(params)}")
-
-    # Query construction
-    where_clause = f"WHERE {' AND '.join(where)} AND p.out_on IS NULL " if where else " WHERE p.out_on IS NULL  "
+    where_clause = f"WHERE {' AND '.join(where)}" if where else ""
     joins_clause = " ".join(joins)
 
     query_template = QUERY_TOP_PRESENCE_WITH_METADATA if needs_metadata else QUERY_TOP_PRESENCE_NO_METADATA
@@ -558,8 +619,8 @@ def get_top_presence(
 
     params.append(limit)
 
-    print(f"PRESENCE SQL: {query}")
-    print(f"PRESENCE Params: {tuple(params)}")
+    print(f"[PRESENCE SQL] {query}")
+    print(f"[PRESENCE params] {tuple(params)}")
 
     rows = db.execute_query(query, tuple(params))
     return build_result(
@@ -581,32 +642,27 @@ def get_top_global(
     year_from: Optional[int],
     year_to: Optional[int],
 ) -> List[Dict[str, Any]]:
-    """Query ms.hits_global for global data."""
+    """Query ms.hits_global for global data (sin helpers)."""
 
     params: List[Any] = []
     where: List[str] = []
     joins: List[str] = []
 
-    # Basic join for clean_title
-    joins.append(
-        f"INNER JOIN {META_TBL} m ON h.uid = m.uid")
+    # Siempre unimos a META para clean_title / plataforma / género
+    joins.append(f"INNER JOIN {META_TBL} m ON h.uid = m.uid")
 
-    # Content filters
+    # Contenido
     if content_type:
-            where.append("h.content_type = %s")
-            content_type = resolve_content_type(content_type)
-            params.append("serie" if "Series" in content_type else content_type)
-
+        where.append("h.content_type = %s")
+        params.append('serie' if 'Series' in content_type else content_type)
     if platform:
         where.append("m.platform_name = %s")
-        params.append(resolve_platform_name(platform))
-
+        params.append(platform)
     if genre:
         where.append("m.primary_genre = %s")
-        genre = resolve_primary_genre(genre)
         params.append(genre)
 
-    # Temporal filters integrated
+    # Temporal inline (columna global: h.date_hits)
     if days_back is not None:
         validated = validate_days_back(days_back, default=7)
         window = compute_window_anchored_to_table(validated)
@@ -622,25 +678,19 @@ def get_top_global(
             where.append("h.date_hits <= %s")
             params.append(date_to)
 
-    # Year filters
+    # Año inline (global usa h.currentyear)
     if currentyear is not None:
         where.append("h.currentyear = %s")
-        params.append(currentyear)
-
+        params.append(int(currentyear))
     if year_from is not None:
         where.append("h.currentyear >= %s")
-        params.append(year_from)
-
+        params.append(int(year_from))
     if year_to is not None:
         where.append("h.currentyear <= %s")
-        params.append(year_to)
+        params.append(int(year_to))
 
-    print(f"[DEBUG global] where: {where}")
-    print(f"[DEBUG global] params: {tuple(params)}")
-
-    # Query construction
-    where_clause = f"WHERE {' AND '.join(where)}  " if where else " "
-    joins_clause = " ".join(j for j in joins if j)
+    where_clause = f"WHERE {' AND '.join(where)}" if where else ""
+    joins_clause = " ".join(joins)
 
     query_template = QUERY_TOP_GLOBAL_WITH_GENRE if bool(
         genre) else QUERY_TOP_GLOBAL_NO_GENRE
@@ -649,8 +699,8 @@ def get_top_global(
 
     params.append(limit)
 
-    print(f"GLOBAL SQL: {query}")
-    print(f"GLOBAL Params: {tuple(params)}")
+    print(f"[GLOBAL SQL] {query}")
+    print(f"[GLOBAL params] {tuple(params)}")
 
     rows = db.execute_query(query, tuple(params))
     return build_result(
@@ -673,16 +723,21 @@ def build_result(
     date_to: Optional[str],
     currentyear: Optional[int],
     year_from: Optional[int],
-    year_to: Optional[int]
+    year_to: Optional[int],
 ) -> List[Dict[str, Any]]:
     """Build result with logging and year/currentyear normalization."""
 
     window_id = (
-        f"rolling_{days_back}d" if days_back is not None
+        f"rolling_{days_back}d"
+        if days_back is not None
         else ("custom_range" if (date_from or date_to) else "all_time")
     )
     if query_type == "presence":
-        loc_id = f"country={resolved_country}" if resolved_country else f"countries={iso_set}"
+        loc_id = (
+            f"country={resolved_country}"
+            if resolved_country
+            else f"countries={iso_set}"
+        )
     else:
         loc_id = "global"
 
@@ -703,7 +758,7 @@ def build_result(
 
     # Normalize to ensure year/currentyear in final payload
     norm_rows: List[Dict[str, Any]] = []
-    for r in (rows or []):
+    for r in rows or []:
         d = dict(r) if not isinstance(r, dict) else r.copy()
 
         # year: take alias hit_year if it exists
@@ -726,6 +781,7 @@ def build_result(
 # CONVENIENCE WRAPPER FUNCTIONS
 # =============================================================================
 
+
 def get_top_by_genre(genre_input: str, limit: int = 10) -> List[Dict]:
     """Simple wrapper for top titles by genre."""
     return get_top_generic(genre=genre_input, limit=limit)
@@ -737,10 +793,7 @@ def get_top_by_type(content_type: str, limit: int = 10) -> List[Dict]:
 
 
 def get_top_by_genre_in_platform_country(
-    genre_input: str,
-    platform_name: str,
-    country_iso: str,
-    limit: int = 10
+    genre_input: str, platform_name: str, country_iso: str, limit: int = 10
 ) -> List[Dict]:
     """Get top titles by genre within a specific platform and country."""
     genre_input = resolve_primary_genre(genre_input)
@@ -757,10 +810,15 @@ def get_top_by_genre_in_platform_country(
 # TOOL-SAFE WRAPPER FUNCTIONS
 # =============================================================================
 
-def get_recent_premieres_by_country_tool(country: str, days_back: int = 7, limit: int = 30) -> str:
+
+def get_recent_premieres_by_country_tool(
+    country: str, days_back: int = 7, limit: int = 30
+) -> str:
     """Tool-safe wrapper for recent premieres query."""
     rows = get_recent_premieres_by_country(country, days_back, limit)
-    return safe_tool_response(rows, f"recent_premieres {country} {days_back}d limit={limit}")
+    return safe_tool_response(
+        rows, f"recent_premieres {country} {days_back}d limit={limit}"
+    )
 
 
 def get_recent_top_premieres_by_country_tool(
@@ -768,14 +826,15 @@ def get_recent_top_premieres_by_country_tool(
     days_back: int = 7,
     limit: int = 30,
     content_type: Optional[str] = None,
-    genre: Optional[str] = None
+    genre: Optional[str] = None,
 ) -> str:
     """Tool-safe wrapper for recent top premieres query."""
     rows = get_recent_top_premieres_by_country(
-        country, days_back, limit, content_type, genre)
+        country, days_back, limit, content_type, genre
+    )
     return safe_tool_response(
         rows,
-        f"recent_top {country} {days_back}d type={content_type or 'any'} genre={genre or 'any'} limit={limit}"
+        f"recent_top {country} {days_back}d type={content_type or 'any'} genre={genre or 'any'} limit={limit}",
     )
 
 
@@ -786,18 +845,18 @@ def query_platforms_for_title_tool(*args, **kwargs) -> str:
 
     # Extract uid from various possible parameter formats
     uid = (
-        params.get("uid") or
-        params.get("__arg1") or
-        params.get("title_uid") or
-        (args[0] if args and isinstance(args[0], str) else None)
+        params.get("uid")
+        or params.get("__arg1")
+        or params.get("title_uid")
+        or (args[0] if args and isinstance(args[0], str) else None)
     )
 
     limit = params.get("limit", 10)
 
     if not uid:
         return safe_tool_response(
-            [{"message": "UID parameter required"}],
-            "platforms_for_title_missing_uid"
+            [{"message": "UID parameter required"}
+             ], "platforms_for_title_missing_uid"
         )
 
     # Call the main function
@@ -813,22 +872,21 @@ def query_platforms_for_uid_by_country_tool(*args, **kwargs) -> str:
 
     # Extract uid from various possible parameter formats
     uid = (
-        params.get("uid") or
-        params.get("__arg1") or
-        params.get("title_uid") or
-        (args[0] if args and isinstance(args[0], str) else None)
+        params.get("uid")
+        or params.get("__arg1")
+        or params.get("title_uid")
+        or (args[0] if args and isinstance(args[0], str) else None)
     )
 
     country = (
-        params.get("country") or
-        params.get("iso_alpha2") or
-        params.get("country_code")
+        params.get("country") or params.get(
+            "iso_alpha2") or params.get("country_code")
     )
 
     if not uid:
         return safe_tool_response(
-            [{"message": "UID parameter required"}],
-            "platforms_by_country_missing_uid"
+            [{"message": "UID parameter required"}
+             ], "platforms_by_country_missing_uid"
         )
 
     # Call the main function
@@ -837,10 +895,14 @@ def query_platforms_for_uid_by_country_tool(*args, **kwargs) -> str:
     return safe_tool_response(rows, operation_name)
 
 
-def get_platform_exclusives_tool(platform_name: str, country: str = "US", limit: int = 30) -> str:
+def get_platform_exclusives_tool(
+    platform_name: str, country: str = "US", limit: int = 30
+) -> str:
     """Tool-safe wrapper for platform exclusives query."""
     rows = get_platform_exclusives(platform_name, country, limit)
-    return safe_tool_response(rows, f"platform_exclusives {platform_name}@{country} limit={limit}")
+    return safe_tool_response(
+        rows, f"platform_exclusives {platform_name}@{country} limit={limit}"
+    )
 
 
 def get_top_generic_tool(*args, **kwargs) -> str:
@@ -866,7 +928,9 @@ def get_top_generic_tool(*args, **kwargs) -> str:
     year_to = params.get("year_to")
     region = params.get("region")
 
-    print(f"[DEBUG] Wrapper - year: {year}, currentyear: {currentyear}, content_type: {content_type}, genre: {genre}")
+    print(
+        f"[DEBUG] Wrapper - year: {year}, currentyear: {currentyear}, content_type: {content_type}, genre: {genre}"
+    )
 
     # Call main function
     rows = get_top_generic(
@@ -882,7 +946,7 @@ def get_top_generic_tool(*args, **kwargs) -> str:
         year=year,
         year_from=year_from,
         year_to=year_to,
-        region=region
+        region=region,
     )
 
     # Create structured response
@@ -899,11 +963,11 @@ def get_top_generic_tool(*args, **kwargs) -> str:
             "limit": limit,
             "days_back": days_back,
             "date_from": date_from,
-            "date_to": date_to
+            "date_to": date_to,
         },
         "data": rows if isinstance(rows, list) else [],
         "count": len(rows) if isinstance(rows, list) else 0,
-        "timestamp": datetime.now().isoformat()
+        "timestamp": datetime.now().isoformat(),
     }
 
     return json.dumps(response, ensure_ascii=False, indent=2, default=str)
@@ -923,27 +987,27 @@ def new_top_by_country_tool(*args, **kwargs) -> str:
     limit = params.get("limit", 20)
 
     if not country:
-        return json.dumps({
-            "status": "error",
-            "operation": "new_top_by_country",
-            "error": "Country parameter required",
-            "data": [],
-            "count": 0
-        }, ensure_ascii=False, indent=2)
+        return json.dumps(
+            {
+                "status": "error",
+                "operation": "new_top_by_country",
+                "error": "Country parameter required",
+                "data": [],
+                "count": 0,
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
 
     rows = get_top_by_country(country, year=year, limit=limit)
 
     response = {
         "status": "success",
         "operation": "new_top_by_country",
-        "filters_applied": {
-            "country": country,
-            "year": year,
-            "limit": limit
-        },
+        "filters_applied": {"country": country, "year": year, "limit": limit},
         "data": rows if isinstance(rows, list) else [],
         "count": len(rows) if isinstance(rows, list) else 0,
-        "timestamp": datetime.now().isoformat()
+        "timestamp": datetime.now().isoformat(),
     }
 
     return json.dumps(response, ensure_ascii=False, indent=2, default=str)
@@ -952,6 +1016,7 @@ def new_top_by_country_tool(*args, **kwargs) -> str:
 # =============================================================================
 # LEGACY COMPATIBILITY FUNCTIONS
 # =============================================================================
+
 
 def tool_top_generic(*args, **kwargs) -> str:
     """Legacy compatibility wrapper"""
@@ -962,107 +1027,114 @@ def tool_top_by_country(*args, **kwargs) -> str:
     """Legacy compatibility wrapper"""
     return new_top_by_country_tool(*args, **kwargs)
 
+
 def get_top_by_type_tool(*args, **kwargs) -> str:
     """Tool-safe wrapper for top by type query."""
     params = normalize_langgraph_params(*args, **kwargs)
-    
+
     # Extract parameters
-    content_type = params.get("content_type") or params.get("type") or params.get("__arg1")
+    content_type = (
+        params.get("content_type") or params.get(
+            "type") or params.get("__arg1")
+    )
     limit = params.get("limit", 10)
-    
+
     # If content_type looks like JSON, try to parse it
-    if isinstance(content_type, str) and content_type.startswith('{'):
+    if isinstance(content_type, str) and content_type.startswith("{"):
         try:
             parsed = json.loads(content_type)
             content_type = parsed.get("type") or parsed.get("content_type")
             limit = parsed.get("limit", limit)
         except:
             pass
-    
+
     if not content_type:
-        return json.dumps({
-            "status": "error",
-            "operation": "top_by_type",
-            "error": "content_type parameter required",
-            "data": [],
-            "count": 0
-        }, ensure_ascii=False, indent=2)
-    
+        return json.dumps(
+            {
+                "status": "error",
+                "operation": "top_by_type",
+                "error": "content_type parameter required",
+                "data": [],
+                "count": 0,
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+
     # Call main function
     rows = get_top_by_type(content_type, limit)
-    
+
     response = {
         "status": "success",
         "operation": "top_by_type",
-        "filters_applied": {
-            "content_type": content_type,
-            "limit": limit
-        },
+        "filters_applied": {"content_type": content_type, "limit": limit},
         "data": rows if isinstance(rows, list) else [],
         "count": len(rows) if isinstance(rows, list) else 0,
-        "timestamp": datetime.now().isoformat()
+        "timestamp": datetime.now().isoformat(),
     }
-    
+
     return json.dumps(response, ensure_ascii=False, indent=2, default=str)
 
 
 def get_top_by_genre_tool(*args, **kwargs) -> str:
     """Tool-safe wrapper for top by genre query."""
     params = normalize_langgraph_params(*args, **kwargs)
-    
+
     # Extract parameters
-    genre = params.get("genre") or params.get("genre_input") or params.get("__arg1")
+    genre = params.get("genre") or params.get(
+        "genre_input") or params.get("__arg1")
     limit = params.get("limit", 10)
-    
+
     # If genre looks like JSON, try to parse it
-    if isinstance(genre, str) and genre.startswith('{'):
+    if isinstance(genre, str) and genre.startswith("{"):
         try:
             parsed = json.loads(genre)
             genre = parsed.get("genre") or parsed.get("genre_input")
             limit = parsed.get("limit", limit)
         except:
             pass
-    
+
     if not genre:
-        return json.dumps({
-            "status": "error",
-            "operation": "top_by_genre",
-            "error": "genre parameter required",
-            "data": [],
-            "count": 0
-        }, ensure_ascii=False, indent=2)
-    
+        return json.dumps(
+            {
+                "status": "error",
+                "operation": "top_by_genre",
+                "error": "genre parameter required",
+                "data": [],
+                "count": 0,
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+
     # Call main function
     rows = get_top_by_genre(genre, limit)
-    
+
     response = {
         "status": "success",
         "operation": "top_by_genre",
-        "filters_applied": {
-            "genre": genre,
-            "limit": limit
-        },
+        "filters_applied": {"genre": genre, "limit": limit},
         "data": rows if isinstance(rows, list) else [],
         "count": len(rows) if isinstance(rows, list) else 0,
-        "timestamp": datetime.now().isoformat()
+        "timestamp": datetime.now().isoformat(),
     }
-    
+
     return json.dumps(response, ensure_ascii=False, indent=2, default=str)
 
 
 def get_top_global_tool(*args, **kwargs) -> str:
     """Tool-safe wrapper for top global query."""
     params = normalize_langgraph_params(*args, **kwargs)
-    
+
     # If first arg is JSON string, parse it
     arg1 = params.get("__arg1")
-    if isinstance(arg1, str) and arg1.startswith('{'):
+    if isinstance(arg1, str) and arg1.startswith("{"):
         try:
             parsed = json.loads(arg1)
             params.update(parsed)
         except:
             pass
-    
+
     # Extract parameters
     platform = params.get("platform")
     genre = params.get("genre")
@@ -1074,7 +1146,7 @@ def get_top_global_tool(*args, **kwargs) -> str:
     currentyear = params.get("currentyear") or params.get("year")
     year_from = params.get("year_from")
     year_to = params.get("year_to")
-    
+
     # Call main function
     rows = get_top_global(
         platform=platform,
@@ -1086,9 +1158,9 @@ def get_top_global_tool(*args, **kwargs) -> str:
         date_to=date_to,
         currentyear=currentyear,
         year_from=year_from,
-        year_to=year_to
+        year_to=year_to,
     )
-    
+
     response = {
         "status": "success",
         "operation": "top_global",
@@ -1102,29 +1174,29 @@ def get_top_global_tool(*args, **kwargs) -> str:
             "date_to": date_to,
             "currentyear": currentyear,
             "year_from": year_from,
-            "year_to": year_to
+            "year_to": year_to,
         },
         "data": rows if isinstance(rows, list) else [],
         "count": len(rows) if isinstance(rows, list) else 0,
-        "timestamp": datetime.now().isoformat()
+        "timestamp": datetime.now().isoformat(),
     }
-    
+
     return json.dumps(response, ensure_ascii=False, indent=2, default=str)
 
 
 def get_top_presence_tool(*args, **kwargs) -> str:
     """Tool-safe wrapper for top presence query."""
     params = normalize_langgraph_params(*args, **kwargs)
-    
+
     # If first arg is JSON string, parse it
     arg1 = params.get("__arg1")
-    if isinstance(arg1, str) and arg1.startswith('{'):
+    if isinstance(arg1, str) and arg1.startswith("{"):
         try:
             parsed = json.loads(arg1)
             params.update(parsed)
         except:
             pass
-    
+
     # Extract parameters
     resolved_country = params.get("country") or params.get("resolved_country")
     iso_set = params.get("iso_set", [])
@@ -1138,11 +1210,11 @@ def get_top_presence_tool(*args, **kwargs) -> str:
     currentyear = params.get("currentyear") or params.get("year")
     year_from = params.get("year_from")
     year_to = params.get("year_to")
-    
+
     # Resolve country if provided
     if resolved_country:
         resolved_country = resolve_country_iso(resolved_country)
-    
+
     # Call main function
     rows = get_top_presence(
         resolved_country=resolved_country,
@@ -1156,9 +1228,9 @@ def get_top_presence_tool(*args, **kwargs) -> str:
         date_to=date_to,
         currentyear=currentyear,
         year_from=year_from,
-        year_to=year_to
+        year_to=year_to,
     )
-    
+
     response = {
         "status": "success",
         "operation": "top_presence",
@@ -1174,11 +1246,11 @@ def get_top_presence_tool(*args, **kwargs) -> str:
             "date_to": date_to,
             "currentyear": currentyear,
             "year_from": year_from,
-            "year_to": year_to
+            "year_to": year_to,
         },
         "data": rows if isinstance(rows, list) else [],
         "count": len(rows) if isinstance(rows, list) else 0,
-        "timestamp": datetime.now().isoformat()
+        "timestamp": datetime.now().isoformat(),
     }
-    
+
     return json.dumps(response, ensure_ascii=False, indent=2, default=str)

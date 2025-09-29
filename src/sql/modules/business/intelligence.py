@@ -2,7 +2,7 @@ from src.sql.utils.default_import import *
 from src.sql.utils.db_utils_sql import *
 from src.sql.utils.constants_sql import *
 from src.sql.utils.validators_shared import *
-from sql.queries.talent.queries_talent import *
+from src.sql.queries.talent.queries_talent import *
 
 
 # ------------------------------------------------------------------

@@ -517,7 +517,8 @@ def get_validation(field_name: str) -> List[Dict]:
         return [{"error": "Field name is required"}]
 
     result = []
-    file_path = Path(f"data/{field_name}.jsonl")
+    print(f"Loading validation data from {field_name}")
+    file_path = Path(f"src/data/{field_name}.jsonl")
 
     # Check if file exists
     if not file_path.exists():

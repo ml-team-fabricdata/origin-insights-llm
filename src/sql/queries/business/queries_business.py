@@ -1,4 +1,3 @@
-
 from src.sql.utils.constants_sql import *
 
 # =============================================================================
@@ -555,7 +554,7 @@ LIMIT %s;
 # EXCLUSIVITY & SIMILARITY
 # =============================================================================
 
-# Exclusividad por país 
+# Exclusividad por país
 SQL_PLATFORM_EXCLUSIVITY_BY_COUNTRY = f"""
 WITH platform_analysis AS (
   SELECT 
@@ -618,28 +617,29 @@ SELECT
 FROM combined_presence;
 """
 
-SQL_TITLES_IN_A_NOT_IN_B =f"""
+SQL_TITLES_IN_A_NOT_IN_B = f"""
 SELECT
   m.uid,
   m.title,
   INITCAP(m.type) AS type,
-  STRING_AGG(DISTINCT p_in.platform_name, ', ' ORDER BY p_in.platform_name) AS platforms_in
+  STRING_AGG(DISTINCT p_in.platform_name, ', ' ORDER BY p_in.platform_name) AS platforms_in,
+  STRING_AGG(DISTINCT p_in.iso_alpha2, ', ' ORDER BY p_in.iso_alpha2) AS countries_in
 FROM {META_TBL} m
 JOIN {PRES_TBL} p_in ON p_in.uid = m.uid
-  AND p_in.iso_alpha2 = %s
+  AND {{in_condition}}
   AND (p_in.out_on IS NULL)
-  {{PIN_FILTER}}
+  {{pin_filter}}
 WHERE NOT EXISTS (
   SELECT 1
   FROM {PRES_TBL} p_out
   WHERE p_out.uid = m.uid
-    AND p_out.iso_alpha2 = %s
+    AND {{out_condition}}
     AND (p_out.out_on IS NULL)
-    {{POUT_FILTER}}
+    {{pout_filter}}
 )
 GROUP BY m.uid, m.title, m.type
 ORDER BY m.title
-LIMIT %s;
+LIMIT {{limit_placeholder}};
 """
 
 # =============================================================================

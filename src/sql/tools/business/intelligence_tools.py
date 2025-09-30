@@ -25,12 +25,15 @@ CATALOG_SIMILARITY_TOOL = Tool.from_function(
 TITLES_DIFFERENCE_TOOL = StructuredTool.from_function(
     name="titles_in_A_not_in_B",
     description=(
-        "Titles present in country_in and NOT in country_not_in (ISO-2). "
-        "Optional platform filter applies the same platform to both countries."
+        "Find titles available on a platform in location A but NOT in location B. "
+        "Both parameters accept either individual countries (ISO-2 codes like 'US', 'JP', 'MX') "
+        "or regions ('LATAM', 'EU', 'ASIA', 'OCEANIA', 'AFRICA', 'MENA'). "
+        "Optional platform filter (e.g., 'netflix', 'prime', 'disney+') applies to both locations. "
+        "Examples: US vs JP, US vs ASIA, LATAM vs EU, MX vs LATAM. "
+        "Returns up to 'limit' titles (default 50, max 200)."
     ),
     func=titles_in_A_not_in_B_sql,
 )
-
 ALL_INTELLIGENCE_TOOLS = [
     # Intelligence Tools
     PLATFORM_EXCLUSIVITY_COUNTRY_TOOL,

@@ -22,7 +22,7 @@ CATALOG_SIMILARITY_TOOL = Tool.from_function(
     func=catalog_similarity_for_platform,
 )
 
-TITLES_DIFFERENCE_TOOL = Tool.from_function(
+TITLES_DIFFERENCE_TOOL = StructuredTool.from_function(
     name="titles_in_A_not_in_B",
     description=(
         "Titles present in country_in and NOT in country_not_in (ISO-2). "

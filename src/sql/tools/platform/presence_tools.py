@@ -38,7 +38,7 @@ PRESENCE_STATISTICS_TOOL = Tool.from_function(
 )
 
 
-GET_AVAILABILITY_BY_UID_PRICE_TOOL = Tool.from_function(
+GET_AVAILABILITY_BY_UID_PRICE_TOOL = StructuredTool.from_function(
     name="get_availability_by_uid_price",
     description=(
         "Disponibilidad por UID (opcionalmente scoping por país) con precios, si 'with_prices' es True, "

@@ -32,11 +32,11 @@ PLATFORM_EXCLUSIVES_QUERY_TOOL = Tool.from_function(
 )
 
 
-COMPARE_PLATFORMS_FOR_TITLE_TOOL = Tool.from_function(
-    name="compare_platforms_for_title",
-    description="Comparar plataformas que tienen un título (match exacto).",
-    func=compare_platforms_for_title,
-)
+# COMPARE_PLATFORMS_FOR_TITLE_TOOL = Tool.from_function(
+#     name="compare_platforms_for_title",
+#     description="Comparar plataformas que tienen un título (match exacto).",
+#     func=compare_platforms_for_title,
+# )
 
 
 TOP_BY_UID_TOOL = Tool.from_function(
@@ -97,8 +97,8 @@ ALL_RANKING_TOOLS = [
     GENRE_MOMENTUM_TOOL,
     # PLATFORMS_FOR_TITLE_QUERY_TOOL,
     # PLATFORMS_FOR_UID_BY_COUNTRY_QUERY_TOOL,
+    # COMPARE_PLATFORMS_FOR_TITLE_TOOL,
     PLATFORM_EXCLUSIVES_QUERY_TOOL,
-    COMPARE_PLATFORMS_FOR_TITLE_TOOL,
     TOP_BY_UID_TOOL,
     TOP_BY_COUNTRY_QUERY_TOOL,
     TOP_GENERIC_QUERY_TOOL,

@@ -99,7 +99,7 @@ QUERY_AVAILABILITY_WITH_PRICES = f"""
 QUERY_AVAILABILITY_WITHOUT_PRICES = f"""
     SELECT
         p.platform_name,
-        p.title
+        p.clean_title
     FROM {PRES_TBL} p
     WHERE p.uid = %(uid)s
         {{country_condition}}
@@ -195,18 +195,18 @@ QUERY_PLATFORM_COUNT_ALL_COUNTRIES = f"""
 """
 
 QUERY_COUNTRY_PLATFORM_SUMMARY = f"""
-    SELECT 
-        p.iso_alpha2 AS country,
-        COUNT(DISTINCT p.platform_name) AS unique_platforms,
-        COUNT(DISTINCT p.uid) AS unique_content,
-        COUNT(*) AS total_records,
-        COUNT(CASE WHEN p.type = 'Movie' THEN 1 END) AS movies,
-        COUNT(CASE WHEN p.type = 'Series' THEN 1 END) AS series,
-        COUNT(CASE WHEN p.is_exclusive = 'true' THEN 1 END) AS exclusive_content,
-        array_agg(DISTINCT p.platform_name ORDER BY p.platform_name) AS platforms
-    FROM {PRES_TBL} p
+SELECT
+    p.iso_alpha2 AS country,
+    COUNT(DISTINCT p.platform_name) AS unique_platforms,
+    COUNT(DISTINCT p.uid) AS unique_content,
+    COUNT(*) AS total_records,
+    COUNT(CASE WHEN p.type = 'Movie' THEN 1 END) AS movies,
+    COUNT(CASE WHEN p.type = 'Series' THEN 1 END) AS series,
+    COUNT(CASE WHEN p.is_exclusive = 'true' THEN 1 END) AS exclusive_content,
+    array_agg(DISTINCT p.platform_name ORDER BY p.platform_name) AS platforms
+FROM {PRES_TBL} p
+WHERE p.out_on IS NULL
     {{country_condition}}
-    AND p.out_on IS NULL
-    GROUP BY p.iso_alpha2
-    ORDER BY unique_platforms DESC, unique_content DESC;
+GROUP BY p.iso_alpha2
+ORDER BY unique_platforms DESC, unique_content DESC;
 """

@@ -838,61 +838,61 @@ def get_recent_top_premieres_by_country_tool(
     )
 
 
-def query_platforms_for_title_tool(*args, **kwargs) -> str:
-    """Tool-safe wrapper for platforms by title query."""
-    # Normalize parameters from LangGraph
-    params = normalize_langgraph_params(*args, **kwargs)
+# def query_platforms_for_title_tool(*args, **kwargs) -> str:
+#     """Tool-safe wrapper for platforms by title query."""
+#     # Normalize parameters from LangGraph
+#     params = normalize_langgraph_params(*args, **kwargs)
 
-    # Extract uid from various possible parameter formats
-    uid = (
-        params.get("uid")
-        or params.get("__arg1")
-        or params.get("title_uid")
-        or (args[0] if args and isinstance(args[0], str) else None)
-    )
+#     # Extract uid from various possible parameter formats
+#     uid = (
+#         params.get("uid")
+#         or params.get("__arg1")
+#         or params.get("title_uid")
+#         or (args[0] if args and isinstance(args[0], str) else None)
+#     )
 
-    limit = params.get("limit", 10)
+#     limit = params.get("limit", 10)
 
-    if not uid:
-        return safe_tool_response(
-            [{"message": "UID parameter required"}
-             ], "platforms_for_title_missing_uid"
-        )
+#     if not uid:
+#         return safe_tool_response(
+#             [{"message": "UID parameter required"}
+#              ], "platforms_for_title_missing_uid"
+#         )
 
-    # Call the main function
-    rows = query_platforms_for_title(uid, limit)
-    operation_name = f"platforms_for_uid {uid} limit={limit}"
-    return safe_tool_response(rows, operation_name)
+#     # Call the main function
+#     rows = query_platforms_for_title(uid, limit)
+#     operation_name = f"platforms_for_uid {uid} limit={limit}"
+#     return safe_tool_response(rows, operation_name)
 
 
-def query_platforms_for_uid_by_country_tool(*args, **kwargs) -> str:
-    """Tool-safe wrapper for platforms by title and country query."""
-    # Normalize parameters from LangGraph
-    params = normalize_langgraph_params(*args, **kwargs)
+# def query_platforms_for_uid_by_country_tool(*args, **kwargs) -> str:
+#     """Tool-safe wrapper for platforms by title and country query."""
+#     # Normalize parameters from LangGraph
+#     params = normalize_langgraph_params(*args, **kwargs)
 
-    # Extract uid from various possible parameter formats
-    uid = (
-        params.get("uid")
-        or params.get("__arg1")
-        or params.get("title_uid")
-        or (args[0] if args and isinstance(args[0], str) else None)
-    )
+#     # Extract uid from various possible parameter formats
+#     uid = (
+#         params.get("uid")
+#         or params.get("__arg1")
+#         or params.get("title_uid")
+#         or (args[0] if args and isinstance(args[0], str) else None)
+#     )
 
-    country = (
-        params.get("country") or params.get(
-            "iso_alpha2") or params.get("country_code")
-    )
+#     country = (
+#         params.get("country") or params.get(
+#             "iso_alpha2") or params.get("country_code")
+#     )
 
-    if not uid:
-        return safe_tool_response(
-            [{"message": "UID parameter required"}
-             ], "platforms_by_country_missing_uid"
-        )
+#     if not uid:
+#         return safe_tool_response(
+#             [{"message": "UID parameter required"}
+#              ], "platforms_by_country_missing_uid"
+#         )
 
-    # Call the main function
-    rows = query_platforms_for_uid_by_country(uid, country)
-    operation_name = f"platforms_for_uid_by_country {uid}@{country or 'all'}"
-    return safe_tool_response(rows, operation_name)
+#     # Call the main function
+#     rows = query_platforms_for_uid_by_country(uid, country)
+#     operation_name = f"platforms_for_uid_by_country {uid}@{country or 'all'}"
+#     return safe_tool_response(rows, operation_name)
 
 
 def get_platform_exclusives_tool(

@@ -22,6 +22,14 @@ def get_availability_by_uid(uid: str, country: Optional[str] = None, with_prices
     if not uid:
         return [{"message": "UID parameter is required"}]
         
+    # Handle country suffix in UID if present
+    if '_' in uid:
+        uid_parts = uid.split('_')
+        if len(uid_parts) == 2 and len(uid_parts[1]) == 2:  # Looks like ISO-2 country code
+            uid = uid_parts[0]
+            if not country:  # Only use suffix if no explicit country provided
+                country = uid_parts[1]
+        
     # Resolve country if provided
     country_iso = None
     if country:

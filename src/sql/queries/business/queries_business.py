@@ -1,6 +1,5 @@
 
 from src.sql.utils.constants_sql import *
-from src.sql.modules.business.intelligence import *
 
 # =============================================================================
 # PRICE QUERIES
@@ -372,23 +371,6 @@ FROM {PRES_TBL} p
 {{where_clause}};
 """
 
-QUERY_COUNTRY_PLATFORM_SUMMARY = f"""
-SELECT 
-  p.iso_alpha2 AS country,
-  COUNT(DISTINCT p.platform_name) AS unique_platforms,
-  COUNT(DISTINCT p.uid) AS unique_content,
-  COUNT(*) AS total_records,
-  COUNT(*) FILTER (WHERE p.type = 'Movie') AS movies,
-  COUNT(*) FILTER (WHERE p.type = 'Series') AS series,
-  COUNT(*) FILTER (WHERE p.is_exclusive = 'true') AS exclusive_content,
-  STRING_AGG(DISTINCT p.platform_name, ',' ORDER BY p.platform_name) AS platforms_list
-FROM {PRES_TBL} p
-WHERE p.out_on IS NULL
-  {{country_condition}}
-GROUP BY p.iso_alpha2
-ORDER BY unique_platforms DESC, unique_content DESC;
-"""
-
 # Presence con precio (paginable)
 SQL_PRESENCE_WITH_PRICE_OPTIMIZED = f"""
 WITH filtered_presence AS (
@@ -636,11 +618,8 @@ SELECT
 FROM combined_presence;
 """
 
-PIN_FILTER, POUT_FILTER = "", ""
-
-# Títulos en A que no están en B (con filtros opcionales por plataforma)
-SQL_TITLES_IN_A_NOT_IN_B = f"""
-SELECT 
+SQL_TITLES_IN_A_NOT_IN_B =f"""
+SELECT
   m.uid,
   m.title,
   INITCAP(m.type) AS type,
@@ -649,14 +628,14 @@ FROM {META_TBL} m
 JOIN {PRES_TBL} p_in ON p_in.uid = m.uid
   AND p_in.iso_alpha2 = %s
   AND (p_in.out_on IS NULL)
-  {PIN_FILTER}
+  {{PIN_FILTER}}
 WHERE NOT EXISTS (
   SELECT 1
   FROM {PRES_TBL} p_out
   WHERE p_out.uid = m.uid
     AND p_out.iso_alpha2 = %s
     AND (p_out.out_on IS NULL)
-    {POUT_FILTER}
+    {{POUT_FILTER}}
 )
 GROUP BY m.uid, m.title, m.type
 ORDER BY m.title

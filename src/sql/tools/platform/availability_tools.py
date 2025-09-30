@@ -37,9 +37,9 @@ GET_PLATFORM_EXCLUSIVES_TOOL = Tool.from_function(
 )
 
 
-COMPARE_PLATFORMS_FOR_TITLE_TOOL = Tool.from_function(
+COMPARE_PLATFORMS_FOR_TITLE_TOOL = StructuredTool.from_function(
     name="compare_platforms_for_title",
-    description="Comparación: qué plataformas tienen un título (match exacto)",
+    description="Comparación de dos o más plataformas que tienen el mismo título (match exacto)",
     func=compare_platforms_for_title,
 )
 

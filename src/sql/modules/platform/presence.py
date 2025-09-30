@@ -200,8 +200,21 @@ def presence_statistics(country: str = None, platform_name: str = None, type: st
 def get_availability_by_uid_price(uid: str, country: str = None, with_prices: bool = False) -> List[Dict]:
     """Get availability information for a specific UID"""
     
+
     if not uid:
         return [{"message": "UID parameter is required"}]
+
+    # Clean UID and strip query params
+    if '?' in uid:
+        uid = uid.split('?')[0]
+
+    if '_' in uid:
+        parts = uid.split('_')
+        if len(parts) == 2 and len(parts[1]) == 2:
+            base_uid, suffix = parts[0], parts[1]
+            uid = base_uid
+            if not country:
+                country = suffix
 
     query_params = {"uid": uid}
     country_condition = ""
@@ -210,7 +223,7 @@ def get_availability_by_uid_price(uid: str, country: str = None, with_prices: bo
         country_iso = resolve_country_iso(country)
         if country_iso:
             country_condition = "AND p.iso_alpha2 = %(country_iso)s"
-            query_params["country_iso"] = country_iso
+            query_params["country_iso"] = country_iso.upper()
 
     # Select appropriate query
     if with_prices:
@@ -281,20 +294,28 @@ def platform_count_by_country(country: str = None) -> List[Dict]:
     return result if result else [{"message": "No results found"}]
 
 def country_platform_summary(country: str = None) -> List[Dict]:
-    """Get summary statistics of platforms and content by country"""
-    
+    """Get summary statistics of platforms and content by country or region"""
+   
     country_condition = ""
-    query_params = {}
-
+    params = ()
+    
     if country:
-        country_iso = resolve_country_iso(country)
-        if country_iso:
-            country_condition = "WHERE p.iso_alpha2 = %(country_iso)s"
-            query_params["country_iso"] = country_iso
-
-    sql = QUERY_COUNTRY_PLATFORM_SUMMARY.format(country_condition=country_condition)
-
-    result = db.execute_query(sql, query_params)
+        # Try to resolve as region first, then as individual country
+        isos = resolve_region_isos(country) or [resolve_country_iso(country)]
+        isos = [iso for iso in isos if iso]  # Filter out None values
+        
+        if isos:
+            # Build the condition with placeholders
+            placeholders = ', '.join(['%s'] * len(isos))
+            country_condition = f"AND p.iso_alpha2 IN ({placeholders})"
+            params = tuple(isos)
+    
+    logger.info(f"Countries: {params}")
+    logger.info(f"Country condition: {country_condition}")
+    
+    sql = QUERY_COUNTRY_PLATFORM_SUMMARY.replace("{country_condition}", country_condition)
+    result = db.execute_query(sql, params)
+    
     return result if result else [{"message": "No results found"}]
 
 
@@ -308,4 +329,4 @@ def new_cp_presence_count(*args, **kwargs) -> List[Dict]:
 
 def fetch_availability_by_uid(*args, **kwargs) -> List[Dict]:
     """Legacy compatibility function"""
-    return get_availability_by_uid(**kwargs)
+    return get_availability_by_uid_price(**kwargs)

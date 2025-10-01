@@ -251,26 +251,51 @@ def _clamp_rolling(max_d: date, days: int, prev_days: int):
     prev_from= prev_to  - timedelta(days=prev_days-1)
     return cur_from, cur_to, prev_from, prev_to
 
-def get_genre_momentum(country: Optional[str], days=30, prev_days=None,
-                       content_type: Optional[str]=None, limit=20) -> List[Dict]:
-    days = validate_days_back(days, default=30)
-    prev_days = validate_days_back(prev_days if prev_days else days, default=days)
+def get_genre_momentum(
+    country: Optional[str],
+    days: int = 30,
+    prev_days: Optional[int] = None,
+    content_type: Optional[str] = None,
+    limit: int = 20,
+) -> List[Dict]:
+    """
+    Ranking de géneros por momentum (ventana actual vs previa).
+    - country: ISO-2 o None para global. Acepta aliases: GLOBAL, WORLD, ALL.
+    - days / prev_days: tamaño de ventanas (en días). Si prev_days es None, usa days.
+    - content_type: 'movie' | 'series' | None
+    - limit: 1..200
+    """
 
+    # Normaliza país
+    if country and country.strip().upper() in {"GLOBAL", "WORLD", "ALL", "NONE", "NULL"}:
+        country = None
+
+    # Valida ventanas
+    days = validate_days_back(days, default=30)
+    prev_days = validate_days_back(prev_days if prev_days is not None else days, default=days)
+
+    # Rango de fechas
     max_d = _max_date_hits()
     cur_from, cur_to, prev_from, prev_to = _clamp_rolling(max_d, days, prev_days)
     min_from, max_to = min(cur_from, prev_from), max(cur_to, prev_to)
+
+    # Tablas y filtro de país
     if not country:
         hits_table     = HITS_GLOBAL_TBL
-        country_clause = ""           # sin filtro de país
+        country_clause = ""
         country_label  = ""
     else:
         iso = resolve_country_iso(country or "")
+        if not iso:
+            return [{"message": f"Unknown country: '{country}'"}]
         hits_table     = HITS_PRESENCE_TBL
-        country_clause = f" AND h.iso_alpha2 = %s"
+        country_clause = " AND h.iso_alpha2 = %s"
         country_label  = iso
 
-    ct_hits_clause = ct_meta_clause = ""
-    params = [cur_from, cur_to, prev_from, prev_to, min_from, max_to]
+    # Filtros por tipo de contenido
+    ct_hits_clause = ""
+    ct_meta_clause = ""
+    params: List[object] = [cur_from, cur_to, prev_from, prev_to, min_from, max_to]
     if country:
         params.append(country_label)
 
@@ -282,15 +307,31 @@ def get_genre_momentum(country: Optional[str], days=30, prev_days=None,
         ct_meta_clause = " AND m.type = %s"
         params.extend([ct, ct])
 
-    params.append(max(1, min(int(limit or 20), 200)))
+    # Clamp de límite
+    try:
+        limit_int = int(limit)
+    except Exception:
+        limit_int = 20
+    limit_int = max(1, min(limit_int, 200))
+    params.append(limit_int)
 
+    # SQL (solo interpolar identificadores/clauses; valores con %s)
     sql = QUERY_GENRE_MOMENTUM.format(
-        HITS_TABLE=hits_table, META_TBL=META_TBL,
-        COUNTRY_CLAUSE=country_clause, CT_HITS_CLAUSE=ct_hits_clause, CT_META_CLAUSE=ct_meta_clause,
+        HITS_TABLE=hits_table,
+        META_TBL=META_TBL,
+        COUNTRY_CLAUSE=country_clause,
+        CT_HITS_CLAUSE=ct_hits_clause,
+        CT_META_CLAUSE=ct_meta_clause,
+    )
+
+    # Log seguro (sin aplicar % sobre el SQL)
+    logger.debug(
+        "genre_momentum cur=%s..%s prev=%s..%s country=%s type=%s limit=%s",
+        cur_from, cur_to, prev_from, prev_to, country_label or "GLOBAL", content_type or "-", limit_int
     )
 
     rows = db.execute_query(sql, tuple(params)) or []
-    ident = f"{country_label} cur[{cur_from}..{cur_to}] vs prev[{prev_from}..{prev_to}]"
+    ident = f"{country_label or 'GLOBAL'} cur[{cur_from}..{cur_to}] vs prev[{prev_from}..{prev_to}]"
     return handle_query_result(rows, "genre momentum", ident)
 # =============================================================================
 # PRESENCE (PLATFORM) FUNCTIONS

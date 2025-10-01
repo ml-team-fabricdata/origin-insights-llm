@@ -4,11 +4,6 @@ from src.sql.modules.business.rankings import *
 # =============================================================================
 # Rankings Tools
 # =============================================================================
-# GENRE_MOMENTUM_TOOL = Tool.from_function(
-#     name="genre_momentum",
-#     description="[advanced] Ranking de géneros por crecimiento (ventana actual vs ventana previa).",
-#     func=get_genre_momentum,
-# )
 
 # class GenreMomentumArgs(BaseModel):
 #     country: str | None = Field(None, description="ISO-2 o 'global'")

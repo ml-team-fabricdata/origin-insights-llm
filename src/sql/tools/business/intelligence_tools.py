@@ -22,6 +22,7 @@ CATALOG_SIMILARITY_TOOL = Tool.from_function(
     func=catalog_similarity_for_platform,
 )
 
+
 TITLES_DIFFERENCE_TOOL = StructuredTool.from_function(
     name="titles_in_A_not_in_B",
     description=(
@@ -34,6 +35,7 @@ TITLES_DIFFERENCE_TOOL = StructuredTool.from_function(
     ),
     func=titles_in_A_not_in_B_sql,
 )
+
 ALL_INTELLIGENCE_TOOLS = [
     # Intelligence Tools
     PLATFORM_EXCLUSIVITY_COUNTRY_TOOL,

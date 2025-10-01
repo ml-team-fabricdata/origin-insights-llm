@@ -4,12 +4,30 @@ from src.sql.modules.business.rankings import *
 # =============================================================================
 # Rankings Tools
 # =============================================================================
-GENRE_MOMENTUM_TOOL = Tool.from_function(
+# GENRE_MOMENTUM_TOOL = Tool.from_function(
+#     name="genre_momentum",
+#     description="[advanced] Ranking de géneros por crecimiento (ventana actual vs ventana previa).",
+#     func=get_genre_momentum,
+# )
+
+# class GenreMomentumArgs(BaseModel):
+#     country: str | None = Field(None, description="ISO-2 o 'global'")
+#     days: int = Field(30, ge=1)
+#     prev_days: int | None = Field(None, ge=1)
+#     content_type: str | None = Field(None, description="'movie' o 'series'")
+#     preset: str | None = Field(None, description="last_30d|last_60d|last_90d|last_year|last_12m|last_5_years|global")
+#     limit: int = Field(20, ge=1, le=200)
+
+GENRE_MOMENTUM_TOOL = StructuredTool.from_function(
     name="genre_momentum",
-    description="[advanced] Ranking de géneros por crecimiento (ventana actual vs ventana previa).",
+    description=(
+        "Ranking de géneros por crecimiento. "
+        "Con país → ms.hits_presence; sin país/global → ms.hits_global. "
+        "Admite 'preset' (last_30d/60d/90d/last_year/last_12m/last_5_years/global). "
+        "Ancla ventanas a MAX(date_hits)."
+    ),
     func=get_genre_momentum,
 )
-
 
 # PLATFORMS_FOR_TITLE_QUERY_TOOL = Tool.from_function(
 #     name="platforms_for_title_query",
@@ -63,22 +81,22 @@ TOP_GENERIC_QUERY_TOOL = Tool.from_function(
 TOP_PRESENCE_TOOL = Tool.from_function(
     name="top_presence",
     description="[advanced] Top en tabla de presencia (requiere ISO resuelto o iso_set).",
-    func=get_top_presence_tool,
+    func=get_top_generic_tool,
 )
 
 
 TOP_GLOBAL_TOOL = Tool.from_function(
     name="top_global",
     description="[advanced] Top en tabla global de hits (con filtros por tipo, plataforma y género).",
-    func=get_top_global_tool,
+    func=get_top_generic_tool,
 )
 
 
-TOP_BY_GENRE_TOOL = Tool.from_function(
-    name="top_by_genre",
-    description="[SIMPLE] Solo por género, SIN otros filtros. Si necesitas género+tipo, usa top_generic_query.",
-    func=get_top_by_genre_tool,
-)
+# TOP_BY_GENRE_TOOL = Tool.from_function(
+#     name="top_by_genre",
+#     description="[SIMPLE] Solo por género, SIN otros filtros. Si necesitas género+tipo, usa top_generic_query.",
+#     func=get_top_by_genre_tool,
+# )
 
 TOP_BY_TYPE_TOOL = Tool.from_function(
     name="top_by_type",
@@ -104,7 +122,7 @@ ALL_RANKING_TOOLS = [
     TOP_GENERIC_QUERY_TOOL,
     TOP_PRESENCE_TOOL,
     TOP_GLOBAL_TOOL,
-    TOP_BY_GENRE_TOOL,
+    # TOP_BY_GENRE_TOOL,
     TOP_BY_TYPE_TOOL,
     TOP_BY_GENRE_IN_PLATFORM_COUNTRY_TOOL,
 ]

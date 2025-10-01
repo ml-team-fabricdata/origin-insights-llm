@@ -2,166 +2,183 @@
 
 This document provides an overview of the src directory structure and its components, with a focus on organization and avoiding redundancy.
 
+
 ## Project Organization
 
 ### Main Components
 ```
 src/
-├── sql/                  # SQL and Database Operations
-│   ├── core/            # Core functionality
-│   ├── modules/         # Domain-specific modules
-│   ├── queries/         # Centralized src.sql.queries
-│   └── utils/           # Shared utilities
-├── data/                # Reference data files
-├── embedding/           # Embedding operations
-└── prompt_templates/    # Prompt configurations
+├── data/                  # Reference data files (JSONL)
+│   ├── currency.jsonl
+│   ├── platform_name_iso.jsonl
+│   ├── platform_name.jsonl
+│   ├── primary_country.jsonl
+│   └── primary_genre.jsonl
+├── embedding/             # Embedding models and operations
+├── prompt_templates/      # Prompt templates and configurations
+│   └── prompt.py
+├── sql/                   # Main SQL and database logic
+│   ├── __init__.py
+│   ├── core/              # Core system logic (validation, admin, queries)
+│   │   ├── admin.py
+│   │   ├── validation.py
+│   │   ├── queries.py
+│   │   └── ...
+│   ├── modules/           # Domain modules
+│   │   ├── business/      # Business analytics, pricing, rankings
+│   │   │   ├── intelligence.py
+│   │   │   ├── pricing.py
+│   │   │   ├── rankings.py
+│   │   │   └── ...
+│   │   ├── common/        # Shared logic (admin, query detection, validation)
+│   │   │   ├── admin.py
+│   │   │   ├── query_detection.py
+│   │   │   ├── query_handler.py
+│   │   │   ├── validation.py
+│   │   │   └── ...
+│   │   ├── content/       # Content discovery and metadata
+│   │   │   ├── discovery.py
+│   │   │   ├── metadata.py
+│   │   │   └── ...
+│   │   ├── platform/      # Platform availability and presence
+│   │   │   ├── availability.py
+│   │   │   ├── presence.py
+│   │   │   └── ...
+│   │   ├── talent/        # Talent (actors, directors, collaborations)
+│   │   │   ├── actors.py
+│   │   │   ├── directors.py
+│   │   │   ├── collaborations.py
+│   │   │   └── ...
+│   ├── queries/           # Centralized SQL query templates
+│   │   ├── business/
+│   │   ├── common/
+│   │   ├── content/
+│   │   ├── platform/
+│   │   ├── talent/
+│   │   └── ...
+│   ├── tools/             # Tool wrappers for each domain
+│   │   ├── all_tools.py
+│   │   ├── business/
+│   │   ├── common/
+│   │   ├── content/
+│   │   ├── platform/
+│   │   ├── talent/
+│   │   └── ...
+│   ├── utils/             # Shared utilities
+│   │   ├── constants_sql.py
+│   │   ├── db_utils_sql.py
+│   │   ├── default_import.py
+│   │   ├── sql_db.py
+│   │   ├── table_constants.py
+│   │   ├── validators_shared.py
+│   │   └── ...
+│   └── __init__.py
+└── __init__.py
 ```
+
 
 ## SQL Module Documentation
 
 ### Core Module (`sql/core/`)
 
-#### Validation (`validation.py`)
-- `validate_title(title: str, threshold: Optional[float])` - Validates movie/TV show titles with exact and fuzzy matching
-- `validate_actor(name: Union[str, List[str], Any], threshold: Optional[float])` - Validates actor names with similarity matching
-- `validate_director(name: Union[str, List[str], Any], threshold: Optional[float])` - Validates director names with title count consideration
-- `search_title_exact(title: str)` - Performs exact title search in the database
-- `search_title_fuzzy(title: str, threshold: float, limit: int)` - Performs fuzzy title search with configurable parameters
+**validation.py**
+- Title, actor, and director validation (exact/fuzzy matching, similarity, count-based)
 
-#### Queries (`queries.py`)
-Core src.sql.queries and database operations for the main functionality of the system.
+**admin.py**
+- System management, administrative operations
 
-### Business Module (`sql/business/`)
+**queries.py**
+- Centralized query logic for core system operations
 
-#### Intelligence (`intelligence.py`)
-Business intelligence and analytics functions:
-- Market analysis
-- Performance metrics
-- Business insights queries
+### Business Module (`sql/modules/business/`)
 
-#### Pricing (`pricing.py`)
-Pricing-related operations:
-- Price analysis
-- Pricing strategy queries
-- Market rate comparisons
+**intelligence.py**
+- Market analysis, performance metrics, business insights
 
-#### Rankings (`rankings.py`)
-Content and performance ranking operations:
-- Content performance metrics
-- Platform rankings
-- Popularity metrics
+**pricing.py**
+- Price analysis, strategy, market rate comparisons
 
-### Content Module (`sql/content/`)
+**rankings.py**
+- Content and platform rankings, popularity metrics
 
-#### Discovery (`discovery.py`)
-Content discovery operations:
-- Content recommendation algorithms
-- Similar content search
-- Topic-based content search
+### Content Module (`sql/modules/content/`)
 
-#### Metadata (`metadata.py`)
-Content metadata operations:
-- Metadata extraction and processing
-- Content information management
-- Data standardization functions
+**discovery.py**
+- Content recommendation, similarity search, topic-based queries
 
-### Platform Module (`sql/platform/`)
+**metadata.py**
+- Metadata extraction, processing, standardization
 
-#### Availability (`availability.py`)
-Key functions:
-- `fetch_availability_by_uid(uid: str, iso2: Optional[str], with_prices: bool)` - Gets content availability by ID
-- `render_availability_summary(rows: List[Dict], country_pretty: str, with_prices: bool)` - Formats availability data
-- Platform-specific availability checks
+### Platform Module (`sql/modules/platform/`)
 
-#### Presence (`presence.py`)
-Platform presence validation:
-- Content presence verification
-- Platform coverage analysis
-- Distribution tracking
+**availability.py**
+- Content availability by ID, summary formatting, platform checks
 
-### Talent Module (`sql/talent/`)
+**presence.py**
+- Content presence verification, coverage analysis, distribution tracking
 
-#### Actors (`actors.py`)
-Actor-related operations:
-- Actor lookup and validation
-- Filmography queries
-- Performance tracking
+### Talent Module (`sql/modules/talent/`)
 
-#### Directors (`directors.py`)
-Director-related operations:
-- Director validation
-- Filmography management
-- Project tracking
+**actors.py**
+- Actor lookup, validation, filmography, performance tracking
 
-#### Collaborations (`collaborations.py`)
-Collaboration analysis:
-- Actor-director partnerships
-- Team analytics
-- Project connections
+**directors.py**
+- Director validation, filmography, project management
+
+**collaborations.py**
+- Actor-director partnerships, team analytics, project connections
 
 ### Utility Modules (`sql/utils/`)
 
-#### Database Utilities (`db_utils_sql.py`)
-Core database functions:
-- `run_sql(sql: str, params: Optional[Union[Dict[str, Any], Tuple[Any, ...]]])` - Executes src.sql.queries safely
-- Connection pool management
-- Query execution handlers
+**db_utils_sql.py**
+- Core DB functions, connection pool, query execution
 
-#### Constants (`constants_sql.py`)
-SQL-related constants:
-- Query templates
-- Database configurations
-- System parameters
+**constants_sql.py**
+- Query templates, DB configs, system parameters
 
-#### Validators (`validators_shared.py`)
-Shared validation utilities:
-- Input sanitization
-- Data validation
-- Format verification
+**validators_shared.py**
+- Input sanitization, data validation, format verification
+
+**default_import.py, sql_db.py, table_constants.py**
+- Shared imports, DB logic, table constants
 
 ## Directory Structure
+
 
 ### Core Components
 
 #### `/sql` - SQL Related Modules
-The SQL directory is organized to maximize code reuse and minimize redundancy:
+Organized for code reuse and minimal redundancy:
 
-##### Core Module
-- **core/**
-  - `admin.py` - Administrative operations and system management
-  - `validation.py` - Central validation logic for all entities
-  - `queries.py` - Core system src.sql.queries
+**core/**
+- `admin.py`: Administrative operations and system management
+- `validation.py`: Central validation logic for all entities
+- `queries.py`: Core system queries and logic
 
-##### Domain-Specific Modules
-- **business/**
-  - `intelligence.py` - Business analytics and insights
-  - `pricing.py` - Pricing analysis and strategies
-  - `rankings.py` - Performance metrics and rankings
+**modules/**
+- `business/`: Business analytics, pricing, and rankings
+- `common/`: Shared admin, query detection, and validation
+- `content/`: Content discovery and metadata
+- `platform/`: Platform availability and presence
+- `talent/`: Actor, director, and collaboration management
 
-- **content/**
-  - `discovery.py` - Content recommendation engine
-  - `metadata.py` - Content information management
+**queries/**
+- Centralized SQL query templates, organized by domain (business, content, platform, talent)
 
-- **platform/**
-  - `availability.py` - Content availability services
-  - `presence.py` - Platform presence tracking
+**tools/**
+- Tool wrappers for each domain, enabling modular access to business, content, platform, and talent logic
 
-- **talent/**
-  - `actors.py` - Actor management and tracking
-  - `directors.py` - Director information handling
-  - `collaborations.py` - Talent relationship analysis
+**utils/**
+- Shared utilities for database operations, validation, constants, and configuration
 
-##### Shared Components
-- **utils/**
-  - `db_utils.py` - Database operations and connection management
-  - `validators.py` - Common validation utilities
-  - `constants.py` - System-wide constants
+**data/**
+- Reference data files in JSONL format for currencies, platforms, countries, genres
 
-##### Query Management
-- **queries/**
-  - Centralized location for all src.sql.queries
-  - Organized by domain (business, content, platform, talent)
-  - Reduces query duplication across modules
+**embedding/**
+- Embedding models and related operations
+
+**prompt_templates/**
+- Prompt templates and configuration for LLMs and automation
 
 #### `/data` - Data Files
 Contains essential data files in JSONL format:
@@ -221,14 +238,3 @@ The system includes robust validation for:
 - Rankings and performance metrics
 - Analytics and reporting tools
 
-## Usage
-
-Each module is designed to be imported and used independently while maintaining integration with the overall system. For example:
-
-```python
-from src.sql.modules.common.validation import validate_director
-from src.sql.modules.content.discovery import discover_content
-from src.sql.modules.business.pricing import analyze_pricing
-```
-
-For more specific implementation details, refer to the individual module docstrings and comments.

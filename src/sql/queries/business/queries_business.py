@@ -316,19 +316,19 @@ ORDER BY peak_hits DESC NULLS LAST, release_date DESC NULLS LAST,
 LIMIT {{limit}};
 """
 
-QUERY_GENRE_MOMENTUM_OPT = f"""
+QUERY_GENRE_MOMENTUM = """
 WITH base AS (
   SELECT
     COALESCE(m.primary_genre, 'Unknown') AS primary_genre,
-    COALESCE(h.{{HITS_COL}}, 0)::numeric AS hits,
+    COALESCE(h.hits, 0)::numeric   AS hits,
     (h.date_hits::date BETWEEN %s AND %s) AS is_cur,
     (h.date_hits::date BETWEEN %s AND %s) AS is_prev
-  FROM {{table}} h
+  FROM {HITS_TABLE} h
   LEFT JOIN {META_TBL} m ON m.uid = h.uid
   WHERE h.date_hits::date BETWEEN %s AND %s
-    {{country_clause}}
-    {{ct_hits_clause}}
-    {{ct_meta_clause}}
+    {COUNTRY_CLAUSE}
+    {CT_HITS_CLAUSE}
+    {CT_META_CLAUSE}
 )
 SELECT
   primary_genre,
@@ -337,16 +337,14 @@ SELECT
   (COALESCE(SUM(hits) FILTER (WHERE is_cur), 0)::numeric
    - COALESCE(SUM(hits) FILTER (WHERE is_prev), 0)::numeric) AS delta,
   CASE WHEN COALESCE(SUM(hits) FILTER (WHERE is_prev), 0) = 0 THEN NULL
-       ELSE ROUND((
-         (COALESCE(SUM(hits) FILTER (WHERE is_cur), 0)::numeric
-          - COALESCE(SUM(hits) FILTER (WHERE is_prev), 0)::numeric)
-         / NULLIF(COALESCE(SUM(hits) FILTER (WHERE is_prev), 0)::numeric, 0)
-       ) * 100::numeric, 2)
+       ELSE ROUND(((COALESCE(SUM(hits) FILTER (WHERE is_cur), 0)::numeric
+                    - COALESCE(SUM(hits) FILTER (WHERE is_prev), 0)::numeric)
+                   / NULLIF(COALESCE(SUM(hits) FILTER (WHERE is_prev), 0)::numeric, 0))
+                   * 100::numeric, 2)
   END AS pct_change
 FROM base
 GROUP BY primary_genre
 ORDER BY delta DESC NULLS LAST, hits_now DESC NULLS LAST, primary_genre ASC
-LIMIT %s;
 """
 
 # =============================================================================

@@ -242,74 +242,38 @@ def get_recent_top_premieres_by_country(
 
 def _max_date_hits() -> date:
     row = db.execute_query(f"SELECT MAX(date_hits)::date AS mx FROM {HITS_PRESENCE_TBL};", []) or []
-    return row[0]["mx"] if row and row[0]["mx"] else datetime.now().date()
+    return row[0]["mx"] or datetime.now().date()
 
-def _clamp_rolling(max_d: date, days:int, prev_days:int) -> Tuple[date,date,date,date]:
+def _clamp_rolling(max_d: date, days: int, prev_days: int):
     cur_to   = max_d
     cur_from = max_d - timedelta(days=days-1)
     prev_to  = cur_from - timedelta(days=1)
     prev_from= prev_to  - timedelta(days=prev_days-1)
     return cur_from, cur_to, prev_from, prev_to
 
-
-def get_genre_momentum(
-    country: Optional[str], 
-    days: int = 30,
-    prev_days: Optional[int] = None,
-    content_type: Optional[str] = None,
-    limit: int = 20,
-    *,
-    anchor_to_max: bool = True,
-) -> List[Dict]:
+def get_genre_momentum(country: Optional[str], days=30, prev_days=None,
+                       content_type: Optional[str]=None, limit=20) -> List[Dict]:
     days = validate_days_back(days, default=30)
     prev_days = validate_days_back(prev_days if prev_days else days, default=days)
 
-    # 1) Ventanas ancladas al MAX(date_hits)
-    max_d = _max_date_hits() if anchor_to_max else datetime.now().date()
+    max_d = _max_date_hits()
     cur_from, cur_to, prev_from, prev_to = _clamp_rolling(max_d, days, prev_days)
     min_from, max_to = min(cur_from, prev_from), max(cur_to, prev_to)
-
-    # 2) Country clause
-    country_clause = ""
-    params: List[object] = [cur_from, cur_to, prev_from, prev_to, min_from, max_to]
-
-    is_global = (country is None) or (str(country).strip().lower() in {"global","all","*"})
-    if is_global:
-        ct_hits_clause = ct_meta_clause = ""
-        if content_type:
-            ct = resolve_content_type(content_type)
-            if not ct:
-                return [{"message": f"Unknown type: '{content_type}'. Use movie/series."}]
-            ct_hits_clause = " AND h.content_type = %s"
-            ct_meta_clause = " AND m.type = %s"
-            params.extend([ct, ct])
-
-        # 4) LIMIT
-        limit_val = max(1, min(int(limit or 20), 200))
-        params.append(limit_val)
-
-        # 5) Render y ejecutar
-        sql = QUERY_GENRE_MOMENTUM_OPT.format(
-            HITS_COL='hits',
-            table = HITS_GLOBAL_TBL,
-            country_clause=country_clause,
-            ct_hits_clause=ct_hits_clause,
-            ct_meta_clause=ct_meta_clause,
-        )
-        rows = db.execute_query(sql, tuple(params)) or []
-
-        ident = (f"{resolved_country} cur[{cur_from}..{cur_to}] vs prev[{prev_from}..{prev_to}]")
-        return handle_query_result(rows, "genre momentum", ident)
-
+    if not country:
+        hits_table     = HITS_GLOBAL_TBL
+        country_clause = ""           # sin filtro de país
+        country_label  = ""
     else:
-        resolved_country = resolve_country_iso(country or "")
-        if not resolved_country:
-            return [{"message": f"Invalid country '{country}'"}]
+        iso = resolve_country_iso(country or "")
+        hits_table     = HITS_PRESENCE_TBL
         country_clause = f" AND h.iso_alpha2 = %s"
-        params.append(resolved_country)
+        country_label  = iso
 
-    # 3) Content type (opcional)
     ct_hits_clause = ct_meta_clause = ""
+    params = [cur_from, cur_to, prev_from, prev_to, min_from, max_to]
+    if country:
+        params.append(country_label)
+
     if content_type:
         ct = resolve_content_type(content_type)
         if not ct:
@@ -318,23 +282,16 @@ def get_genre_momentum(
         ct_meta_clause = " AND m.type = %s"
         params.extend([ct, ct])
 
-    # 4) LIMIT
-    limit_val = max(1, min(int(limit or 20), 200))
-    params.append(limit_val)
+    params.append(max(1, min(int(limit or 20), 200)))
 
-    # 5) Render y ejecutar
-    sql = QUERY_GENRE_MOMENTUM_OPT.format(
-        HITS_COL='hits',
-        table = HITS_PRESENCE_TBL,
-        country_clause=country_clause,
-        ct_hits_clause=ct_hits_clause,
-        ct_meta_clause=ct_meta_clause,
+    sql = QUERY_GENRE_MOMENTUM.format(
+        HITS_TABLE=hits_table, META_TBL=META_TBL,
+        COUNTRY_CLAUSE=country_clause, CT_HITS_CLAUSE=ct_hits_clause, CT_META_CLAUSE=ct_meta_clause,
     )
+
     rows = db.execute_query(sql, tuple(params)) or []
-
-    ident = (f"{resolved_country} cur[{cur_from}..{cur_to}] vs prev[{prev_from}..{prev_to}]")
+    ident = f"{country_label} cur[{cur_from}..{cur_to}] vs prev[{prev_from}..{prev_to}]"
     return handle_query_result(rows, "genre momentum", ident)
-
 # =============================================================================
 # PRESENCE (PLATFORM) FUNCTIONS
 # =============================================================================
@@ -1146,135 +1103,135 @@ def get_top_by_genre_tool(*args, **kwargs) -> str:
     return json.dumps(response, ensure_ascii=False, indent=2, default=str)
 
 
-def get_top_global_tool(*args, **kwargs) -> str:
-    """Tool-safe wrapper for top global query."""
-    params = normalize_langgraph_params(*args, **kwargs)
+# def get_top_global_tool(*args, **kwargs) -> str:
+#     """Tool-safe wrapper for top global query."""
+#     params = normalize_langgraph_params(*args, **kwargs)
 
-    # If first arg is JSON string, parse it
-    arg1 = params.get("__arg1")
-    if isinstance(arg1, str) and arg1.startswith("{"):
-        try:
-            parsed = json.loads(arg1)
-            params.update(parsed)
-        except:
-            pass
+#     # If first arg is JSON string, parse it
+#     arg1 = params.get("__arg1")
+#     if isinstance(arg1, str) and arg1.startswith("{"):
+#         try:
+#             parsed = json.loads(arg1)
+#             params.update(parsed)
+#         except:
+#             pass
 
-    # Extract parameters
-    platform = params.get("platform")
-    genre = params.get("genre")
-    content_type = params.get("content_type") or params.get("type")
-    limit = params.get("limit", 10)
-    days_back = params.get("days_back")
-    date_from = params.get("date_from")
-    date_to = params.get("date_to")
-    currentyear = params.get("currentyear") or params.get("year")
-    year_from = params.get("year_from")
-    year_to = params.get("year_to")
+#     # Extract parameters
+#     platform = params.get("platform")
+#     genre = params.get("genre")
+#     content_type = params.get("content_type") or params.get("type")
+#     limit = params.get("limit", 10)
+#     days_back = params.get("days_back")
+#     date_from = params.get("date_from")
+#     date_to = params.get("date_to")
+#     currentyear = params.get("currentyear") or params.get("year")
+#     year_from = params.get("year_from")
+#     year_to = params.get("year_to")
 
-    # Call main function
-    rows = get_top_global(
-        platform=platform,
-        genre=genre,
-        content_type=content_type,
-        limit=limit,
-        days_back=days_back,
-        date_from=date_from,
-        date_to=date_to,
-        currentyear=currentyear,
-        year_from=year_from,
-        year_to=year_to,
-    )
+#     # Call main function
+#     rows = get_top_global(
+#         platform=platform,
+#         genre=genre,
+#         content_type=content_type,
+#         limit=limit,
+#         days_back=days_back,
+#         date_from=date_from,
+#         date_to=date_to,
+#         currentyear=currentyear,
+#         year_from=year_from,
+#         year_to=year_to,
+#     )
 
-    response = {
-        "status": "success",
-        "operation": "top_global",
-        "filters_applied": {
-            "platform": platform,
-            "genre": genre,
-            "content_type": content_type,
-            "limit": limit,
-            "days_back": days_back,
-            "date_from": date_from,
-            "date_to": date_to,
-            "currentyear": currentyear,
-            "year_from": year_from,
-            "year_to": year_to,
-        },
-        "data": rows if isinstance(rows, list) else [],
-        "count": len(rows) if isinstance(rows, list) else 0,
-        "timestamp": datetime.now().isoformat(),
-    }
+#     response = {
+#         "status": "success",
+#         "operation": "top_global",
+#         "filters_applied": {
+#             "platform": platform,
+#             "genre": genre,
+#             "content_type": content_type,
+#             "limit": limit,
+#             "days_back": days_back,
+#             "date_from": date_from,
+#             "date_to": date_to,
+#             "currentyear": currentyear,
+#             "year_from": year_from,
+#             "year_to": year_to,
+#         },
+#         "data": rows if isinstance(rows, list) else [],
+#         "count": len(rows) if isinstance(rows, list) else 0,
+#         "timestamp": datetime.now().isoformat(),
+#     }
 
-    return json.dumps(response, ensure_ascii=False, indent=2, default=str)
+#     return json.dumps(response, ensure_ascii=False, indent=2, default=str)
 
 
-def get_top_presence_tool(*args, **kwargs) -> str:
-    """Tool-safe wrapper for top presence query."""
-    params = normalize_langgraph_params(*args, **kwargs)
+# def get_top_presence_tool(*args, **kwargs) -> str:
+#     """Tool-safe wrapper for top presence query."""
+#     params = normalize_langgraph_params(*args, **kwargs)
 
-    # If first arg is JSON string, parse it
-    arg1 = params.get("__arg1")
-    if isinstance(arg1, str) and arg1.startswith("{"):
-        try:
-            parsed = json.loads(arg1)
-            params.update(parsed)
-        except:
-            pass
+#     # If first arg is JSON string, parse it
+#     arg1 = params.get("__arg1")
+#     if isinstance(arg1, str) and arg1.startswith("{"):
+#         try:
+#             parsed = json.loads(arg1)
+#             params.update(parsed)
+#         except:
+#             pass
 
-    # Extract parameters
-    resolved_country = params.get("country") or params.get("resolved_country")
-    iso_set = params.get("iso_set", [])
-    platform = params.get("platform")
-    genre = params.get("genre")
-    content_type = params.get("content_type") or params.get("type")
-    limit = params.get("limit", 10)
-    days_back = params.get("days_back")
-    date_from = params.get("date_from")
-    date_to = params.get("date_to")
-    currentyear = params.get("currentyear") or params.get("year")
-    year_from = params.get("year_from")
-    year_to = params.get("year_to")
+#     # Extract parameters
+#     resolved_country = params.get("country") or params.get("resolved_country")
+#     iso_set = params.get("iso_set", [])
+#     platform = params.get("platform")
+#     genre = params.get("genre")
+#     content_type = params.get("content_type") or params.get("type")
+#     limit = params.get("limit", 10)
+#     days_back = params.get("days_back")
+#     date_from = params.get("date_from")
+#     date_to = params.get("date_to")
+#     currentyear = params.get("currentyear") or params.get("year")
+#     year_from = params.get("year_from")
+#     year_to = params.get("year_to")
 
-    # Resolve country if provided
-    if resolved_country:
-        resolved_country = resolve_country_iso(resolved_country)
+#     # Resolve country if provided
+#     if resolved_country:
+#         resolved_country = resolve_country_iso(resolved_country)
 
-    # Call main function
-    rows = get_top_presence(
-        resolved_country=resolved_country,
-        iso_set=iso_set,
-        platform=platform,
-        genre=genre,
-        content_type=content_type,
-        limit=limit,
-        days_back=days_back,
-        date_from=date_from,
-        date_to=date_to,
-        currentyear=currentyear,
-        year_from=year_from,
-        year_to=year_to,
-    )
+#     # Call main function
+#     rows = get_top_presence(
+#         resolved_country=resolved_country,
+#         iso_set=iso_set,
+#         platform=platform,
+#         genre=genre,
+#         content_type=content_type,
+#         limit=limit,
+#         days_back=days_back,
+#         date_from=date_from,
+#         date_to=date_to,
+#         currentyear=currentyear,
+#         year_from=year_from,
+#         year_to=year_to,
+#     )
 
-    response = {
-        "status": "success",
-        "operation": "top_presence",
-        "filters_applied": {
-            "country": resolved_country,
-            "iso_set": iso_set,
-            "platform": platform,
-            "genre": genre,
-            "content_type": content_type,
-            "limit": limit,
-            "days_back": days_back,
-            "date_from": date_from,
-            "date_to": date_to,
-            "currentyear": currentyear,
-            "year_from": year_from,
-            "year_to": year_to,
-        },
-        "data": rows if isinstance(rows, list) else [],
-        "count": len(rows) if isinstance(rows, list) else 0,
-        "timestamp": datetime.now().isoformat(),
-    }
+#     response = {
+#         "status": "success",
+#         "operation": "top_presence",
+#         "filters_applied": {
+#             "country": resolved_country,
+#             "iso_set": iso_set,
+#             "platform": platform,
+#             "genre": genre,
+#             "content_type": content_type,
+#             "limit": limit,
+#             "days_back": days_back,
+#             "date_from": date_from,
+#             "date_to": date_to,
+#             "currentyear": currentyear,
+#             "year_from": year_from,
+#             "year_to": year_to,
+#         },
+#         "data": rows if isinstance(rows, list) else [],
+#         "count": len(rows) if isinstance(rows, list) else 0,
+#         "timestamp": datetime.now().isoformat(),
+#     }
 
-    return json.dumps(response, ensure_ascii=False, indent=2, default=str)
+#     return json.dumps(response, ensure_ascii=False, indent=2, default=str)

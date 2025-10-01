@@ -239,78 +239,101 @@ def get_recent_top_premieres_by_country(
     return handle_query_result(rows, "recent top premieres by country", ident)
 
 
+
+def _max_date_hits() -> date:
+    row = db.execute_query(f"SELECT MAX(date_hits)::date AS mx FROM {HITS_PRESENCE_TBL};", []) or []
+    return row[0]["mx"] if row and row[0]["mx"] else datetime.now().date()
+
+def _clamp_rolling(max_d: date, days:int, prev_days:int) -> Tuple[date,date,date,date]:
+    cur_to   = max_d
+    cur_from = max_d - timedelta(days=days-1)
+    prev_to  = cur_from - timedelta(days=1)
+    prev_from= prev_to  - timedelta(days=prev_days-1)
+    return cur_from, cur_to, prev_from, prev_to
+
+
 def get_genre_momentum(
-    country: str,
+    country: Optional[str], 
     days: int = 30,
     prev_days: Optional[int] = None,
     content_type: Optional[str] = None,
     limit: int = 20,
+    *,
+    anchor_to_max: bool = True,
 ) -> List[Dict]:
-    """Get genre ranking by growth: current window vs previous adjacent window."""
-    if not country:
-        return [{"message": "Country (ISO-2) required."}]
-
     days = validate_days_back(days, default=30)
-    prev_days = validate_days_back(
-        prev_days if prev_days else days, default=days)
+    prev_days = validate_days_back(prev_days if prev_days else days, default=days)
 
-    today = datetime.now().date()
-    cur_from = today - timedelta(days=days)
-    cur_to = today
-    prev_to = cur_from - timedelta(days=1)
-    prev_from = prev_to - timedelta(days=prev_days - 1)
+    # 1) Ventanas ancladas al MAX(date_hits)
+    max_d = _max_date_hits() if anchor_to_max else datetime.now().date()
+    cur_from, cur_to, prev_from, prev_to = _clamp_rolling(max_d, days, prev_days)
+    min_from, max_to = min(cur_from, prev_from), max(cur_to, prev_to)
 
-    resolved_country = resolve_country_iso(country)
+    # 2) Country clause
+    country_clause = ""
+    params: List[object] = [cur_from, cur_to, prev_from, prev_to, min_from, max_to]
 
-    # Build content type filters
-    ct_hits = None
-    ct_meta = None
+    is_global = (country is None) or (str(country).strip().lower() in {"global","all","*"})
+    if is_global:
+        ct_hits_clause = ct_meta_clause = ""
+        if content_type:
+            ct = resolve_content_type(content_type)
+            if not ct:
+                return [{"message": f"Unknown type: '{content_type}'. Use movie/series."}]
+            ct_hits_clause = " AND h.content_type = %s"
+            ct_meta_clause = " AND m.type = %s"
+            params.extend([ct, ct])
+
+        # 4) LIMIT
+        limit_val = max(1, min(int(limit or 20), 200))
+        params.append(limit_val)
+
+        # 5) Render y ejecutar
+        sql = QUERY_GENRE_MOMENTUM_OPT.format(
+            HITS_COL='hits',
+            table = HITS_GLOBAL_TBL,
+            country_clause=country_clause,
+            ct_hits_clause=ct_hits_clause,
+            ct_meta_clause=ct_meta_clause,
+        )
+        rows = db.execute_query(sql, tuple(params)) or []
+
+        ident = (f"{resolved_country} cur[{cur_from}..{cur_to}] vs prev[{prev_from}..{prev_to}]")
+        return handle_query_result(rows, "genre momentum", ident)
+
+    else:
+        resolved_country = resolve_country_iso(country or "")
+        if not resolved_country:
+            return [{"message": f"Invalid country '{country}'"}]
+        country_clause = f" AND h.iso_alpha2 = %s"
+        params.append(resolved_country)
+
+    # 3) Content type (opcional)
+    ct_hits_clause = ct_meta_clause = ""
     if content_type:
         ct = resolve_content_type(content_type)
-        if ct is None:
+        if not ct:
             return [{"message": f"Unknown type: '{content_type}'. Use movie/series."}]
-        ct_meta = ct
-        ct_hits = ct
+        ct_hits_clause = " AND h.content_type = %s"
+        ct_meta_clause = " AND m.type = %s"
+        params.extend([ct, ct])
 
-    # Build WHERE clauses and parameters
-    where_hits_cur = ["h.country = %s", "h.date_hits BETWEEN %s AND %s"]
-    where_hits_prev = ["h.country = %s", "h.date_hits BETWEEN %s AND %s"]
+    # 4) LIMIT
+    limit_val = max(1, min(int(limit or 20), 200))
+    params.append(limit_val)
 
-    params_cur = [resolved_country, cur_from.isoformat(), cur_to.isoformat()]
-    params_prev = [resolved_country,
-                   prev_from.isoformat(), prev_to.isoformat()]
-
-    if ct_hits:
-        where_hits_cur.append("h.content_type = %s")
-        where_hits_prev.append("h.content_type = %s")
-        params_cur.append(ct_hits)
-        params_prev.append(ct_hits)
-
-    where_meta = []
-    params_meta: List[str] = []
-    if ct_meta:
-        where_meta.append("m.type = %s")
-        params_meta.append(ct_meta)
-
-    # Build SQL query
-    meta_join = " AND " + " AND ".join(where_meta) if where_meta else ""
-
-    query_template = QUERY_GENRE_MOMENTUM
-    query = query_template.format(
-        where_hits_cur=" AND ".join(where_hits_cur),
-        where_hits_prev=" AND ".join(where_hits_prev),
-        meta_join=meta_join,
-        limit=limit,
+    # 5) Render y ejecutar
+    sql = QUERY_GENRE_MOMENTUM_OPT.format(
+        HITS_COL='hits',
+        table = HITS_PRESENCE_TBL,
+        country_clause=country_clause,
+        ct_hits_clause=ct_hits_clause,
+        ct_meta_clause=ct_meta_clause,
     )
+    rows = db.execute_query(sql, tuple(params)) or []
 
-    all_params = tuple(params_cur + params_meta + params_prev + params_meta)
-    rows = db.execute_query(query, all_params)
-
-    ident = (
-        f"{resolved_country} cur[{cur_from}..{cur_to}] vs prev[{prev_from}..{prev_to}]"
-    )
+    ident = (f"{resolved_country} cur[{cur_from}..{cur_to}] vs prev[{prev_from}..{prev_to}]")
     return handle_query_result(rows, "genre momentum", ident)
-
 
 # =============================================================================
 # PRESENCE (PLATFORM) FUNCTIONS
@@ -553,20 +576,21 @@ def get_top_presence(
 
     needs_metadata = bool(resolved_country or iso_set or genre)
     if needs_metadata:
-        joins.append(f"INNER JOIN {META_TBL} m ON h.uid = m.uid")
+        joins.append(f"INNER JOIN {PRES_TBL} AS np ON np.uid = h.uid")
+        if genre:
+            joins.append(f"INNER JOIN {META_TBL} AS m ON m.uid = h.uid")
 
-    # Geográfico
     if resolved_country:
-        where.append("m.countries_iso = %s")
+        where.append("np.iso_alpha2 = %s")
         params.append(resolved_country)
     elif iso_set:
         if len(iso_set) == 1:
-            where.append("m.countries_iso = %s")
+            where.append("np.iso_alpha2 = %s")
             params.append(iso_set[0])
         else:
             conds = []
             for iso in iso_set:
-                conds.append("m.countries_iso LIKE %s")
+                conds.append("np.iso_alpha2 ILIKE %s")
                 params.append(f"%{iso}%")
             if conds:
                 where.append("(" + " OR ".join(conds) + ")")
@@ -576,11 +600,10 @@ def get_top_presence(
         where.append("h.content_type = %s")
         params.append(content_type)
     if platform:
-        where.append("h.platform_name = %s")
+        where.append("np.platform_name ILIKE %s")
         params.append(platform)
     if genre:
-        # Mantengo ILIKE si esperás variantes
-        where.append("m.primary_genre = %s")
+        where.append("m.primary_genre ILIKE %s")
         params.append(genre)
 
     # Temporal inline (columna de presence: h.date_hits)
@@ -611,6 +634,8 @@ def get_top_presence(
         params.append(int(year_to))
 
     where_clause = f"WHERE {' AND '.join(where)}" if where else ""
+    joins = list(dict.fromkeys(joins))
+    print(joins)
     joins_clause = " ".join(joins)
 
     query_template = QUERY_TOP_PRESENCE_WITH_METADATA if needs_metadata else QUERY_TOP_PRESENCE_NO_METADATA
@@ -642,27 +667,20 @@ def get_top_global(
     year_from: Optional[int],
     year_to: Optional[int],
 ) -> List[Dict[str, Any]]:
-    """Query ms.hits_global for global data (sin helpers)."""
-
+    """
+    Top global (sin país). Si se pide género o se selecciona campo de metadata,
+    agrega JOIN a metadata (m). Evita referenciar m.* sin haberlo unido.
+    """
     params: List[Any] = []
     where: List[str] = []
     joins: List[str] = []
 
-    # Siempre unimos a META para clean_title / plataforma / género
-    joins.append(f"INNER JOIN {META_TBL} m ON h.uid = m.uid")
+    # ¿Necesitamos metadata?
+    needs_meta = bool(genre)
 
-    # Contenido
-    if content_type:
-        where.append("h.content_type = %s")
-        params.append('serie' if 'Series' in content_type else content_type)
-    if platform:
-        where.append("m.platform_name = %s")
-        params.append(platform)
-    if genre:
-        where.append("m.primary_genre = %s")
-        params.append(genre)
-
-    # Temporal inline (columna global: h.date_hits)
+    needs_metadata = bool(genre)
+    if needs_metadata:
+        joins.append(f"INNER JOIN {PRES_TBL} AS np ON np.uid = h.uid INNER JOIN {META_TBL} AS m ON m.uid = h.uid")
     if days_back is not None:
         validated = validate_days_back(days_back, default=7)
         window = compute_window_anchored_to_table(validated)
@@ -678,35 +696,41 @@ def get_top_global(
             where.append("h.date_hits <= %s")
             params.append(date_to)
 
-    # Año inline (global usa h.currentyear)
     if currentyear is not None:
-        where.append("h.currentyear = %s")
+        where.append("h.year = %s")
         params.append(int(currentyear))
     if year_from is not None:
-        where.append("h.currentyear >= %s")
+        where.append("h.year >= %s")
         params.append(int(year_from))
     if year_to is not None:
-        where.append("h.currentyear <= %s")
+        where.append("h.year <= %s")
         params.append(int(year_to))
 
-    where_clause = f"WHERE {' AND '.join(where)}" if where else ""
-    joins_clause = " ".join(joins)
+    if content_type:
+        where.append("m.type = %s")
+        params.append(content_type)
 
-    query_template = QUERY_TOP_GLOBAL_WITH_GENRE if bool(
-        genre) else QUERY_TOP_GLOBAL_NO_GENRE
-    query = query_template.format(
-        joins_clause=joins_clause, where_clause=where_clause)
+    if genre:
+        where.append("m.primary_genre ILIKE %s")
+        params.append(genre)
+
+    if platform:
+        where.append("np.platform_name ILIKE %s")
+        params.append(platform)
+
+    joins_clause = " ".join(dict.fromkeys(joins))
+    where_clause = f"WHERE {' AND '.join(where)}" if where else ""
+    query_template = QUERY_TOP_GLOBAL_WITH_META if needs_metadata else QUERY_TOP_GLOBAL_NO_META
+    query = query_template.format(joins_clause=joins_clause, where_clause=where_clause)
 
     params.append(limit)
 
+    # Debug opcional
     print(f"[GLOBAL SQL] {query}")
     print(f"[GLOBAL params] {tuple(params)}")
 
-    rows = db.execute_query(query, tuple(params))
-    return build_result(
-        rows, "global", None, [], platform, genre, content_type,
-        limit, days_back, date_from, date_to, currentyear, year_from, year_to
-    )
+    rows = db.execute_query(query, tuple(params)) or []
+    return rows
 
 
 def build_result(
@@ -905,7 +929,7 @@ def get_platform_exclusives_tool(
     )
 
 
-def get_top_generic_tool(*args, **kwargs) -> str:
+def     get_top_generic_tool(*args, **kwargs) -> str:
     """Tool-safe wrapper for generic top query specific for LangGraph."""
     # Normalize parameters from LangGraph
     params = normalize_langgraph_params(*args, **kwargs)

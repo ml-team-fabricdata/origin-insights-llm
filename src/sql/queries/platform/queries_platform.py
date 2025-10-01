@@ -60,40 +60,25 @@ QUERY_RECENT_PREMIERES_BY_COUNTRY = f"""
 """
 
 QUERY_AVAILABILITY_WITH_PRICES = f"""
-    WITH latest_prices AS (
-        SELECT DISTINCT ON (hash_unique)
-            hash_unique,
-            price,
-            currency,
-            price_type,
-            definition,
-            license,
-            created_at
-        FROM {PRICES_TBL}
-        ORDER BY hash_unique, created_at DESC
-    )
-    SELECT
-        p.platform_name AS platform,
-        p.iso_alpha2 AS country_iso2,
-        p.permalink,
-        p.uid,
-        p.hash_unique,
-        p.out_on,
-        p.is_exclusive,
-        p.plan_name,
-        p.registry_status,
-        lp.price,
-        lp.currency,
-        lp.price_type,
-        lp.definition,
-        lp.license,
-        lp.created_at AS price_updated_at
-    FROM {PRES_TBL} p
-    LEFT JOIN latest_prices lp ON lp.hash_unique = p.hash_unique
-    WHERE p.uid = %(uid)s
-        {{country_condition}}
-        AND p.out_on IS NULL
-    ORDER BY p.platform_name ASC, lp.price ASC NULLS LAST;
+SELECT
+  p.platform_name AS platform,
+  p.uid,
+  p.hash_unique,
+  lp.price,
+  lp.currency,
+  lp.price_type,
+  lp.definition,
+  lp.license
+FROM {PRES_TBL} p
+LEFT JOIN LATERAL (
+  SELECT price, currency, price_type, definition, license
+  FROM {PRICES_TBL} x
+  WHERE x.hash_unique = p.hash_unique
+  LIMIT 1
+) lp ON TRUE
+WHERE p.uid = %(uid)s
+  {{country_condition}}
+ORDER BY p.platform_name ASC, lp.price ASC NULLS LAST;
 """
 
 QUERY_AVAILABILITY_WITHOUT_PRICES = f"""

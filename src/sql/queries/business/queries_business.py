@@ -316,38 +316,37 @@ ORDER BY peak_hits DESC NULLS LAST, release_date DESC NULLS LAST,
 LIMIT {{limit}};
 """
 
-# Momentum de géneros (ventanas adyacentes)
-QUERY_GENRE_MOMENTUM = f"""
-WITH cur AS (
-  SELECT m.primary_genre, SUM(h.hits) AS hits_now
-  FROM {HITS_PRESENCE_TBL} h
-  JOIN {META_TBL} m ON m.uid = h.uid
-  WHERE {{where_hits_cur}}{{meta_join}}
-  GROUP BY m.primary_genre
-),
-prv AS (
-  SELECT m.primary_genre, SUM(h.hits) AS hits_prev
-  FROM {HITS_PRESENCE_TBL} h
-  JOIN {META_TBL} m ON m.uid = h.uid
-  WHERE {{where_hits_prev}}{{meta_join}}
-  GROUP BY m.primary_genre
+QUERY_GENRE_MOMENTUM_OPT = f"""
+WITH base AS (
+  SELECT
+    COALESCE(m.primary_genre, 'Unknown') AS primary_genre,
+    COALESCE(h.{{HITS_COL}}, 0)::numeric AS hits,
+    (h.date_hits::date BETWEEN %s AND %s) AS is_cur,
+    (h.date_hits::date BETWEEN %s AND %s) AS is_prev
+  FROM {{table}} h
+  LEFT JOIN {META_TBL} m ON m.uid = h.uid
+  WHERE h.date_hits::date BETWEEN %s AND %s
+    {{country_clause}}
+    {{ct_hits_clause}}
+    {{ct_meta_clause}}
 )
 SELECT
-  COALESCE(c.primary_genre, p.primary_genre) AS primary_genre,
-  COALESCE(c.hits_now, 0) AS hits_now,
-  COALESCE(p.hits_prev, 0) AS hits_prev,
-  COALESCE(c.hits_now, 0) - COALESCE(p.hits_prev, 0) AS delta,
-  CASE 
-    WHEN COALESCE(p.hits_prev,0) = 0 THEN NULL
-    ELSE ROUND(
-      ((COALESCE(c.hits_now,0) - COALESCE(p.hits_prev,0))::numeric 
-       / NULLIF(p.hits_prev,0)) * 100, 2
-    )
+  primary_genre,
+  COALESCE(SUM(hits) FILTER (WHERE is_cur), 0)::numeric  AS hits_now,
+  COALESCE(SUM(hits) FILTER (WHERE is_prev), 0)::numeric AS hits_prev,
+  (COALESCE(SUM(hits) FILTER (WHERE is_cur), 0)::numeric
+   - COALESCE(SUM(hits) FILTER (WHERE is_prev), 0)::numeric) AS delta,
+  CASE WHEN COALESCE(SUM(hits) FILTER (WHERE is_prev), 0) = 0 THEN NULL
+       ELSE ROUND((
+         (COALESCE(SUM(hits) FILTER (WHERE is_cur), 0)::numeric
+          - COALESCE(SUM(hits) FILTER (WHERE is_prev), 0)::numeric)
+         / NULLIF(COALESCE(SUM(hits) FILTER (WHERE is_prev), 0)::numeric, 0)
+       ) * 100::numeric, 2)
   END AS pct_change
-FROM cur c
-FULL OUTER JOIN prv p ON c.primary_genre = p.primary_genre
+FROM base
+GROUP BY primary_genre
 ORDER BY delta DESC NULLS LAST, hits_now DESC NULLS LAST, primary_genre ASC
-LIMIT {{limit}};
+LIMIT %s;
 """
 
 # =============================================================================
@@ -370,7 +369,6 @@ FROM {PRES_TBL} p
 {{where_clause}};
 """
 
-# Presence con precio (paginable)
 SQL_PRESENCE_WITH_PRICE_OPTIMIZED = f"""
 WITH filtered_presence AS (
   SELECT 
@@ -411,21 +409,16 @@ ORDER BY fp.rn;
 # HITS / TOPS
 # =============================================================================
 
-# Fecha máxima en hits
-QUERY_MAX_DATE = f"SELECT MAX(date_hits) AS max_date FROM {HITS_GLOBAL_TBL}"
-
 # Top por presencia (con metadata)
 QUERY_TOP_PRESENCE_WITH_METADATA = f"""
 SELECT
   h.uid,
-  h.title,
-  h.year,
-  m.primary_genre,
+  m.title,
+  m.year,
   SUM(h.hits) AS hits
 FROM {HITS_PRESENCE_TBL} h
 {{joins_clause}}
 {{where_clause}}
-GROUP BY h.uid, h.title, h.year, m.primary_genre
 ORDER BY hits DESC
 LIMIT %s;
 """
@@ -434,41 +427,10 @@ LIMIT %s;
 QUERY_TOP_PRESENCE_NO_METADATA = f"""
 SELECT
   h.uid,
-  h.title,
-  h.year,
+  m.title,
+  m.year,
   SUM(h.hits) AS hits
 FROM {HITS_PRESENCE_TBL} h
-{{joins_clause}}
-{{where_clause}}
-GROUP BY h.uid, h.title, h.year
-ORDER BY hits DESC
-LIMIT %s;
-"""
-
-# Top global (con género)
-QUERY_TOP_GLOBAL_WITH_GENRE = f"""
-SELECT
-  h.uid,
-  m.title,
-  m.year,
-  m.primary_genre,
-  SUM(h.hits) AS hits
-FROM {HITS_GLOBAL_TBL} h
-{{joins_clause}}
-{{where_clause}}
-GROUP BY h.uid, m.title, m.year, m.primary_genre
-ORDER BY hits DESC
-LIMIT %s;
-"""
-
-# Top global (sin género)
-QUERY_TOP_GLOBAL_NO_GENRE = f"""
-SELECT
-  h.uid,
-  m.title,
-  m.year,
-  SUM(h.hits) AS hits
-FROM {HITS_GLOBAL_TBL} h
 {{joins_clause}}
 {{where_clause}}
 GROUP BY h.uid, m.title, m.year
@@ -476,31 +438,32 @@ ORDER BY hits DESC
 LIMIT %s;
 """
 
-# Hits con calidad (por plataforma)
-SQL_HITS_OPTIMIZED = f"""
-WITH platform_hashes AS (
-  SELECT DISTINCT 
-    p.platform_name,
-    p.hash_unique,
-    p.iso_alpha2
-  FROM {PRES_TBL} p
-  WHERE p.uid = %(uid)s
-    {{country_filter}}
-)
-SELECT 
-  ph.platform_name,
-  {{aggregation}}
-FROM platform_hashes ph
-WHERE EXISTS (
-  SELECT 1 
-  FROM {PRICES_TBL} pr
-  WHERE pr.hash_unique = ph.hash_unique
-    {{quality_filters}}
-)
-GROUP BY ph.platform_name
-ORDER BY ph.platform_name
-LIMIT %(limit)s;
+QUERY_TOP_GLOBAL_WITH_META = f"""
+SELECT
+  h.uid,
+  m.title,
+  m.year,
+  SUM(h.hits) AS hits
+FROM {HITS_GLOBAL_TBL} h
+INNER JOIN {META_TBL} m ON m.uid = h.uid
+{{where_clause}}
+GROUP BY h.uid, m.title, m.year
+ORDER BY hits DESC
+LIMIT %s;
 """
+
+QUERY_TOP_GLOBAL_NO_META = f"""
+SELECT
+  h.uid,
+  SUM(h.hits) AS hits
+FROM {HITS_GLOBAL_TBL} h
+{{where_clause}}
+GROUP BY h.uid
+ORDER BY hits DESC
+LIMIT %s;
+"""
+
+
 
 # Hits + calidad (global / por país)
 SQL_HITS_Q_GLOBAL = """

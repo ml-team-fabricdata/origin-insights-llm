@@ -195,8 +195,6 @@ def tool_hits_with_quality(
 @dataclass
 class PresenceWithPriceQuery:
     # Filtros de presencia
-    active_only_presence: bool = True
-    registry_status: Optional[str] = None
     iso_alpha2: Optional[str] = None
     platform_name: Optional[str] = None
     platform_code: Optional[str] = None
@@ -268,9 +266,6 @@ def build_presence_with_price_query(q: PresenceWithPriceQuery) -> Tuple[str, Dic
     if q.duration_max is not None:
         where.append("p.duration <= %(duration_max)s")
         params["duration_max"] = q.duration_max
-    if q.registry_status:
-        where.append("p.registry_status = %(registry_status)s")
-        params["registry_status"] = q.registry_status
 
     # Filtros de precio
     price_where: List[str] = []
@@ -292,8 +287,6 @@ def build_presence_with_price_query(q: PresenceWithPriceQuery) -> Tuple[str, Dic
     if q.max_price is not None:
         price_where.append("pp.price <= %(maxp)s")
         params["maxp"] = q.max_price
-    if not price_where:
-        price_where.append("TRUE")
     price_where_sql = " AND ".join(price_where)
 
     where_sql = f"WHERE {' AND '.join(where)}" if where else ""
@@ -310,10 +303,8 @@ def build_presence_with_price_query(q: PresenceWithPriceQuery) -> Tuple[str, Dic
                     pp.price_type AS price_type,
                     pp.definition AS price_definition,
                     pp.license    AS price_license,
-                    pp.created_at AS price_created_at
                 FROM {PRICES_TBL} pp
                 WHERE pp.hash_unique = p.hash_unique AND ({price_where_sql})
-                ORDER BY pp.created_at DESC
                 LIMIT 1
             ) price ON TRUE
             {where_sql};
@@ -341,11 +332,9 @@ def build_presence_with_price_query(q: PresenceWithPriceQuery) -> Tuple[str, Dic
                 pp.price_type AS price_type,
                 pp.definition AS price_definition,
                 pp.license    AS price_license,
-                pp.out_on     AS price_out_on,
-                pp.created_at AS price_created_at
+                pp.out_on     AS price_out_on
             FROM {PRICES_TBL} pp
             WHERE pp.hash_unique = p.hash_unique AND ({price_where_sql})
-            ORDER BY pp.created_at DESC
             LIMIT 1
         ) price ON TRUE
         {where_sql}

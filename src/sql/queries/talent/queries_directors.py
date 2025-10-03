@@ -6,7 +6,7 @@ FILMOGRAPHY_SQL_DIRECTOR = f"""
         m.type, 
         m.year, 
         m.imdb_id
-    FROM {METADATA_TABLE} m
+    FROM {META_TBL} m
     INNER JOIN {DIRECTED_TABLE} dt ON m.uid = dt.uid
     WHERE dt.director_id = %s
     ORDER BY m.year DESC NULLS LAST, m.title

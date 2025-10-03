@@ -10,7 +10,7 @@ def get_availability_by_uid(uid: str, country: Optional[str] = None, with_prices
     
     Args:
         uid: Unique identifier for the title (required)
-        country: Country ISO-2 code (optional)
+        country: Country ISO-2 code or region name (e.g., 'US', 'LATAM', 'EU') (optional)
         with_prices: Include price information (default: False)
         
     Returns:
@@ -21,18 +21,31 @@ def get_availability_by_uid(uid: str, country: Optional[str] = None, with_prices
     if not uid:
         return [{"message": "UID parameter is required"}]
     
-    country_iso = None
+    country_isos = None
     if country:
-        country_iso = resolve_country_iso(country)
-        if not country_iso:
-            return [{"message": f"Invalid country code: {country}"}]
+        # Try to resolve as region first
+        region_isos = get_region_iso_list(country)
+        if region_isos:
+            country_isos = region_isos
+        else:
+            # Try to resolve as individual country
+            country_iso = resolve_country_iso(country)
+            if country_iso:
+                country_isos = [country_iso]
+            else:
+                return [{"message": f"Invalid country code or region: {country}"}]
 
     query_params = {"uid": uid}
     country_condition = ""
 
-    if country_iso:
-        country_condition = "AND p.iso_alpha2 = %(country_iso)s"
-        query_params["country_iso"] = country_iso.lower()
+    if country_isos:
+        if len(country_isos) == 1:
+            country_condition = "AND p.iso_alpha2 = %(country_iso)s"
+            query_params["country_iso"] = country_isos[0].lower()
+        else:
+            # Multiple countries (region) - need to use tuple for psycopg2
+            placeholders = ", ".join([f"'{iso.lower()}'" for iso in country_isos])
+            country_condition = f"AND p.iso_alpha2 IN ({placeholders})"
 
     if with_prices:
         sql = QUERY_AVAILABILITY_WITH_PRICES.format(country_condition=country_condition)
@@ -40,17 +53,24 @@ def get_availability_by_uid(uid: str, country: Optional[str] = None, with_prices
         sql = QUERY_AVAILABILITY_WITHOUT_PRICES.format(country_condition=country_condition)
 
     result = db.execute_query(sql, query_params)
-    logger.info(f"Availability queried for {uid} (country={country_iso}, with_prices={with_prices}), results: {len(result) if result else 0}")
+    country_filter_display = country_isos[0] if country_isos and len(country_isos) == 1 else (f"region:{country}" if country_isos and len(country_isos) > 1 else None)
+    logger.info(f"Availability queried for {uid} (country={country_filter_display}, with_prices={with_prices}), results: {len(result) if result else 0}")
 
     if not result:
         error_context = {"uid": uid, "message": "No availability found"}
-        if country_iso:
-            error_context["country"] = country_iso
+        if country_isos:
+            if len(country_isos) == 1:
+                error_context["country"] = country_isos[0]
+            else:
+                error_context["region"] = country
+                error_context["countries_searched"] = country_isos
         return [error_context]
 
     response_data = {
         "uid": uid,
-        "country_filter": country_iso,
+        "country_filter": country_isos[0] if country_isos and len(country_isos) == 1 else None,
+        "region_filter": country if country_isos and len(country_isos) > 1 else None,
+        "countries_searched": country_isos if country_isos and len(country_isos) > 1 else None,
         "with_prices": with_prices,
         "total_platforms": len(result),
         "results": result
@@ -104,14 +124,14 @@ def query_platforms_for_title(uid: str, limit: int = 50) -> List[Dict]:
 
 def query_platforms_for_uid_by_country(uid: str, country: str = None) -> List[Dict]:
     """
-    Get platforms for a UID within a specific country.
+    Get platforms for a UID within a specific country or region.
 
     Args:
         uid: Unique identifier for the title
-        country: Country ISO-2 code (optional)
+        country: Country ISO-2 code or region name (e.g., 'US', 'LATAM', 'EU') (optional)
 
     Returns:
-        List of platform information filtered by country
+        List of platform information filtered by country/region
     """
     logger.info(f"query_platforms_for_uid_by_country called with uid={uid}, country={country}")
 
@@ -122,9 +142,27 @@ def query_platforms_for_uid_by_country(uid: str, country: str = None) -> List[Di
         logger.info("No country provided, falling back to generic platforms query")
         return query_platforms_for_title(uid)
 
+    # Try to resolve as region first
+    region_isos = get_region_iso_list(country)
+    if region_isos:
+        # Handle region with multiple countries
+        if len(region_isos) == 1:
+            result = db.execute_query(QUERY_PLATFORMS_FOR_UID_BY_COUNTRY, (uid, region_isos[0]))
+            return handle_query_result(result, "platforms for title by country", f"{uid} @ {region_isos[0]}")
+        else:
+            # Multiple countries - need different query approach
+            placeholders = ", ".join([f"'{iso.lower()}'" for iso in region_isos])
+            query = QUERY_PLATFORMS_FOR_UID_BY_COUNTRY.replace(
+                "p.iso_alpha2 = %s",
+                f"p.iso_alpha2 IN ({placeholders})"
+            )
+            result = db.execute_query(query, (uid,))
+            return handle_query_result(result, "platforms for title by region", f"{uid} @ {country}")
+    
+    # Try as individual country
     resolved_country = resolve_country_iso(country)
     if not resolved_country:
-        return [{"message": f"Invalid country code: {country}"}]
+        return [{"message": f"Invalid country code or region: {country}"}]
     
     result = db.execute_query(QUERY_PLATFORMS_FOR_UID_BY_COUNTRY, (uid, resolved_country))
     

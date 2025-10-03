@@ -7,7 +7,7 @@ FILMOGRAPHY_SQL_ACTOR = f"""
         m.year,
         m.imdb_id
     FROM {ACTED_IN_TABLE} ai
-    INNER JOIN {METADATA_TABLE} m ON ai.uid = m.uid
+    INNER JOIN {META_TBL} m ON ai.uid = m.uid
     WHERE ai.cast_id = %s
     ORDER BY m.year DESC NULLS LAST, m.title
     LIMIT %s

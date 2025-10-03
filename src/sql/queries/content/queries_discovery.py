@@ -2,7 +2,7 @@ from src.sql.utils.constants_sql import *
 
 FILMOGRAPHY_SQL = f"""
 SELECT *
-FROM {METADATA_TABLE} m
+FROM {META_TBL} m
 WHERE m.uid = %s
 """
 

@@ -5,7 +5,7 @@ COMMON_TITLES_ACTOR_DIRECTOR_SQL = f"""
         m.title, 
         m.type, 
         m.year
-    FROM {METADATA_TABLE} m
+    FROM {META_TBL} m
     INNER JOIN {ACTED_IN_TABLE} ai ON m.uid = ai.uid
     INNER JOIN {DIRECTED_TABLE} dt ON m.uid = dt.uid
     WHERE ai.cast_id = %s

@@ -10,7 +10,8 @@ GET_AVAILABILITY_BY_UID_TOOL = StructuredTool.from_function(
     name="get_availability_by_uid",
     description=(
         "Get platform availability for a title by UID with optional price information. "
-        "Parameters: uid (required), country (optional ISO-2 code for filtering), with_prices (boolean, default False). "
+        "Parameters: uid (required), country (optional - accepts ISO-2 code like 'US' OR region name like 'LATAM', 'EU', 'latin_america'), with_prices (boolean, default False). "
+        "Supports regions: LATAM/latin_america, EU, north_america, south_america, europe, asia, africa, oceania, and more. "
         "When with_prices=True, includes comprehensive price summary: price range (min/max), available currencies, and platform counts with/without prices. "
         "Returns detailed platform availability across countries and regions."
     ),

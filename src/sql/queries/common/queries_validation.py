@@ -12,7 +12,7 @@ SELECT DISTINCT ON (m.uid)
   md.type,
   md.imdb_id
 FROM {AKAS_TABLE} m
-LEFT JOIN {METADATA_TABLE} md ON md.uid = m.uid
+LEFT JOIN {META_TBL} md ON md.uid = m.uid
 WHERE m.title = LOWER(%s)
 ORDER BY m.uid, m.year NULLS LAST
 """
@@ -37,7 +37,7 @@ candidates AS (
 ranked AS (
   SELECT c.*, md.type, md.imdb_id
   FROM candidates c
-  LEFT JOIN {METADATA_TABLE} md ON md.uid = c.uid
+  LEFT JOIN {META_TBL} md ON md.uid = c.uid
   WHERE c.title_similarity >= %s
 )
 SELECT *

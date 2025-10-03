@@ -2,7 +2,7 @@ from src.sql.utils.db_utils_sql import *
 from src.sql.utils.default_import import *
 from src.sql.queries.business.pricing_queries import *
 from src.sql.utils.validators_shared import *
-from src.sql.modules.content.metadata import _normalize_tool_call, _validate_select
+from src.sql.modules.content.metadata import _validate_select
 
 def _resolve_definition(values: Optional[List[str]]) -> Optional[List[str]]:
     """Normaliza/valida definiciones (e.g., "sd hd" -> "SD/HD")."""
@@ -423,12 +423,11 @@ def tool_prices_latest(*args, **kwargs):
 
 def tool_prices_history(*args, **kwargs):
     """Histórico de precios con filtros flexibles."""
-    kwargs = _normalize_tool_call(args, kwargs)
+    kwargs = normalize_args_kwargs(args, kwargs)
     arg1 = kwargs.get("__arg1")
     hash_unique = kwargs.get("hash_unique")
     uid = kwargs.get("uid")
     title_like = kwargs.get("title_like")
-    country = kwargs.get("country")
     platform_name = kwargs.get("platform_name")
     platform_code = kwargs.get("platform_code")
     price_type = kwargs.get("price_type")
@@ -622,7 +621,7 @@ def tool_prices_changes_last_n_days(*args, **kwargs):
 
 def tool_prices_stats(*args, **kwargs):
     """Estadísticas de precio (min/max/avg/medianas/pXX) con filtros comunes."""
-    kwargs = _normalize_tool_call(args, kwargs)
+    kwargs = normalize_args_kwargs(args, kwargs)
     country = kwargs.get("country") or kwargs.get("__arg1")
     platform_code = kwargs.get("platform_code")
     platform_name = kwargs.get("platform_name")

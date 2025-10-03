@@ -4,6 +4,11 @@ from src.sql.utils.constants_sql import *
 # RANKINGS QUERIES
 # =============================================================================
 
+QUERY_MAX_DATE = f"""
+SELECT MAX(date_hits)::date AS max_date
+FROM {HITS_PRESENCE_TBL}
+"""
+
 QUERY_GENRE_MOMENTUM = """
 WITH base AS (
   SELECT
@@ -60,6 +65,7 @@ SELECT
   m.year,
   SUM(h.hits) AS hits
 FROM {HITS_PRESENCE_TBL} h
+INNER JOIN {META_TBL} m ON m.uid = h.uid
 {{joins_clause}}
 {{where_clause}}
 GROUP BY h.uid, m.title, m.year
@@ -75,6 +81,7 @@ SELECT
   m.year,
   SUM(h.hits) AS hits
 FROM {HITS_PRESENCE_TBL} h
+INNER JOIN {META_TBL} m ON m.uid = h.uid
 {{joins_clause}}
 {{where_clause}}
 GROUP BY h.uid, m.title, m.year
@@ -101,6 +108,7 @@ SELECT
   h.uid,
   SUM(h.hits) AS hits
 FROM {HITS_GLOBAL_TBL} h
+INNER JOIN {META_TBL} m ON m.uid = h.uid
 {{where_clause}}
 GROUP BY h.uid
 ORDER BY hits DESC

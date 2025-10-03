@@ -30,7 +30,7 @@ PRICES_HISTORY_TOOL = Tool.from_function(
         "Histórico de precios con joins opcionales a presencia (uid/country/plataforma). "
         "Permite title_like y filtros por tipo/definición/licencia/moneda/rango de precio."
     ),
-    func=toolprices_history,
+    func=tool_prices_history,
 )
 
 PRICES_CHANGES_TOOL = Tool.from_function(

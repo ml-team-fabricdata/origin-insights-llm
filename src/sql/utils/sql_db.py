@@ -1,24 +1,42 @@
-import os
-import json
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
 import base64
+import json
+import logging
+import os
 import time
+from functools import lru_cache
+
+# =============================================================================
+# THIRD PARTY IMPORTS
+# =============================================================================
+import boto3
 import psycopg2
 import psycopg2.extras
-import boto3
 from botocore.exceptions import ClientError
 
+# =============================================================================
+# LOGGER
+# =============================================================================
+logger = logging.getLogger(__name__)
 
+
+@lru_cache(maxsize=1)
 def get_secret() -> dict:
     """
-    Lee SIEMPRE de AWS Secrets Manager (sin hardcodear ARN).
+    Lee de AWS Secrets Manager con caché.
+    
     Env vars:
       - DB_SECRET_ID  (nombre o ARN del secreto; default: 'aurora-postgres-origin-insights-secret-er')
       - AWS_REGION / AWS_DEFAULT_REGION (default: 'us-east-1')
 
     Devuelve un dict normalizado con claves:
       host, port, db, user, password
+      
+    Note:
+      Uses @lru_cache to avoid repeated AWS API calls.
     """
-    now = time.time()
 
     secret_id = os.getenv("DB_SECRET_ID", "aurora-postgres-origin-insights-secret-er")
     region = os.getenv("AWS_REGION") or os.getenv("AWS_DEFAULT_REGION") or "us-east-1"
@@ -81,14 +99,14 @@ class SQLConnectionManager:
         try:
             self._connection = psycopg2.connect(**self.conn_params)
             if not self._initialized:
-                print(
+                logger.info(
                     f"✅ Connected to PostgreSQL: {self.conn_params['dbname']}@"
                     f"{self.conn_params['host']}:{self.conn_params['port']}"
                 )
                 self._initialized = True
                 
         except psycopg2.Error as e:
-            print(f"❌ Initial connection failed: {e}")
+            logger.error(f"❌ Initial connection failed: {e}")
             self._connection = None
 
     def get_connection(self, retry_count=3):
@@ -103,17 +121,17 @@ class SQLConnectionManager:
                         self.close()
 
                 if attempt == 0:
-                    print("🔄 Creating new PostgreSQL connection")
+                    logger.info("🔄 Creating new PostgreSQL connection")
                 self._connection = psycopg2.connect(**self.conn_params)
                 self._connection.autocommit = True
                 return self._connection
 
             except psycopg2.Error as e:
                 if attempt < retry_count - 1:
-                    print(f"⚠️ Connection attempt {attempt+1} failed: {e}")
+                    logger.warning(f"⚠️ Connection attempt {attempt+1} failed: {e}")
                     time.sleep(2 ** attempt)
                 else:
-                    print(f"❌ All connection attempts failed: {e}")
+                    logger.error(f"❌ All connection attempts failed: {e}")
                     raise
 
     def cursor(self, dictionary=True):
@@ -151,48 +169,12 @@ class SQLConnectionManager:
                 else:  # INSERT/UPDATE/DELETE
                     return cur.rowcount
         except psycopg2.Error as e:
-            print(f"❌ Query execution failed: {e}")
+            logger.error(f"❌ Query execution failed: {e}")
             try:
                 conn.rollback()
             except Exception:
                 pass
             raise
-
-    def execute_non_query(self, query, params=None, operation_name=None):
-        """
-        Execute non-query operations (INSERT, UPDATE, DELETE).
-        Added for compatibility with tools that might call this method.
-        
-        Args:
-            query: SQL query string
-            params: Optional parameters for the query
-            operation_name: Optional name for the operation
-        """
-        return self.execute_query(query, params, operation_name)
-
-
-# Para compatibilidad con AsyncSQLConnectionManager si otras partes del código lo esperan
-class AsyncSQLConnectionManager(SQLConnectionManager):
-    """
-    Wrapper de compatibilidad para código que espera AsyncSQLConnectionManager.
-    No es realmente async, pero mantiene la interfaz.
-    """
-    
-    async def execute_query(self, query, params=None, operation_name=None):
-        """Wrapper async para compatibilidad"""
-        return super().execute_query(query, params, operation_name)
-    
-    async def execute_non_query(self, query, params=None, operation_name=None):
-        """Wrapper async para compatibilidad"""
-        return super().execute_non_query(query, params, operation_name)
-    
-    async def close(self):
-        """Wrapper async para compatibilidad"""
-        return super().close()
-    
-    async def _ensure_initialized(self):
-        """Para compatibilidad con código que espera este método"""
-        pass
 
 
 db = SQLConnectionManager()

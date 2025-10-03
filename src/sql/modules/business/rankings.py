@@ -1,7 +1,7 @@
 from src.sql.utils.db_utils_sql import *
 from src.sql.utils.default_import import *
-from src.sql.queries.business.queries_business import *
 from src.sql.utils.validators_shared import *
+from src.sql.queries.business.rankings_queries import *
 
 
 def compute_window_anchored_to_table(days_back: int) -> Optional[Tuple[str, str]]:
@@ -146,7 +146,7 @@ def get_top_by_uid(uid: str) -> List[Dict]:
     """Get top/rating information for a specific UID."""
     if not uid:
         return [{"message": "UID required"}]
-    
+
     rows = db.execute_query(UID_RATING_SQL, (uid,))
     return handle_query_result(rows, "Rating by uid", f"{uid}")
 
@@ -177,7 +177,7 @@ def get_top_generic(
 
     Filtros: platform, genre, content_type; ventana temporal (days_back o date_from/date_to); 
     año (currentyear/year o rango year_from/year_to); y limit.
-    
+
     Ejemplos:
         get_top_generic(country="US", days_back=30)
         get_top_generic(country="US", date_from="2024-01-01", date_to="2024-12-31")
@@ -216,7 +216,7 @@ def get_top_generic(
         f"date_from={date_from}, date_to={date_to}, "
         f"year={resolved_currentyear}, year_from={year_from}, year_to={year_to}"
     )
-    
+
     print(
         f"get_top_generic | Filters: ct={normalized_content_type}, "
         f"platform={normalized_platform}, genre={normalized_genre}, "
@@ -303,11 +303,13 @@ def get_top_presence(
     # Temporal inline (columna de presence: h.date_hits)
     if days_back is not None:
         validated = validate_days_back(days_back, default=7)
-        print(f"get_top_presence | days_back={days_back} → validated={validated}")
+        print(
+            f"get_top_presence | days_back={days_back} → validated={validated}")
         window = compute_window_anchored_to_table(validated)
         if window:
             df, dt = window
-            print(f"get_top_presence | Computed window: {df} to {dt} ({validated} days)")
+            print(
+                f"get_top_presence | Computed window: {df} to {dt} ({validated} days)")
             where.append("h.date_hits BETWEEN %s AND %s")
             params.extend([df, dt])
     else:
@@ -386,11 +388,13 @@ def get_top_global(
     # Temporal filters
     if days_back is not None:
         validated = validate_days_back(days_back, default=7)
-        print(f"get_top_global | days_back={days_back} → validated={validated}")
+        print(
+            f"get_top_global | days_back={days_back} → validated={validated}")
         window = compute_window_anchored_to_table(validated)
         if window:
             df, dt = window
-            print(f"get_top_global | Computed window: {df} to {dt} ({validated} days)")
+            print(
+                f"get_top_global | Computed window: {df} to {dt} ({validated} days)")
             where.append("h.date_hits BETWEEN %s AND %s")
             params.extend([df, dt])
     else:
@@ -540,7 +544,7 @@ def get_top_generic_tool(*args, **kwargs) -> str:
         f"days_back={days_back}, date_from={date_from}, date_to={date_to}, "
         f"year={year}, currentyear={currentyear}, year_from={year_from}, year_to={year_to}"
     )
-    
+
     print(
         f"get_top_generic_tool | Filters: country={country}, platform={platform}, "
         f"genre={genre}, content_type={content_type}, limit={limit}"

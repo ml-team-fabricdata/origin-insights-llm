@@ -2,6 +2,7 @@
 from src.sql.utils.db_utils_sql import *
 from src.sql.utils.default_import import *
 from src.sql.queries.business.queries_business import *
+from src.sql.queries.business.pricing_queries import *
 from src.sql.utils.validators_shared import *
 from src.sql.modules.content.metadata import _normalize_tool_call, _validate_select
 
@@ -81,12 +82,14 @@ def _build_filters_and_params(
 ) -> Tuple[str, str, List[str]]:
     """Construye filtros SQL y parámetros para las columnas derivadas (x.*)."""
     params: List[str] = []
-    
-    def_clause, def_params = build_in_clause("COALESCE(x.definition,'')", definition)
+
+    def_clause, def_params = build_in_clause(
+        "COALESCE(x.definition,'')", definition)
     def_filter = f"AND {def_clause}" if def_clause else ""
     params.extend(def_params)
-    
-    lic_clause, lic_params = build_in_clause("COALESCE(x.license,'')", license_)
+
+    lic_clause, lic_params = build_in_clause(
+        "COALESCE(x.license,'')", license_)
     lic_filter = f"AND {lic_clause}" if lic_clause else ""
     params.extend(lic_params)
 

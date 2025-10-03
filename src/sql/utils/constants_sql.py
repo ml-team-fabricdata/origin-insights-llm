@@ -18,7 +18,6 @@ HITS_GLOBAL_TBL = f"{SCHEMA}.hits_global"
 
 # Additional tables
 AKAS_TABLE = f"{SCHEMA}.akas_with_year"
-METADATA_TABLE = f"{SCHEMA}.metadata_simple_all"
 CAST_TABLE = f"{SCHEMA}.cast"
 ACTED_IN_TABLE = f"{SCHEMA}.acted_in"
 DIRECTOR_TABLE = f"{SCHEMA}.directors"

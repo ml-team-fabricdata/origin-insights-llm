@@ -4,38 +4,26 @@ from src.sql.utils.constants_sql import *
 from src.sql.utils.validators_shared import *
 from src.sql.queries.common.base_queries import *
 
-
-# Patrones compilados para mejor performance
 _ident = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$", re.IGNORECASE)
 _func = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*\s*\(", re.IGNORECASE)
 _numeric = re.compile(r"^-?\d+(\.\d+)?$", re.IGNORECASE)
 _qualified = re.compile(
     r"^[A-Za-z_][A-Za-z0-9_]*\.[A-Za-z_][A-Za-z0-9_]*$", re.IGNORECASE)
 
-
-# ══════════════════════════════════════════════════════════════════════════════
-# UTILIDADES BÁSICAS
-# ══════════════════════════════════════════════════════════════════════════════
-
 def _norm_table(t: str) -> str:
     return TABLE_MAP.get(t, t)
-
 
 def _ensure_table(t: str) -> bool:
     return t in SCHEMAS
 
-
 def _ensure_col(t: str, c: str) -> bool:
     return _ensure_table(t) and c in SCHEMAS[t]
-
 
 def _ensure_alias(a: Optional[str]) -> bool:
     return a is None or _ident.match(a) is not None
 
-
 def _is_func(expr: str) -> bool:
     return bool(_func.match(expr))
-
 
 def _split_args(arglist: str) -> List[str]:
     """Divide argumentos de función respetando paréntesis."""
@@ -63,11 +51,6 @@ def _split_args(arglist: str) -> List[str]:
         args.append(tail)
     return args
 
-
-# ══════════════════════════════════════════════════════════════════════════════
-# COMPILACIÓN DE EXPRESIONES
-# ══════════════════════════════════════════════════════════════════════════════
-
 def _render_colref(colref: str, tables: Dict[str, str]) -> Optional[str]:
     """Renderiza referencia a columna."""
     if "." not in colref:
@@ -83,12 +66,10 @@ def _render_colref(colref: str, tables: Dict[str, str]) -> Optional[str]:
 
     return f"{left}.{c}"
 
-
 def _render_expr(expr: str, tables: Dict[str, str]) -> Optional[str]:
     """Renderiza expresión SQL."""
     expr = expr.strip()
 
-    # CAST especial
     m_cast = re.match(
         r"^CAST\s*\((.+)\s+AS\s+([A-Za-z0-9_]+)\s*\)$", expr, re.I)
     if m_cast:
@@ -96,7 +77,6 @@ def _render_expr(expr: str, tables: Dict[str, str]) -> Optional[str]:
         inner_rendered = _render_expr(inner, tables)
         return f"CAST({inner_rendered} AS {type_})" if inner_rendered else None
 
-    # Función
     if _is_func(expr):
         m = re.match(r"^([A-Za-z_][A-Za-z0-9_]*)\s*\((.*)\)$", expr)
         if not m:
@@ -121,11 +101,9 @@ def _render_expr(expr: str, tables: Dict[str, str]) -> Optional[str]:
 
         return f"{fname}(" + ", ".join(args_rendered) + ")"
 
-    # Columna calificada
     if "." in expr and _qualified.match(expr):
         return _render_colref(expr, tables)
 
-    # Literales
     if expr.startswith("'") and expr.endswith("'"):
         return expr
     if _numeric.match(expr):
@@ -133,21 +111,17 @@ def _render_expr(expr: str, tables: Dict[str, str]) -> Optional[str]:
 
     return None
 
-
 def _render_value_or_col(token: str, tables: Dict[str, str]) -> Optional[str]:
     """Renderiza token (literal o columna)."""
     token = token.strip()
 
-    # Literales directos
     if _numeric.match(token) or (len(token) >= 2 and token[0] == token[-1] == "'"):
         return token
 
-    # Expresiones
     if "." in token or _is_func(token) or token.upper().startswith("CAST("):
         return _render_expr(token, tables)
 
     return None
-
 
 def _render_select_item(item: str, tables: Dict[str, str]) -> Optional[str]:
     """Renderiza item de SELECT."""
@@ -162,11 +136,6 @@ def _render_select_item(item: str, tables: Dict[str, str]) -> Optional[str]:
 
     return _render_expr(item, tables)
 
-# ══════════════════════════════════════════════════════════════════════════════
-# MANEJO DE PARÁMETROS Y FILTROS
-# ══════════════════════════════════════════════════════════════════════════════
-
-
 def _apply_resolver(qualified_col: str, value: Any) -> Any:
     """Aplica resolver si existe."""
     fn = RESOLVERS.get(qualified_col)
@@ -175,7 +144,6 @@ def _apply_resolver(qualified_col: str, value: Any) -> Any:
     if isinstance(value, (list, tuple, set)):
         return [fn(v) for v in value]
     return fn(value)
-
 
 def _render_filters(table_alias_map: Dict[str, str],
                     filters: Optional[Mapping[str, Tuple[str, Any]]],
@@ -236,11 +204,6 @@ def _render_filters(table_alias_map: Dict[str, str],
 
     return f" {clause} " + " AND ".join(parts) if parts else ""
 
-# ══════════════════════════════════════════════════════════════════════════════
-# FUNCIÓN PRINCIPAL DE CONSTRUCCIÓN
-# ══════════════════════════════════════════════════════════════════════════════
-
-
 def build_sql(*,
               base_table: str, base_alias: str,
               select: Sequence[str],
@@ -260,7 +223,6 @@ def build_sql(*,
 
     tables = {base_alias: base_table}
 
-    # JOINs
     join_sql = []
     if joins:
         for j in joins:
@@ -290,7 +252,6 @@ def build_sql(*,
                 join_sql.append(f"{jt} {tbl} {als} ON " +
                                 " AND ".join(on_parts))
 
-    # SELECT
     if len(select) == 0:
         return None
 
@@ -303,16 +264,13 @@ def build_sql(*,
     if not sel_rendered:
         return None
 
-    # Parámetros
     params = {}
     param_counter = [0]
 
-    # WHERE/HAVING
     where_sql = _render_filters(tables, where, params, param_counter, "WHERE")
     having_sql = _render_filters(
         tables, having, params, param_counter, "HAVING")
 
-    # GROUP BY
     group_sql = ""
     if group_by:
         group_items = []
@@ -326,7 +284,6 @@ def build_sql(*,
         if group_items:
             group_sql = " GROUP BY " + ", ".join(group_items)
 
-    # ORDER BY
     order_sql = ""
     if order_by:
         obs = []
@@ -346,7 +303,6 @@ def build_sql(*,
         if obs:
             order_sql = " ORDER BY " + ", ".join(obs)
 
-    # LIMIT/OFFSET
     limoff = ""
     if limit is not None and isinstance(limit, int) and limit > 0:
         limoff += f" LIMIT {limit}"
@@ -362,15 +318,9 @@ def build_sql(*,
 
     return sql, params
 
-# ══════════════════════════════════════════════════════════════════════════════
-# FUNCIONES PÚBLICAS
-# ══════════════════════════════════════════════════════════════════════════════
-
-
 def run_sql(intent: Dict[str, Any], op_name: str = "intent_query") -> List[Dict]:
     """Ejecuta intent compilado."""
 
-    # Compilar intent
     sql_result = build_sql(**intent)
     if sql_result is None:
         logger.warning(f"Falló compilación de intent: {op_name}")
@@ -379,7 +329,6 @@ def run_sql(intent: Dict[str, Any], op_name: str = "intent_query") -> List[Dict]
     sql, params = sql_result
     rows = db.execute_query(sql, params)
     return _process_results(rows, op_name)
-
 
 def _process_results(raw_rows: List[Any], op_name: str) -> List[Dict[str, Any]]:
     """Procesa resultados crudos."""
@@ -399,7 +348,6 @@ def _process_results(raw_rows: List[Any], op_name: str) -> List[Dict[str, Any]]:
             processed.append({'row': row})
 
     return processed
-
 
 def run_sql_adapter(*args, **kwargs) -> List[Dict[str, Any]]:
     """Adaptador para múltiples formatos."""
@@ -439,13 +387,9 @@ def run_sql_adapter(*args, **kwargs) -> List[Dict[str, Any]]:
     rows = db.execute_query(query, params)
     return _process_results(rows, "adapter_query")
 
-# Funciones de utilidad
-
-
 def validate_intent(intent: Dict[str, Any]) -> bool:
     """Valida intent sin ejecutar."""
     return build_sql(**intent) is not None
-
 
 def get_schema_info(table_name: Optional[str] = None) -> Optional[Dict[str, Any]]:
     """Info del schema."""
@@ -464,4 +408,3 @@ def get_schema_info(table_name: Optional[str] = None) -> Optional[Dict[str, Any]
         'table_count': len(SCHEMAS),
         'functions': list(ALLOWED_FUNCS.keys())
     }
-

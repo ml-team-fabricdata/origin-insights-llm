@@ -2,13 +2,11 @@ from src.sql.utils.default_import import *
 from src.sql.utils.db_utils_sql import *
 from src.sql.utils.constants_sql import *
 from src.sql.utils.validators_shared import *
-from src.sql.queries.content.queries_content import *
-
+from src.sql.queries.content.queries_metadata import *
 
 def _normalize_args_kwargs(args, kwargs, parse_arg1=False):
     kwargs = normalize_args_kwargs(args, kwargs)
     
-    # Parse __arg1 if requested
     if parse_arg1 and "__arg1" in kwargs:
         arg1_value = kwargs.get("__arg1", "")
         if str(arg1_value).strip().lower() not in NO_FILTER_KEYWORDS:
@@ -188,7 +186,6 @@ def _parse_arg1_basic(a1: str, kwargs: dict) -> dict:
 
     return out
 
-
 def _validate_order_by(order_by: Optional[str], default: str = "year") -> str:
     if not order_by:
         return default
@@ -235,7 +232,6 @@ class MetadataSimpleQuery:
     limit: Optional[int] = DEFAULT_LIMIT
     offset: Optional[int] = 0
     count_only: bool = False
-
 
 def build_metadata_simple_all_query(q: MetadataSimpleQuery) -> Tuple[str, Dict[str, Any]]:
     params: Dict[str, Any] = {}
@@ -335,7 +331,6 @@ def build_metadata_simple_all_query(q: MetadataSimpleQuery) -> Tuple[str, Dict[s
     )
 
     return sql, params
-
 
 def query_metadata_simple_all(*args, **kwargs) -> List[Dict[str, Any]]:
     kwargs = _normalize_args_kwargs(args, kwargs, parse_arg1=True)

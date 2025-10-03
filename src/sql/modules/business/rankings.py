@@ -3,7 +3,6 @@ from src.sql.utils.default_import import *
 from src.sql.utils.validators_shared import *
 from src.sql.queries.business.rankings_queries import *
 
-
 def compute_window_anchored_to_table(days_back: int) -> Optional[Tuple[str, str]]:
     """Compute date window anchored to MAX(date_hits) when no current data exists."""
     logger.debug(f"Computing window anchored to table with days_back={days_back}")
@@ -26,17 +25,10 @@ def compute_window_anchored_to_table(days_back: int) -> Optional[Tuple[str, str]
     date_to = max_dt.isoformat()
     return (date_from, date_to)
 
-
-# =============================================================================
-# GENRE AND MOMENTUM FUNCTIONS
-# =============================================================================
-
-
 def max_date_hits() -> date:
     row = db.execute_query(
         f"SELECT MAX(date_hits)::date AS mx FROM {HITS_PRESENCE_TBL};", []) or []
     return row[0]["mx"] or datetime.now().date()
-
 
 def _clamp_rolling(max_d: date, days: int, prev_days: int) -> Tuple[date, date, date, date]:
     cur_to = max_d
@@ -44,7 +36,6 @@ def _clamp_rolling(max_d: date, days: int, prev_days: int) -> Tuple[date, date, 
     prev_to = cur_from - timedelta(days=1)
     prev_from = prev_to - timedelta(days=prev_days-1)
     return (cur_from, cur_to, prev_from, prev_to)
-
 
 def get_genre_momentum(
     country: Optional[str] = None,
@@ -69,29 +60,25 @@ def get_genre_momentum(
     Returns:
         Lista de dicts con métricas de momentum por género.
     """
-    # Validate and set defaults
     if days_back is None or days_back <= 0:
         days_back = 30
     if prev_days_back is None or prev_days_back <= 0:
         prev_days_back = days_back
 
-    # Get max date from hits table
     max_d = max_date_hits()
 
-    # Calculate date ranges
     cur_from, cur_to, prev_from, prev_to = _clamp_rolling(
         max_d, days_back, prev_days_back)
     logger.debug(f"Date ranges: prev={prev_from} → {prev_to}, cur={cur_from} → {cur_to}")
 
-    # Build dynamic clauses
     country_clause = ""
     ct_hits_clause = ""
     ct_meta_clause = ""
 
     params = [
-        cur_from.isoformat(), cur_to.isoformat(),  # Current period
-        prev_from.isoformat(), prev_to.isoformat(),  # Previous period
-        prev_from.isoformat(), cur_to.isoformat()  # Overall range
+        cur_from.isoformat(), cur_to.isoformat(),
+        prev_from.isoformat(), prev_to.isoformat(),
+        prev_from.isoformat(), cur_to.isoformat()
     ]
 
     if country:
@@ -108,7 +95,6 @@ def get_genre_momentum(
             params.append(resolved_type)
             params.append(resolved_type)
 
-    # Format the query
     query = QUERY_GENRE_MOMENTUM.format(
         HITS_TABLE=HITS_PRESENCE_TBL,
         META_TBL=META_TBL,
@@ -117,13 +103,10 @@ def get_genre_momentum(
         CT_META_CLAUSE=ct_meta_clause
     )
 
-    # Add limit
     query += f"\nLIMIT {limit}"
 
-    # Execute query
     rows = db.execute_query(query, tuple(params))
 
-    # Build identifier for logging
     ident_parts = []
     if country:
         ident_parts.append(f"country={country}")
@@ -134,12 +117,6 @@ def get_genre_momentum(
 
     return handle_query_result(rows, "genre_momentum", ident)
 
-
-# =============================================================================
-# TOP FUNCTIONS
-# =============================================================================
-
-
 def get_top_by_uid(uid: str) -> List[Dict]:
     """Get top/rating information for a specific UID."""
     if not uid:
@@ -147,7 +124,6 @@ def get_top_by_uid(uid: str) -> List[Dict]:
 
     rows = db.execute_query(UID_RATING_SQL, (uid,))
     return handle_query_result(rows, "Rating by uid", f"{uid}")
-
 
 def get_top_generic(
     country: Optional[str] = None,
@@ -164,9 +140,8 @@ def get_top_generic(
     *,
     region: Optional[str] = None,
     countries_list: Optional[List[str]] = None,
-    # Aliases
-    type: Optional[str] = None,   # alias de content_type
-    year: Optional[int] = None,   # alias de currentyear
+    type: Optional[str] = None,
+    year: Optional[int] = None,
 ) -> List[Dict[str, Any]]:
     """
     Top genérico con filtros flexibles; rutea automáticamente según geografía:
@@ -183,7 +158,6 @@ def get_top_generic(
         get_top_generic(year_from=2020, year_to=2024)
     """
 
-    # -------- Normalizaciones únicas --------
     normalized_content_type = resolve_content_type(
         content_type) or resolve_content_type(type)
 
@@ -195,10 +169,8 @@ def get_top_generic(
     normalized_platform = resolve_platform_name(platform) if platform else None
     normalized_genre = resolve_primary_genre(genre) if genre else None
 
-    # Límite seguro
     limit_val = validate_limit(limit, default=20, max_limit=200)
 
-    # Geografía inline
     resolved_country = resolve_country_iso(country) if country else None
     iso_set: List[str] = []
     if not resolved_country and (region or countries_list):
@@ -208,7 +180,6 @@ def get_top_generic(
             iso_set = [c.strip().upper()
                        for c in countries_list if isinstance(c, str) and c.strip()]
 
-    # Log time range parameters
     logger.debug(
         f"get_top_generic | Time: days_back={days_back}, dates={date_from} to {date_to}, "
         f"year={resolved_currentyear}, years={year_from}-{year_to} | "
@@ -216,7 +187,6 @@ def get_top_generic(
         f"genre={normalized_genre}, country={resolved_country}, limit={limit_val}"
     )
 
-    # Routing
     if resolved_country or iso_set:
         return get_top_presence(
             resolved_country=resolved_country,
@@ -245,7 +215,6 @@ def get_top_generic(
             year_from=year_from,
             year_to=year_to,
         )
-
 
 def get_top_presence(
     resolved_country: Optional[str],
@@ -277,12 +246,10 @@ def get_top_presence(
         where.append("np.iso_alpha2 = %s")
         params.append(resolved_country)
     elif iso_set:
-        # Use IN clause for better performance
         placeholders = ','.join(['%s'] * len(iso_set))
         where.append(f"np.iso_alpha2 IN ({placeholders})")
         params.extend(iso_set)
 
-    # Contenido
     if content_type:
         where.append("h.content_type = %s")
         params.append(content_type)
@@ -293,7 +260,6 @@ def get_top_presence(
         where.append("m.primary_genre ILIKE %s")
         params.append(genre)
 
-    # Temporal inline (columna de presence: h.date_hits)
     if days_back is not None:
         validated = validate_days_back(days_back, default=7)
         logger.debug(f"get_top_presence | days_back={days_back} → validated={validated}")
@@ -313,7 +279,6 @@ def get_top_presence(
             where.append("h.date_hits <= %s")
             params.append(date_to)
 
-    # Año inline (presence usa h.year)
     if currentyear is not None:
         where.append("h.year = %s")
         params.append(int(currentyear))
@@ -342,7 +307,6 @@ def get_top_presence(
         currentyear, year_from, year_to
     )
 
-
 def get_top_global(
     platform: Optional[str],
     genre: Optional[str],
@@ -364,7 +328,6 @@ def get_top_global(
     where: List[str] = []
     joins: List[str] = []
 
-    # Determinar uniones requeridas según filtros
     join_presence = bool(platform)
     join_meta = bool(genre or content_type)
 
@@ -373,7 +336,6 @@ def get_top_global(
     if join_meta:
         joins.append(f"INNER JOIN {META_TBL} AS m ON m.uid = h.uid")
 
-    # Temporal filters
     if days_back is not None:
         validated = validate_days_back(days_back, default=7)
         logger.debug(f"get_top_global | days_back={days_back} → validated={validated}")
@@ -427,7 +389,6 @@ def get_top_global(
     rows = db.execute_query(query, tuple(params)) or []
     return rows
 
-
 def build_result(
     rows: List[Any],
     query_type: str,
@@ -473,11 +434,9 @@ def build_result(
     ident = " ".join(p for p in ident_parts if p)
     logger.debug(f"{query_type.upper()}: {ident}, rows={len(rows or [])}")
 
-    # Normalize to ensure year/currentyear in final payload
     def _normalize_row(r: Any) -> Dict[str, Any]:
         """Normalize a single row efficiently."""
         d = dict(r) if not isinstance(r, dict) else r
-        # Use pop with default to avoid multiple lookups
         if "year" not in d:
             hit_year = d.pop("hit_year", None)
             if hit_year is not None:
@@ -486,7 +445,6 @@ def build_result(
             current_year = d.pop("current_year", None)
             if current_year is not None:
                 d["currentyear"] = current_year
-        # Clean any remaining aliases
         d.pop("hit_year", None)
         d.pop("current_year", None)
         return d
@@ -494,18 +452,11 @@ def build_result(
     norm_rows = [_normalize_row(r) for r in (rows or [])]
     return handle_query_result(norm_rows, f"top ({query_type})", ident)
 
-
-# =============================================================================
-# TOOL WRAPPER FUNCTIONS
-# =============================================================================
-
-
 def get_top_generic_tool(*args, **kwargs) -> str:
     """Tool-safe wrapper for generic top query specific for LangGraph."""
     params = normalize_langgraph_params(*args, **kwargs)
     logger.debug(f"get_top_generic_tool | Raw params received: {params}")
 
-    # Extract parameters
     country = params.get("country")
     platform = params.get("platform")
     genre = params.get("genre")
@@ -526,7 +477,6 @@ def get_top_generic_tool(*args, **kwargs) -> str:
         f"Filters: country={country}, platform={platform}, genre={genre}, ct={content_type}, limit={limit}"
     )
 
-    # Call main function
     rows = get_top_generic(
         country=country,
         platform=platform,
@@ -543,7 +493,6 @@ def get_top_generic_tool(*args, **kwargs) -> str:
         region=region,
     )
 
-    # Create structured response
     response = {
         "status": "success",
         "operation": "top_generic",
@@ -565,7 +514,6 @@ def get_top_generic_tool(*args, **kwargs) -> str:
     }
 
     return json.dumps(response, ensure_ascii=False, indent=2, default=str)
-
 
 def new_top_by_country_tool(*args, **kwargs) -> str:
     """New function specific for LangGraph for tops by country."""
@@ -590,7 +538,6 @@ def new_top_by_country_tool(*args, **kwargs) -> str:
             indent=2,
         )
 
-    # Use get_top_generic with country and year
     rows = get_top_generic(country=country, year=year, limit=limit)
 
     response = {

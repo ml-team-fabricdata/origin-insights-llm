@@ -1,14 +1,12 @@
 from src.sql.utils.default_import import *
 from src.sql.utils.constants_sql import *
-from src.sql.queries.content.queries_content import *
+from src.sql.queries.content.queries_discovery import *
 from src.sql.utils.sql_db import db
 from src.sql.utils.validators_shared import *
-
 
 def get_filmography_by_uid(uid: str) -> List[Dict[str, Any]]:
     """
     Obtiene la filmografía/ficha para un UID específico.
-   
     Args:
         uid (str): Identificador único del título
        
@@ -18,7 +16,6 @@ def get_filmography_by_uid(uid: str) -> List[Dict[str, Any]]:
     Raises:
         ValueError: Si el UID tiene formato inválido
     """
-    # Validación de entrada usando helper
     uid = validate_uid(uid)
     if not uid:
         logger.warning("Invalid or empty UID for filmography query")
@@ -26,7 +23,6 @@ def get_filmography_by_uid(uid: str) -> List[Dict[str, Any]]:
    
     logger.debug(f"Getting filmography for UID: {uid}")
     
-    # Manejo de errores de base de datos
     results = db.execute_query(FILMOGRAPHY_SQL, (uid,))
     
     if results is None:
@@ -34,7 +30,6 @@ def get_filmography_by_uid(uid: str) -> List[Dict[str, Any]]:
         return []
     
     return handle_query_result(results, "filmography", uid)
-
 
 def get_title_rating(uid: str, country: Optional[str] = None) -> List[Dict[str, Any]]:
     """
@@ -51,7 +46,6 @@ def get_title_rating(uid: str, country: Optional[str] = None) -> List[Dict[str, 
     Raises:
         ValueError: Si el UID tiene formato inválido
     """
-    # Validación de entrada usando helper
     uid = validate_uid(uid)
     if not uid:
         logger.warning("Invalid or empty UID for rating query")
@@ -59,7 +53,6 @@ def get_title_rating(uid: str, country: Optional[str] = None) -> List[Dict[str, 
 
     logger.debug(f"Querying rating for UID: {uid}, country: {country or 'global'}")
 
-    # Rating global (sin país específico)
     if not country:
         results = db.execute_query(RATING_QUERY_GLOBAL, (uid,))
         
@@ -70,7 +63,6 @@ def get_title_rating(uid: str, country: Optional[str] = None) -> List[Dict[str, 
         logger.info(f"Global rating queried for {uid}, results: {len(results)}")
         return handle_query_result(results, "title rating global", uid)
     
-    # Rating específico por país
     country = country.strip() if isinstance(country, str) else str(country).strip()
     resolved_country_iso = resolve_country_iso(country)
     
@@ -87,7 +79,6 @@ def get_title_rating(uid: str, country: Optional[str] = None) -> List[Dict[str, 
     logger.info(f"Country rating queried for {uid}:{resolved_country_iso}, results: {len(results)}")
     return handle_query_result(results, "title rating by country", uid)
 
-
 def get_multiple_titles_info(uids: List[str]) -> List[Dict[str, Any]]:
     """
     Obtiene información básica para múltiples UIDs de una vez.
@@ -102,7 +93,6 @@ def get_multiple_titles_info(uids: List[str]) -> List[Dict[str, Any]]:
         logger.warning("Invalid or missing UIDs list")
         return []
     
-    # Filtrar UIDs válidos usando helper
     valid_uids = [validated for uid in uids if (validated := validate_uid(uid))]
     
     if not valid_uids:
@@ -111,7 +101,6 @@ def get_multiple_titles_info(uids: List[str]) -> List[Dict[str, Any]]:
     
     logger.debug(f"Getting info for {len(valid_uids)} UIDs")
     
-    # Usar build_in_clause helper
     in_clause, params = build_in_clause("uid", valid_uids)
     sql = f"""
         SELECT uid, title, type, year, duration, countries_iso

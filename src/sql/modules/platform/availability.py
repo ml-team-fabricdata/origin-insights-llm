@@ -1,11 +1,12 @@
 from src.sql.utils.db_utils_sql import *
 from src.sql.utils.default_import import *
-from src.sql.queries.platform.queries_platform import *
+from src.sql.queries.platform.queries_availability import *
 from src.sql.utils.validators_shared import *
 
 def get_availability_by_uid(uid: str, country: Optional[str] = None, with_prices: bool = False) -> List[Dict]:
     """
     Get availability information for a specific UID
+    {{ ... }}
     
     Args:
         uid: Unique identifier for the title (required)
@@ -15,20 +16,17 @@ def get_availability_by_uid(uid: str, country: Optional[str] = None, with_prices
     Returns:
         List containing availability data or error message
     """
-    # Parse UID and extract country using shared helper
     uid, country = parse_uid_with_country(uid, country)
     
     if not uid:
         return [{"message": "UID parameter is required"}]
     
-    # Resolve country if provided
     country_iso = None
     if country:
         country_iso = resolve_country_iso(country)
         if not country_iso:
             return [{"message": f"Invalid country code: {country}"}]
 
-    # Build query parameters
     query_params = {"uid": uid}
     country_condition = ""
 
@@ -36,7 +34,6 @@ def get_availability_by_uid(uid: str, country: Optional[str] = None, with_prices
         country_condition = "AND p.iso_alpha2 = %(country_iso)s"
         query_params["country_iso"] = country_iso.lower()
 
-    # Select appropriate query and format it with country condition
     if with_prices:
         sql = QUERY_AVAILABILITY_WITH_PRICES.format(country_condition=country_condition)
     else:
@@ -51,7 +48,6 @@ def get_availability_by_uid(uid: str, country: Optional[str] = None, with_prices
             error_context["country"] = country_iso
         return [error_context]
 
-    # Add metadata about the query
     response_data = {
         "uid": uid,
         "country_filter": country_iso,
@@ -60,7 +56,6 @@ def get_availability_by_uid(uid: str, country: Optional[str] = None, with_prices
         "results": result
     }
 
-    # If prices were requested, add price statistics
     if with_prices:
         prices_found = [r for r in result if r.get('price') is not None]
         response_data.update({
@@ -123,7 +118,6 @@ def query_platforms_for_uid_by_country(uid: str, country: str = None) -> List[Di
     if not uid:
         return [{"message": "uid required"}]
 
-    # If no country provided, fall back to generic platforms query
     if not country:
         logger.info("No country provided, falling back to generic platforms query")
         return query_platforms_for_title(uid)
@@ -199,7 +193,6 @@ def get_recent_premieres_by_country(country: str, days_back: int = 7, limit: int
     if not country:
         return [{"message": "Valid country (ISO-2) required."}]
 
-    # Policy: restrict search to last 7 days only
     if days_back != 7:
         return [{"message": "Only 7-day lookback allowed (days_back=7)."}]
 

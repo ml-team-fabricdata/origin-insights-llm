@@ -1,7 +1,7 @@
 from src.sql.utils.constants_sql import *
 from src.sql.utils.db_utils_sql import *
 from src.sql.utils.default_import import *
-from src.sql.queries.platform.queries_platform import *
+from src.sql.queries.platform.queries_presence import *
 from src.sql.utils.validators_shared import *
 
 def build_where_clause(filters: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
@@ -9,10 +9,8 @@ def build_where_clause(filters: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
     conditions = []
     params = {}
 
-    # Active status filter (always apply)
     conditions.append("p.out_on IS NULL")
 
-    # Identity filters
     if filters.get("uid"):
         conditions.append("p.uid = %(uid)s")
         params["uid"] = filters["uid"]
@@ -21,14 +19,12 @@ def build_where_clause(filters: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
         conditions.append("p.hash_unique = %(hash_unique)s")
         params["hash_unique"] = filters["hash_unique"]
 
-    # Geographic filters
     if filters.get("country"):
         country_iso = resolve_country_iso(filters["country"])
         if country_iso:
             conditions.append("p.iso_alpha2 = %(country_iso)s")
             params["country_iso"] = country_iso.upper()
 
-    # Platform filters
     if filters.get("platform_name"):
         platform = resolve_platform_name(filters["platform_name"])
         if platform:
@@ -39,7 +35,6 @@ def build_where_clause(filters: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
         conditions.append("p.platform_code = %(platform_code)s")
         params["platform_code"] = filters["platform_code"]
 
-    # Content filters
     if filters.get("type"):
         content_type = resolve_content_type(filters["type"])
         if content_type:
@@ -50,7 +45,6 @@ def build_where_clause(filters: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
         conditions.append("p.clean_title ILIKE %(title_like)s")
         params["title_like"] = build_like_pattern(filters['title_like'])
 
-    # Boolean filters
     for field in ["is_kids", "is_exclusive", "is_original"]:
         if field in filters and filters[field] is not None:
             conditions.append(f"p.{field} = %({field})s")
@@ -69,7 +63,6 @@ def get_select_fields(requested_fields: Optional[List[str]] = None) -> List[str]
             "p.duration", "p.permalink"
         ]
 
-    # Validate and prefix fields
     validated = []
     for field in requested_fields:
         clean_field = field.strip()
@@ -77,10 +70,6 @@ def get_select_fields(requested_fields: Optional[List[str]] = None) -> List[str]
             validated.append(f"p.{clean_field}")
 
     return validated or ["p.uid", "p.clean_title"]
-
-# =============================================================================
-# FUNCTIONS
-# =============================================================================
 
 def presence_count(country: str = None, platform_name: str = None, uid: str = None, 
                   type: str = None, title_like: str = None) -> List[Dict]:
@@ -94,7 +83,6 @@ def presence_count(country: str = None, platform_name: str = None, uid: str = No
         "title_like": title_like
     }
     
-    # Remove None values
     filters = {k: v for k, v in filters.items() if v is not None}
 
     where_clause, query_params = build_where_clause(filters)
@@ -115,10 +103,8 @@ def presence_list(country: str = None, platform_name: str = None, type: str = No
         "title_like": title_like
     }
     
-    # Remove None values
     filters = {k: v for k, v in filters.items() if v is not None}
     
-    # Validate parameters
     limit = validate_limit(limit, DEFAULT_LIMIT, MAX_LIMIT)
     offset = max(0, int(offset or 0))
     
@@ -152,7 +138,6 @@ def presence_distinct(column: str, country: str = None, platform_name: str = Non
     if not column:
         return [{"message": "Column parameter is required"}]
 
-    # Define allowed columns
     CP_ALLOWED_COLUMNS = {
         'iso_alpha2', 'plan_name', 'platform_code',
         'platform_name', 'type', 'content_type'
@@ -167,7 +152,6 @@ def presence_distinct(column: str, country: str = None, platform_name: str = Non
         "type": type
     }
     
-    # Remove None values
     filters = {k: v for k, v in filters.items() if v is not None}
     
     limit = validate_limit(limit, MAX_LIMIT)
@@ -188,7 +172,6 @@ def presence_statistics(country: str = None, platform_name: str = None, type: st
         "type": type
     }
     
-    # Remove None values
     filters = {k: v for k, v in filters.items() if v is not None}
 
     where_clause, query_params = build_where_clause(filters)
@@ -222,12 +205,10 @@ def country_platform_summary(country: str = None) -> List[Dict]:
     params = ()
     
     if country:
-        # Try to resolve as region first, then as individual country
         isos = resolve_region_isos(country) or [resolve_country_iso(country)]
-        isos = [iso for iso in isos if iso]  # Filter out None values
+        isos = [iso for iso in isos if iso]
         
         if isos:
-            # Use build_in_clause helper
             in_clause, params_list = build_in_clause("p.iso_alpha2", isos)
             country_condition = f"AND {in_clause}"
             params = tuple(params_list)

@@ -1,4 +1,4 @@
-from src.sql.queries.talent.queries_talent import *
+from src.sql.queries.talent.queries_actors import *
 from src.sql.utils.db_utils_sql import *
 from src.sql.utils.constants_sql import *
 from src.sql.utils.default_import import *
@@ -14,7 +14,6 @@ def get_actor_filmography(actor_id: str, limit: int = DEFAULT_LIMIT) -> Dict[str
     )
     return handle_query_result(results, "actor_filmography", actor_id)
 
-
 def get_actor_coactors(actor_id: str, limit: int = MAX_LIMIT) -> Dict[str, Any]:
     """Get an actor's co-actors - sync version."""
     
@@ -24,7 +23,6 @@ def get_actor_coactors(actor_id: str, limit: int = MAX_LIMIT) -> Dict[str, Any]:
         f"actor_coactors_{actor_id}"
     )
     return handle_query_result(results, "actor_coactors", actor_id)
-
 
 def get_actor_filmography_by_name(
     actor_name: Union[str, List[str], Any], 
@@ -44,7 +42,6 @@ def get_actor_filmography_by_name(
         return f"Encontré varios posibles para '{query_text}'. Elige uno:\n{options_text}"
     
     return f"No encontré coincidencias para '{query_text}'."
-
 
 def get_actor_coactors_by_name(
     actor_name: Union[str, List[str], Any], 

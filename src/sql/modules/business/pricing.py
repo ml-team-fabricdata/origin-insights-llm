@@ -1,15 +1,8 @@
-
 from src.sql.utils.db_utils_sql import *
 from src.sql.utils.default_import import *
-from src.sql.queries.business.queries_business import *
 from src.sql.queries.business.pricing_queries import *
 from src.sql.utils.validators_shared import *
 from src.sql.modules.content.metadata import _normalize_tool_call, _validate_select
-
-# ================================================================
-# Helpers de normalización y validación
-# ================================================================
-
 
 def _resolve_definition(values: Optional[List[str]]) -> Optional[List[str]]:
     """Normaliza/valida definiciones (e.g., "sd hd" -> "SD/HD")."""
@@ -30,7 +23,6 @@ def _resolve_definition(values: Optional[List[str]]) -> Optional[List[str]]:
             logger.warning(f"Definición no válida ignorada: {value}")
     return resolved or None
 
-
 def _resolve_license(values: Optional[List[str]]) -> Optional[List[str]]:
     """Normaliza/valida licencias."""
     if not values:
@@ -44,11 +36,6 @@ def _resolve_license(values: Optional[List[str]]) -> Optional[List[str]]:
         else:
             logger.warning(f"Licencia no válida ignorada: {value}")
     return resolved or None
-
-
-# ================================================================
-# HITS con calidad (definition/license)
-# ================================================================
 
 def _normalize_price_filters(
     country: Optional[str] = None,
@@ -64,17 +51,14 @@ def _normalize_price_filters(
     iso = resolve_country_iso(country) if country else None
     plat_name = resolve_platform_name(platform_name) if platform_name else None
 
-    # Normalizar price_type a lista
     if isinstance(price_type, str):
         price_type = [price_type]
 
-    # Normalizar currency a lista uppercase
     if isinstance(currency, str):
         currency = [currency]
     currency_list = [c.upper() for c in (currency or [])]
 
     return iso, plat_name, price_type, currency_list
-
 
 def _build_filters_and_params(
     definition: Optional[List[str]],
@@ -94,7 +78,6 @@ def _build_filters_and_params(
     params.extend(lic_params)
 
     return def_filter, lic_filter, params
-
 
 def _build_sql_hits_quality(
     country: Optional[str],
@@ -130,7 +113,6 @@ def _build_sql_hits_quality(
 
     return sql, params
 
-
 def tool_hits_with_quality(
     uid: Optional[str] = None,
     country_input: Optional[str] = None,
@@ -153,13 +135,11 @@ def tool_hits_with_quality(
     scope = f"country={country}" if (
         scoped_by_country and country) else "global(hash_unique)"
 
-    # Consulta principal
     sql, params = _build_sql_hits_quality(
         country, uid, limit, resolved_definition, resolved_license)
     rows = db.execute_query(sql, params)
     logger.debug("SQL principal:\n%s\nparams=%s", sql, params)
 
-    # Fallback: si no hay resultados y se pidió definición, reintentar sin definition
     did_fallback = False
     if fallback_when_empty and not rows and resolved_definition:
         logger.info(
@@ -178,14 +158,8 @@ def tool_hits_with_quality(
 
     return handle_query_result(rows, "hits + quality", ident)
 
-
-# ================================================================
-# Presencia + precio (query model + builder)
-# ================================================================
-
 @dataclass
 class PresenceWithPriceQuery:
-    # Filtros de presencia
     iso_alpha2: Optional[str] = None
     platform_name: Optional[str] = None
     platform_code: Optional[str] = None
@@ -199,7 +173,6 @@ class PresenceWithPriceQuery:
     duration_min: Optional[int] = None
     duration_max: Optional[int] = None
 
-    # Filtros de precio
     price_type: Optional[List[str]] = None
     definition: Optional[List[str]] = None
     license_: Optional[List[str]] = None
@@ -207,28 +180,23 @@ class PresenceWithPriceQuery:
     min_price: Optional[float] = None
     max_price: Optional[float] = None
 
-    # Salida, orden y paginación
     select: Optional[List[str]] = None
     order_by: Optional[str] = None
     limit: Optional[int] = 100
     offset: Optional[int] = 0
 
-    # Especiales
     count_only: bool = False
     today: Optional[date] = None
-
 
 def build_presence_with_price_query(q: PresenceWithPriceQuery) -> Tuple[str, Dict[str, Any]]:
     """Genera SQL (LEFT JOIN LATERAL) para presencia con último precio."""
     params: Dict[str, Any] = {}
     where: List[str] = []
 
-    # Presencia activa (filtro opcional basado en today)
     if q.today:
         params["today_p"] = q.today
         where.append("(p.out_on IS NULL OR p.out_on >= %(today_p)s)")
 
-    # Filtros de presencia
     if q.uid:
         where.append("p.uid = %(uid)s")
         params["uid"] = q.uid
@@ -257,7 +225,6 @@ def build_presence_with_price_query(q: PresenceWithPriceQuery) -> Tuple[str, Dic
         where.append("p.duration <= %(duration_max)s")
         params["duration_max"] = q.duration_max
 
-    # Filtros de precio
     price_where: List[str] = []
     if q.price_type:
         price_where.append("pp.price_type = ANY(%(ptype)s)")
@@ -281,7 +248,6 @@ def build_presence_with_price_query(q: PresenceWithPriceQuery) -> Tuple[str, Dic
 
     where_sql = f"WHERE {' AND '.join(where)}" if where else ""
 
-    # COUNT ONLY
     if q.count_only:
         sql = f"""
             SELECT COUNT(*) AS cnt
@@ -333,18 +299,12 @@ def build_presence_with_price_query(q: PresenceWithPriceQuery) -> Tuple[str, Dic
     """
     return sql, params
 
-
 def query_presence_with_price(**kwargs) -> List[Dict[str, Any]]:
     """Ejecuta la query de presencia+precio y devuelve filas."""
     q = PresenceWithPriceQuery(**kwargs)
     sql, params = build_presence_with_price_query(q)
     rows = db.execute_query(sql, params) or []
     return rows
-
-
-# ================================================================
-# Herramientas de precios (latest, history, changes, stats)
-# ================================================================
 
 def tool_prices_latest(*args, **kwargs):
     """Últimos precios con filtros flexibles (hash/uid/país/plataforma, etc.)."""
@@ -364,12 +324,10 @@ def tool_prices_latest(*args, **kwargs):
     limit = validate_limit(kwargs.get("limit", MAX_LIMIT),
                            DEFAULT_LIMIT, MAX_LIMIT)
 
-    # Normalizar filtros comunes
     iso, plat_name, price_type, currency = _normalize_price_filters(
         country, platform_name, price_type, currency
     )
 
-    # Desambiguación de __arg1
     if arg1 and not (hash_unique or uid or country):
         kind, _ = detect_id_kind(arg1, PRICES_TBL, PRES_TBL)
         if kind == "hash_unique":
@@ -380,7 +338,6 @@ def tool_prices_latest(*args, **kwargs):
             country = arg1
             iso = resolve_country_iso(country)
 
-    # Scopes para WHERE_SCOPES (solo condiciones)
     scopes, scope_params = [], []
 
     if hash_unique:
@@ -420,7 +377,6 @@ def tool_prices_latest(*args, **kwargs):
 
     where_scopes = " AND ".join(scopes) if scopes else "TRUE"
 
-    # Filtros post (EXTRA_FILTERS)
     extra_filters, post_params = "TRUE", []
 
     pt_clause, pt_params = build_in_clause("price_type", price_type)
@@ -465,7 +421,6 @@ def tool_prices_latest(*args, **kwargs):
         f"hash={hash_unique or '-'} uid={uid or '-'} iso={iso or '-'} plat_name={plat_name or '-'} plat_code={platform_code or '-'} limit={limit}",
     )
 
-
 def tool_prices_history(*args, **kwargs):
     """Histórico de precios con filtros flexibles."""
     kwargs = _normalize_tool_call(args, kwargs)
@@ -484,12 +439,10 @@ def tool_prices_history(*args, **kwargs):
     max_price = kwargs.get("max_price")
     limit = validate_limit(kwargs.get("limit", 500), 500, MAX_LIMIT)
 
-    # Normalizar filtros comunes
     iso, plat_name, price_type, currency = _normalize_price_filters(
         country, platform_name, price_type, currency
     )
 
-    # __arg1 heurístico
     if arg1 and not (hash_unique or uid):
         kind, _ = detect_id_kind(arg1, PRICES_TBL, PRES_TBL)
         if kind == "hash_unique":
@@ -502,12 +455,10 @@ def tool_prices_history(*args, **kwargs):
     joins, where_parts = [], []
     params: List[Any] = []
 
-    # JOIN/WHERE principal
     if hash_unique:
         where_parts.append("pr.hash_unique = %s")
         params.append(hash_unique)
     else:
-        # Fast-path: si sólo dan uid, intentar un hash
         if uid and not (iso or plat_name or title_like):
             one = db.execute_query(
                 f"SELECT p.hash_unique FROM {PRES_TBL} p WHERE p.uid = %s AND p.hash_unique IS NOT NULL LIMIT 1",
@@ -516,7 +467,6 @@ def tool_prices_history(*args, **kwargs):
             if one:
                 where_parts.append("pr.hash_unique = %s")
                 params.append(one[0]["hash_unique"])
-        # Si no hay fast-path válido, usar JOIN con presencia
         if not where_parts and (uid or iso or plat_name or title_like):
             joins.append(
                 f"JOIN {PRES_TBL} p ON p.hash_unique = pr.hash_unique")
@@ -537,7 +487,6 @@ def tool_prices_history(*args, **kwargs):
         where_parts.append("pr.platform_code = %s")
         params.append(platform_code)
 
-    # Usar helper para cláusulas IN
     pt_clause, pt_params = build_in_clause("pr.price_type", price_type)
     if pt_clause:
         where_parts.append(pt_clause)
@@ -582,7 +531,6 @@ def tool_prices_history(*args, **kwargs):
         "presence_prices.history",
         f"uid={uid or '-'} iso={iso or '-'} plat_name={plat_name or '-'} limit={limit}",
     )
-
 
 def tool_prices_changes_last_n_days(*args, **kwargs):
     """Cambios de precio en los últimos N días (up/down/all)."""
@@ -643,7 +591,6 @@ def tool_prices_changes_last_n_days(*args, **kwargs):
         scopes.append("pr.platform_code = %s")
         scope_params.append(platform_code)
 
-    # Usar helper para cláusula IN
     pt_clause, pt_params = build_in_clause("pr.price_type", price_type)
     if pt_clause:
         scopes.append(pt_clause)
@@ -673,7 +620,6 @@ def tool_prices_changes_last_n_days(*args, **kwargs):
         f"last={n_days}d uid={uid or '-'} iso={iso or '-'} dir={direction} limit={limit}",
     )
 
-
 def tool_prices_stats(*args, **kwargs):
     """Estadísticas de precio (min/max/avg/medianas/pXX) con filtros comunes."""
     kwargs = _normalize_tool_call(args, kwargs)
@@ -685,7 +631,6 @@ def tool_prices_stats(*args, **kwargs):
     license_ = _resolve_license(kwargs.get("license_"))
     currency = kwargs.get("currency")
 
-    # Normalizar filtros comunes
     iso, plat_name, price_type, currency = _normalize_price_filters(
         country, platform_name, price_type, currency
     )
@@ -706,7 +651,6 @@ def tool_prices_stats(*args, **kwargs):
         scopes.append("pr.platform_code = %s")
         params.append(platform_code)
 
-    # Usar helper para cláusulas IN
     pt_clause, pt_params = build_in_clause("pr.price_type", price_type)
     if pt_clause:
         scopes.append(pt_clause)

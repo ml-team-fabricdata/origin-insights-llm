@@ -1,4 +1,4 @@
-from src.sql.queries.talent.queries_talent import *
+from src.sql.queries.talent.queries_directors import *
 from src.sql.utils.db_utils_sql import *
 from src.sql.utils.constants_sql import *
 from src.sql.utils.default_import import *
@@ -14,7 +14,6 @@ def get_director_filmography(director_id: str, limit: int = DEFAULT_LIMIT) -> Di
     )
     return handle_query_result(results, "director_filmography", director_id)
 
-
 def get_director_collaborators(director_id: str, limit: int = MAX_LIMIT) -> Dict[str, Any]:
     """Get a director's collaborators (actors they've worked with) - sync version."""
    
@@ -24,7 +23,6 @@ def get_director_collaborators(director_id: str, limit: int = MAX_LIMIT) -> Dict
         f"director_collaborators_{director_id}"
     )
     return handle_query_result(results, "director_collaborators", director_id)
-
 
 def get_director_filmography_by_name(
     director_name: Union[str, List[str], Any],

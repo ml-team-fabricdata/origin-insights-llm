@@ -4,11 +4,6 @@ from src.sql.utils.constants_sql import *
 from src.sql.utils.validators_shared import *
 from src.sql.queries.business.intelligence_queries import *
 
-
-# ------------------------------------------------------------------
-# Platform exclusivity by country
-# ------------------------------------------------------------------
-
 def get_platform_exclusivity_by_country(
     platform_name: str,
     country: str,
@@ -29,11 +24,6 @@ def get_platform_exclusivity_by_country(
     rows = db.execute_query(sql, params)
     ident = f"{resolved_platform} @ {resolved_country} limit={limit_norm}"
     return handle_query_result(rows, "platform exclusivity (country)", ident)
-
-# ------------------------------------------------------------------
-# Catalog similarity (platform, country A vs B)
-# ------------------------------------------------------------------
-
 
 def catalog_similarity_for_platform(
     platform: Any,
@@ -94,11 +84,6 @@ def catalog_similarity_for_platform(
         'unique_to_b': unique_b
     }
 
-# ------------------------------------------------------------------
-# Titles in A not in B
-# ------------------------------------------------------------------
-
-
 def _build_pin_pout_filters(platform: Optional[str]) -> Tuple[str, List[str], str, List[str]]:
     """Construye filtros de plataforma para queries IN/OUT."""
     if not platform:
@@ -107,7 +92,6 @@ def _build_pin_pout_filters(platform: Optional[str]) -> Tuple[str, List[str], st
         "AND p_in.platform_name ILIKE %s", [platform],
         "AND p_out.platform_name ILIKE %s", [platform]
     )
-
 
 def titles_in_A_not_in_B_sql(
     *,
@@ -118,13 +102,11 @@ def titles_in_A_not_in_B_sql(
 ) -> List[Dict]:
     """Get titles available in country/region A but not in country/region B."""
 
-    # Resolve countries/regions
     isos_in = resolve_region_isos(country_in) or [
         resolve_country_iso(country_in)]
     isos_out = resolve_region_isos(country_not_in) or [
         resolve_country_iso(country_not_in)]
 
-    # Filter out None values
     isos_in = [iso for iso in isos_in if iso]
     isos_out = [iso for iso in isos_out if iso]
 
@@ -133,19 +115,15 @@ def titles_in_A_not_in_B_sql(
     if not isos_out:
         return [{"error": f"Could not resolve country/region: {country_not_in}"}]
 
-    # Resolve platform
     plat = resolve_platform_name(platform) if platform else None
     limit_norm = validate_limit(limit, default=50, max_limit=200)
 
-    # Build platform filters
     pin_filter, pin_params, pout_filter, pout_params = _build_pin_pout_filters(
         plat)
 
-    # Build country conditions using helper
     in_condition, _ = build_in_clause("p_in.iso_alpha2", isos_in)
     out_condition, _ = build_in_clause("p_out.iso_alpha2", isos_out)
 
-    # Replace placeholders
     sql = (SQL_TITLES_IN_A_NOT_IN_B
            .replace("{in_condition}", in_condition)
            .replace("{out_condition}", out_condition)
@@ -153,14 +131,11 @@ def titles_in_A_not_in_B_sql(
            .replace("{pout_filter}", pout_filter if pout_filter else "")
            .replace("{limit_placeholder}", "%s"))
 
-    # Build params list
     params = list(isos_in) + pin_params + list(isos_out) + \
         pout_params + [limit_norm]
 
-    # Execute query
     rows = db.execute_query(sql, tuple(params))
 
-    # Log
     region_in = f"{country_in}({len(isos_in)})" if len(
         isos_in) > 1 else isos_in[0]
     region_out = f"{country_not_in}({len(isos_out)})" if len(

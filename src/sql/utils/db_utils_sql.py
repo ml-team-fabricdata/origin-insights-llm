@@ -664,6 +664,60 @@ def normalize_args_kwargs(args, kwargs, parse_arg1=False):
     return kwargs
 
 
+def safe_cast_float(value: Any, default: float = 0.0) -> float:
+    """
+    Safely cast value to float with default fallback.
+    
+    Args:
+        value: Value to cast
+        default: Default value if casting fails
+        
+    Returns:
+        Float value or default
+        
+    Examples:
+        >>> safe_cast_float("3.14")
+        3.14
+        >>> safe_cast_float(None, 0.0)
+        0.0
+        >>> safe_cast_float("invalid", 1.0)
+        1.0
+    """
+    if value is None:
+        return default
+    try:
+        return float(value)
+    except (ValueError, TypeError):
+        return default
+
+
+def safe_cast_int(value: Any, default: int = 0) -> int:
+    """
+    Safely cast value to int with default fallback.
+    
+    Args:
+        value: Value to cast
+        default: Default value if casting fails
+        
+    Returns:
+        Int value or default
+        
+    Examples:
+        >>> safe_cast_int("42")
+        42
+        >>> safe_cast_int(None, 0)
+        0
+        >>> safe_cast_int("invalid", -1)
+        -1
+    """
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except (ValueError, TypeError):
+        return default
+
+
 def format_validation_options(options: List[Dict[str, Any]], entity_type: str = "option") -> str:
     """
     Format validation options for display (actors, directors, etc.).

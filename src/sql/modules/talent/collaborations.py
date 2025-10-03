@@ -1,12 +1,8 @@
-from src.sql.queries.talent.queries_talent import *
+from src.sql.queries.talent.queries_collaborations import *
 from src.sql.utils.db_utils_sql import *
 from src.sql.utils.constants_sql import *
 from src.sql.utils.default_import import *
 from src.sql.modules.common.validation import *
-
-# =============================================================================
-# GENERIC COMBINED ID PARSER
-# =============================================================================
 
 def parse_combined_ids(
     combined_input: str,
@@ -23,12 +19,9 @@ def parse_combined_ids(
     if not combined_input or not isinstance(combined_input, str):
         return False, {"error": "Invalid input: empty or not a string"}
     
-    # Try to split by separator
     parts = combined_input.split(separator)
     
-    # If we don't get expected parts, try other common separators
     if len(parts) != expected_parts:
-        # Try other separators
         for alt_sep in ['_', ', ', ' and ', ' & ', '|']:
             if alt_sep != separator:
                 parts = combined_input.split(alt_sep)
@@ -40,10 +33,8 @@ def parse_combined_ids(
             "error": f"Expected {expected_parts} parts separated by '{separator}', got {len(parts)}"
         }
     
-    # Clean up parts (strip whitespace)
     parts = [part.strip() for part in parts]
     
-    # Create result dict
     result = {}
     if part_names:
         for name, value in zip(part_names, parts):
@@ -52,10 +43,6 @@ def parse_combined_ids(
         result = {"parts": parts}
     
     return True, result
-
-# =============================================================================
-# MAIN COLLABORATION FUNCTIONS
-# =============================================================================
 
 def find_common_titles_actor_director(
     actor_name: Union[str, List[str], Any],
@@ -73,11 +60,9 @@ def find_common_titles_actor_director(
     Returns:
         Dict with common titles or error message
     """
-    # Normalize inputs
     actor_input = normalize_input(actor_name)
     director_input = normalize_input(director_name)
     
-    # Validate actor
     actor_validation = validate_actor(actor_input)
     if actor_validation.get("status") != "ok":
         return {
@@ -85,7 +70,6 @@ def find_common_titles_actor_director(
             "details": actor_validation
         }
     
-    # Validate director
     director_validation = validate_director(director_input)
     if director_validation.get("status") != "ok":
         return {
@@ -93,13 +77,11 @@ def find_common_titles_actor_director(
             "details": director_validation
         }
     
-    # Log the operation
     logger.debug(
         f"Finding common titles for actor '{actor_validation['name']}' (ID: {actor_validation['id']}) "
         f"and director '{director_validation['name']}' (ID: {director_validation['id']})"
     )
     
-    # Execute query
     limit = validate_limit(limit, default=DEFAULT_LIMIT, max_limit=100)
     
     results = db.execute_query(
@@ -108,7 +90,6 @@ def find_common_titles_actor_director(
         f"common_titles_actor_{actor_validation['id']}_director_{director_validation['id']}"
     )
     
-    # Format response
     if not results:
         return {
             "message": f"No common projects found between {actor_validation['name']} and {director_validation['name']}",
@@ -159,13 +140,10 @@ def get_common_projects_actor_director_by_name(
     Returns:
         JSON string with common projects
     """
-    # Case 1: Combined input provided
     if actor_director:
-        # Check if it's numeric IDs
         if '_' in actor_director:
             parts = actor_director.split('_')
             if len(parts) == 2 and parts[0].isdigit() and parts[1].isdigit():
-                # Direct query with IDs
                 actor_id = parts[0]
                 director_id = parts[1]
                 
@@ -210,7 +188,5 @@ def get_common_projects_actor_director_by_name(
             "error": "Must provide either 'actor_director' combined string or both 'actor_name' and 'director_name'"
         }, ensure_ascii=False)
     
-    # Call the main function
     result = find_common_titles_actor_director(actor_name, director_name, limit)
     return json.dumps(result, indent=2, ensure_ascii=False)
-

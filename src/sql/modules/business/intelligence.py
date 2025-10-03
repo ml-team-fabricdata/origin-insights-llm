@@ -120,33 +120,36 @@ def titles_in_A_not_in_B_sql(
     limit: int = 50,
 ) -> List[Dict]:
     """Get titles available in country/region A but not in country/region B."""
-    
+
     # Resolve countries/regions
-    isos_in = resolve_region_isos(country_in) or [resolve_country_iso(country_in)]
-    isos_out = resolve_region_isos(country_not_in) or [resolve_country_iso(country_not_in)]
+    isos_in = resolve_region_isos(country_in) or [
+        resolve_country_iso(country_in)]
+    isos_out = resolve_region_isos(country_not_in) or [
+        resolve_country_iso(country_not_in)]
 
     print(isos_in, isos_out)
-    
+
     # Filter out None values
     isos_in = [iso for iso in isos_in if iso]
     isos_out = [iso for iso in isos_out if iso]
-    
+
     if not isos_in:
         return [{"error": f"Could not resolve country/region: {country_in}"}]
     if not isos_out:
         return [{"error": f"Could not resolve country/region: {country_not_in}"}]
-    
+
     # Resolve platform
     plat = resolve_platform_name(platform) if platform else None
     limit_norm = validate_limit(limit, default=50, max_limit=200)
 
     # Build platform filters
-    pin_filter, pin_params, pout_filter, pout_params = _build_pin_pout_filters(plat)
+    pin_filter, pin_params, pout_filter, pout_params = _build_pin_pout_filters(
+        plat)
 
     # Build country conditions
     placeholders_in = ', '.join(['%s'] * len(isos_in))
     placeholders_out = ', '.join(['%s'] * len(isos_out))
-    
+
     in_condition = f"p_in.iso_alpha2 IN ({placeholders_in})"
     out_condition = f"p_out.iso_alpha2 IN ({placeholders_out})"
 
@@ -159,15 +162,19 @@ def titles_in_A_not_in_B_sql(
            .replace("{limit_placeholder}", "%s"))
 
     # Build params list
-    params = list(isos_in) + pin_params + list(isos_out) + pout_params + [limit_norm]
-    
+    params = list(isos_in) + pin_params + list(isos_out) + \
+        pout_params + [limit_norm]
+
     # Execute query
     rows = db.execute_query(sql, tuple(params))
-    
+
     # Log
-    region_in = f"{country_in}({len(isos_in)})" if len(isos_in) > 1 else isos_in[0]
-    region_out = f"{country_not_in}({len(isos_out)})" if len(isos_out) > 1 else isos_out[0]
+    region_in = f"{country_in}({len(isos_in)})" if len(
+        isos_in) > 1 else isos_in[0]
+    region_out = f"{country_not_in}({len(isos_out)})" if len(
+        isos_out) > 1 else isos_out[0]
     ident = f"A={region_in} !B={region_out} platform={plat or 'any'} limit={limit_norm}"
-    logger.info(f"titles_in_A_not_in_B → {ident} ⇒ {len(rows) if rows else 0} rows")
-    
+    logger.info(
+        f"titles_in_A_not_in_B → {ident} ⇒ {len(rows) if rows else 0} rows")
+
     return handle_query_result(rows, "titles in A not in B", ident)

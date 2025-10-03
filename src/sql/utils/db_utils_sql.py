@@ -465,6 +465,142 @@ def get_date_range(days_back: int) -> Tuple[str, str]:
 
     return (date_from.isoformat(), today.isoformat())
 
+
+
+
+# ============================================================================
+# REGEX Y CONSTANTES
+# ============================================================================
+
+_TIME_AGO_PATTERN = re.compile(
+    r"^\s*(?:hace\s+)?(\d+(?:\.\d+)?)\s+"
+    r"(anio|ano|año|anos|años|year|years|"
+    r"mes|meses|month|months|"
+    r"semana|semanas|week|weeks|"
+    r"dia|dias|day|days)"
+    r"(?:\s+(?:atras|atrás|ago))?\s*$",
+    re.IGNORECASE
+)
+
+_DAYS_PATTERN = re.compile(
+    r"^\s*(\d+(?:\.\d+)?)\s*"
+    r"(?:([ymwd])|"
+    r"(anio|ano|año|anos|años|year|years|"
+    r"mes|meses|month|months|"
+    r"semana|semanas|week|weeks|"
+    r"dia|dias|day|days))?\s*$",
+    re.IGNORECASE
+)
+
+_UNIT_TO_DAYS = {
+    'y': 365, 'anio': 365, 'ano': 365, 'año': 365, 
+    'anos': 365, 'años': 365, 'year': 365, 'years': 365,
+    'm': 30, 'mes': 30, 'meses': 30, 'month': 30, 'months': 30,
+    'w': 7, 'semana': 7, 'semanas': 7, 'week': 7, 'weeks': 7,
+    'd': 1, 'dia': 1, 'dias': 1, 'day': 1, 'days': 1, '': 1
+}
+
+_ACCENT_TRANS = str.maketrans('áéíóú', 'aeiou')
+
+
+# ============================================================================
+# FUNCIONES AUXILIARES
+# ============================================================================
+
+def parse_time_to_days(
+    value: NumberOrStr,
+    *,
+    default: int = 30,
+    max_days: int = 36500
+) -> int:
+    """
+    Convierte expresiones temporales a días.
+    """
+    if value is None:
+        return default
+    
+    # Caso numérico (path rápido)
+    if isinstance(value, (int, float)):
+        days = int(value)
+        return default if days <= 0 else min(days, max_days)
+    
+    # Normalizar string
+    s = str(value).strip().lower().translate(_ACCENT_TRANS)
+    
+    # Intentar con patrón "hace X tiempo"
+    match = _TIME_AGO_PATTERN.match(s)
+    if match:
+        qty = float(match.group(1))
+        unit = match.group(2).lower()
+        factor = _UNIT_TO_DAYS.get(unit, 1)
+        days = int(qty * factor)
+        return default if days <= 0 else min(days, max_days)
+    
+    # Intentar con patrón simple (5y, 3m, 30, etc)
+    match = _DAYS_PATTERN.match(s)
+    if match:
+        qty = float(match.group(1))
+        unit = (match.group(2) or match.group(3) or '').lower()
+        factor = _UNIT_TO_DAYS.get(unit, 1)
+        days = int(qty * factor)
+        return default if days <= 0 else min(days, max_days)
+    
+    # Si no matchea nada, retornar default
+    return default
+
+
+def validate_days_back(
+    value: NumberOrStr,
+    *,
+    default: int = 30,
+    max_days: int = 36500
+) -> int:
+    """
+    Versión mejorada de validate_days_back que acepta expresiones naturales.
+    
+    Compatible con código existente pero ahora también acepta:
+    - "hace 5 años"
+    - "3 semanas atrás"
+    - "2 meses"
+    - "5y", "3m", "2w"
+    
+    Ejemplos:
+        validate_days_back(30) → 30
+        validate_days_back("hace 5 años") → 1825
+        validate_days_back("3 semanas") → 21
+        validate_days_back("5y") → 1825
+    """
+    return parse_time_to_days(value, default=default, max_days=max_days)
+
+
+def clamp_rolling(
+    max_date: date,
+    current_days: int,
+    previous_days: int
+) -> Tuple[date, date, date, date]:
+    """
+    Calcula rangos para período actual y anterior.
+    
+    Args:
+        max_date: Fecha máxima de referencia
+        current_days: Días del período actual
+        previous_days: Días del período anterior
+    
+    Returns:
+        (cur_from, cur_to, prev_from, prev_to)
+    """
+    # Período actual: desde max_date hacia atrás
+    cur_to = max_date
+    cur_from = max_date - timedelta(days=current_days - 1)
+    
+    # Período anterior: justo antes del período actual
+    prev_to = cur_from - timedelta(days=1)
+    prev_from = prev_to - timedelta(days=previous_days - 1)
+    
+    return cur_from, cur_to, prev_from, prev_to
+
+
+
 # =============================================================================
 # DATA HANDLING FUNCTIONS
 # =============================================================================
@@ -499,6 +635,65 @@ def handle_query_result(
             return result
 
     return result
+
+
+def safe_tool_response(result: Any, operation_name: str = "operation") -> str:
+    """
+    Ensure tool response is never empty for Bedrock API compliance.
+    
+    Converts query results to JSON format with proper status and metadata.
+    Handles empty results, errors, and various data types.
+    
+    Args:
+        result: Query result (list, dict, string, or None)
+        operation_name: Name of the operation for logging
+        
+    Returns:
+        JSON string with status, data, and count
+        
+    Examples:
+        >>> safe_tool_response([{"title": "Movie"}], "search")
+        '{"status": "success", "data": [{"title": "Movie"}], "count": 1, ...}'
+        >>> safe_tool_response([], "search")
+        '{"status": "no_results", "message": "No data found...", ...}'
+    """
+    if result is None or (isinstance(result, list) and len(result) == 0):
+        return json.dumps(
+            {
+                "status": "no_results",
+                "message": f"No data found for {operation_name}.",
+                "data": [],
+                "count": 0,
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+
+    if isinstance(result, str) and not result.strip():
+        return json.dumps(
+            {
+                "status": "empty_response",
+                "message": f"Empty response from {operation_name}.",
+                "data": [],
+                "count": 0,
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+
+    if isinstance(result, (list, dict)):
+        return json.dumps(
+            {
+                "status": "success",
+                "data": result,
+                "count": len(result) if isinstance(result, list) else 1,
+                "operation": operation_name,
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+
+    return str(result) or f"No content from {operation_name}."
 
 
 def get_validation(field_name: str) -> List[Dict]:

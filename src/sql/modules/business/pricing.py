@@ -3,6 +3,7 @@ from src.sql.utils.db_utils_sql import *
 from src.sql.utils.default_import import *
 from src.sql.queries.business.queries_business import *
 from src.sql.utils.validators_shared import *
+from src.sql.modules.content.metadata import _normalize_tool_call, _validate_select
 
 # ================================================================
 # Helpers de normalización y validación
@@ -47,35 +48,6 @@ def _resolve_license(values: Optional[List[str]]) -> Optional[List[str]]:
         else:
             logger.warning(f"Licencia no válida ignorada: {value}")
     return resolved or None
-
-
-def _normalize_tool_call(args, kwargs) -> Dict[str, Any]:
-    """Permite llamadas flexibles (posicional, dict único o kwargs puros)."""
-    if args:
-        if len(args) == 1:
-            a0 = args[0]
-            if isinstance(a0, dict):
-                merged = dict(a0)
-                merged.update(kwargs or {})
-                return merged
-            merged = dict(kwargs or {})
-            merged.setdefault("__arg1", a0)
-            return merged
-        merged = dict(kwargs or {})
-        merged.setdefault("__arg1", args[0])
-        return merged
-    return kwargs or {}
-
-
-def _validate_select(select: Optional[List[str]]) -> List[str]:
-    """Valida columnas de salida para presencia+precio."""
-    if not select:
-        return PRESENCE_DEFAULT_SELECT
-    safe = [
-        c for c in select
-        if c in PRESENCE_ALLOWED_SELECT or c in PRESENCE_PRICE_DERIVED_SELECT
-    ]
-    return safe or PRESENCE_DEFAULT_SELECT
 
 
 # ================================================================

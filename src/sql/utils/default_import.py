@@ -13,3 +13,5 @@ from rapidfuzz import fuzz, process
 from src.sql.utils.sql_db import db
 
 logger = logging.getLogger(__name__)
+
+NumberOrStr = Union[int, float, str, None]

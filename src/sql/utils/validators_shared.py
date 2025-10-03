@@ -420,8 +420,6 @@ def validate_all_fields(
         'currency': resolve_currency(currency) if currency else None,
         'genre': resolve_primary_genre(genre) if genre else None
     }
-
-# =============================================================================
 # VALIDATION STATUS HELPERS
 # =============================================================================
 
@@ -439,3 +437,86 @@ def get_validation_report() -> dict:
         'movie_types': len(MOVIE_TYPES),
         'series_types': len(SERIES_TYPES)
     }
+
+
+# =============================================================================
+# DATE UTILITIES
+# =============================================================================
+
+def get_date_range(days_back: int) -> Tuple[str, str]:
+    """
+    Get ISO date range for the last N days.
+    
+    Args:
+        days_back: Number of days to look back from today
+        
+    Returns:
+        Tuple of (date_from, date_to) in ISO format (YYYY-MM-DD)
+        
+    Examples:
+        >>> get_date_range(7)
+        ('2025-09-25', '2025-10-02')
+        >>> get_date_range(30)
+        ('2025-09-02', '2025-10-02')
+    """
+    from datetime import date, timedelta
+    
+    today = date.today()
+    date_from = (today - timedelta(days=days_back)).isoformat()
+    date_to = today.isoformat()
+    return (date_from, date_to)
+
+
+def normalize_langgraph_params(*args, **kwargs) -> dict:
+    """
+    Normalize parameters from LangGraph tool calls.
+    Handles nested kwargs format: {'kwargs': {'param1': 'value1', ...}}
+    
+    Args:
+        *args: Positional arguments (can be dict or JSON string)
+        **kwargs: Keyword arguments (may contain nested 'kwargs' key)
+        
+    Returns:
+        Normalized dictionary of parameters
+        
+    Examples:
+        >>> normalize_langgraph_params({'country': 'US'})
+        {'country': 'US'}
+        >>> normalize_langgraph_params(kwargs={'country': 'US'})
+        {'country': 'US'}
+        >>> normalize_langgraph_params('{"country": "US"}')
+        {'country': 'US'}
+    """
+    import json
+    
+    # Handle LangGraph nested kwargs format
+    if "kwargs" in kwargs and isinstance(kwargs["kwargs"], dict):
+        nested_kwargs = kwargs["kwargs"]
+        other_params = {k: v for k, v in kwargs.items() if k != "kwargs"}
+        merged = dict(nested_kwargs)
+        merged.update(other_params)
+        kwargs = merged
+
+    # Handle positional arguments
+    if args:
+        if len(args) == 1:
+            arg = args[0]
+            if isinstance(arg, dict):
+                merged = dict(arg)
+                merged.update(kwargs)
+                return merged
+            elif isinstance(arg, str):
+                parsed = json.loads(arg) if arg.startswith("{") else None
+                if isinstance(parsed, dict):
+                    parsed.update(kwargs)
+                    return parsed
+                # Treat as simple parameter
+                merged = dict(kwargs)
+                merged.setdefault("__arg1", arg)
+                return merged
+        # Multiple positional args
+        merged = dict(kwargs)
+        merged.setdefault("__arg1", args[0])
+        return merged
+
+    return kwargs or {}

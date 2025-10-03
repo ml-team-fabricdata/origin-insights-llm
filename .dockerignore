@@ -1,4 +1,17 @@
-﻿.git
-infra
+﻿# No incluir Terraform en la imagen
+terraform/
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+
+# Git & cachés
+.git
 **/__pycache__/
 *.pyc
+*.pyo
+*.pyd
+*.log
+.env
+.venv
+dist/
+build/

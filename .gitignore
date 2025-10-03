@@ -1,5 +1,5 @@
 @"
-# Terraform
+# Terraform (solo ignora artefactos locales, NO la carpeta en sí)
 **/.terraform/*
 *.tfstate
 *.tfstate.*
@@ -16,7 +16,26 @@ __pycache__/
 .venv
 dist/
 build/
+*.ipynb
 
 # Node (solo si se suma frontend)
 node_modules/
 "@ | Set-Content -Encoding UTF8 .gitignore
+
+# Docker
+*.log
+*.pid
+*.db
+*.sqlite3
+
+# Entornos
+.env.local
+.env.*
+.vs
+
+# Python packaging artifacts
+*.egg-info/
+dist/
+build/
+.pytest_cache
+.github

@@ -23,7 +23,7 @@ def build_where_clause(filters: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
         country_iso = resolve_country_iso(filters["country"])
         if country_iso:
             conditions.append("p.iso_alpha2 = %(country_iso)s")
-            params["country_iso"] = country_iso.upper()
+            params["country_iso"] = country_iso
 
     if filters.get("platform_name"):
         platform = resolve_platform_name(filters["platform_name"])

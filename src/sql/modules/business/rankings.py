@@ -168,7 +168,6 @@ def get_top_generic(
 
     normalized_platform = resolve_platform_name(platform) if platform else None
     normalized_genre = resolve_primary_genre(genre) if genre else None
-
     limit_val = validate_limit(limit, default=20, max_limit=200)
 
     resolved_country = resolve_country_iso(country) if country else None
@@ -177,8 +176,7 @@ def get_top_generic(
         if region:
             iso_set = resolve_region_isos(region) or []
         if not iso_set and countries_list:
-            iso_set = [c.strip().upper()
-                       for c in countries_list if isinstance(c, str) and c.strip()]
+            iso_set = [resolve_country_iso(c) or c.strip().upper() for c in countries_list if isinstance(c, str) and c.strip()]
 
     logger.debug(
         f"get_top_generic | Time: days_back={days_back}, dates={date_from} to {date_to}, "
@@ -257,7 +255,7 @@ def get_top_presence(
         where.append("np.platform_name ILIKE %s")
         params.append(platform)
     if genre:
-        where.append("m.primary_genre ILIKE %s")
+        where.append("m.primary_genre = %s")
         params.append(genre)
 
     if days_back is not None:
@@ -370,7 +368,7 @@ def get_top_global(
         params.append(content_type)
 
     if genre:
-        where.append("m.primary_genre ILIKE %s")
+        where.append("m.primary_genre = %s")
         params.append(genre)
 
     if platform:

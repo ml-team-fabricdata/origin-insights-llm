@@ -276,7 +276,6 @@ def build_metadata_simple_all_query(q: MetadataSimpleQuery) -> Tuple[str, Dict[s
     if q.title_like:
         where.append("title ILIKE %(tlike)s")
         params["tlike"] = build_like_pattern(q.title_like)
-        
     if q.synopsis_like:
         where.append("synopsis ILIKE %(slike)s")
         params["slike"] = build_like_pattern(q.synopsis_like)
@@ -284,14 +283,14 @@ def build_metadata_simple_all_query(q: MetadataSimpleQuery) -> Tuple[str, Dict[s
     if q.primary_genre:
         resolved_genre = resolve_primary_genre(q.primary_genre)
         if resolved_genre:
-            where.append("primary_genre ILIKE %(pgen)s")
-            params["pgen"] = build_like_pattern(resolved_genre)
+            where.append("primary_genre = %(pgen)s")
+            params["pgen"] = resolved_genre
 
     array_conditions = [
         ("languages", q.languages_any, "l_"),
         ("directors", q.directors_any, "dir_"),
         ("writers", q.writers_any, "wri_"),
-        ("full_cast", q.cast_any, "cast_")
+        ("countries_iso", q.countries_iso_any, "ci_")
     ]
     
     for col, values, prefix in array_conditions:

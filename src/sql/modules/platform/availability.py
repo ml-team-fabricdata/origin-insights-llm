@@ -15,21 +15,12 @@ def get_availability_by_uid(uid: str, country: Optional[str] = None, with_prices
     Returns:
         List containing availability data or error message
     """
-    # Clean and validate UID
-    if not uid or '?' in uid:  # Remove any query parameters if present
-        uid = uid.split('?')[0] if uid else None
-        
+    # Parse UID and extract country using shared helper
+    uid, country = parse_uid_with_country(uid, country)
+    
     if not uid:
         return [{"message": "UID parameter is required"}]
-        
-    # Handle country suffix in UID if present
-    if '_' in uid:
-        uid_parts = uid.split('_')
-        if len(uid_parts) == 2 and len(uid_parts[1]) == 2:  # Looks like ISO-2 country code
-            uid = uid_parts[0]
-            if not country:  # Only use suffix if no explicit country provided
-                country = uid_parts[1]
-        
+    
     # Resolve country if provided
     country_iso = None
     if country:
@@ -50,7 +41,6 @@ def get_availability_by_uid(uid: str, country: Optional[str] = None, with_prices
         sql = QUERY_AVAILABILITY_WITH_PRICES.format(country_condition=country_condition)
     else:
         sql = QUERY_AVAILABILITY_WITHOUT_PRICES.format(country_condition=country_condition)
-    print(sql)
 
     result = db.execute_query(sql, query_params)
     logger.info(f"Availability queried for {uid} (country={country_iso}, with_prices={with_prices}), results: {len(result) if result else 0}")

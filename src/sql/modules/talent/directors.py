@@ -26,20 +26,6 @@ def get_director_collaborators(director_id: str, limit: int = MAX_LIMIT) -> Dict
     return handle_query_result(results, "director_collaborators", director_id)
 
 
-def format_director_options(options: List[Dict[str, Any]]) -> str:
-    """Format director validation options for display."""
-    return "\n".join(
-        f"- {opt['name']} (id: {opt['id']}" +
-        (f", score: {opt['score']:.2f}" if opt.get("score") else "") + ")"
-        for opt in options
-    )
-
-
-def get_query_text(director_name: Union[str, List[str], Any]) -> str:
-    """Extract normalized query text from director name input."""
-    return normalize_input(director_name)
-
-
 def get_director_filmography_by_name(
     director_name: Union[str, List[str], Any],
     limit: int = DEFAULT_LIMIT
@@ -51,10 +37,10 @@ def get_director_filmography_by_name(
         filmography = get_director_filmography(validation["id"], limit)
         return json.dumps(filmography, indent=2, ensure_ascii=False)
    
-    query_text = get_query_text(director_name)
+    query_text = normalize_input(director_name)
    
     if validation["status"] == "ambiguous":
-        options_text = format_director_options(validation["options"])
+        options_text = format_validation_options(validation["options"], "director")
         return f"Encontré varios posibles para '{query_text}'. Elige uno:\n{options_text}"
    
     return f"No encontré coincidencias para '{query_text}'."

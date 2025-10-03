@@ -6,8 +6,7 @@ from src.sql.queries.business.rankings_queries import *
 
 def compute_window_anchored_to_table(days_back: int) -> Optional[Tuple[str, str]]:
     """Compute date window anchored to MAX(date_hits) when no current data exists."""
-    print(
-        f"Computing window anchored to table with days_back={days_back}")
+    logger.debug(f"Computing window anchored to table with days_back={days_back}")
 
     rows = db.execute_query(QUERY_MAX_DATE)
     if not rows:
@@ -82,8 +81,7 @@ def get_genre_momentum(
     # Calculate date ranges
     cur_from, cur_to, prev_from, prev_to = _clamp_rolling(
         max_d, days_back, prev_days_back)
-    print(f"Date range: {prev_from} → {prev_to}")
-    print(f"Date range: {cur_from} → {cur_to}")
+    logger.debug(f"Date ranges: prev={prev_from} → {prev_to}, cur={cur_from} → {cur_to}")
 
     # Build dynamic clauses
     country_clause = ""
@@ -211,16 +209,11 @@ def get_top_generic(
                        for c in countries_list if isinstance(c, str) and c.strip()]
 
     # Log time range parameters
-    print(
-        f"get_top_generic | Time range: days_back={days_back}, "
-        f"date_from={date_from}, date_to={date_to}, "
-        f"year={resolved_currentyear}, year_from={year_from}, year_to={year_to}"
-    )
-
-    print(
-        f"get_top_generic | Filters: ct={normalized_content_type}, "
-        f"platform={normalized_platform}, genre={normalized_genre}, "
-        f"country={resolved_country}, iso_set={iso_set}, limit={limit_val}"
+    logger.debug(
+        f"get_top_generic | Time: days_back={days_back}, dates={date_from} to {date_to}, "
+        f"year={resolved_currentyear}, years={year_from}-{year_to} | "
+        f"Filters: ct={normalized_content_type}, platform={normalized_platform}, "
+        f"genre={normalized_genre}, country={resolved_country}, limit={limit_val}"
     )
 
     # Routing
@@ -303,22 +296,20 @@ def get_top_presence(
     # Temporal inline (columna de presence: h.date_hits)
     if days_back is not None:
         validated = validate_days_back(days_back, default=7)
-        print(
-            f"get_top_presence | days_back={days_back} → validated={validated}")
+        logger.debug(f"get_top_presence | days_back={days_back} → validated={validated}")
         window = compute_window_anchored_to_table(validated)
         if window:
             df, dt = window
-            print(
-                f"get_top_presence | Computed window: {df} to {dt} ({validated} days)")
+            logger.debug(f"get_top_presence | Computed window: {df} to {dt} ({validated} days)")
             where.append("h.date_hits BETWEEN %s AND %s")
             params.extend([df, dt])
     else:
         if date_from:
-            print(f"get_top_presence | Using date_from: {date_from}")
+            logger.debug(f"get_top_presence | Using date_from: {date_from}")
             where.append("h.date_hits >= %s")
             params.append(date_from)
         if date_to:
-            print(f"get_top_presence | Using date_to: {date_to}")
+            logger.debug(f"get_top_presence | Using date_to: {date_to}")
             where.append("h.date_hits <= %s")
             params.append(date_to)
 
@@ -335,7 +326,6 @@ def get_top_presence(
 
     where_clause = f"WHERE {' AND '.join(where)}" if where else ""
     joins = list(dict.fromkeys(joins))
-    print(f"Joins: {joins}")
     joins_clause = " ".join(joins)
 
     query_template = QUERY_TOP_PRESENCE_WITH_METADATA if needs_metadata else QUERY_TOP_PRESENCE_NO_METADATA
@@ -343,9 +333,7 @@ def get_top_presence(
         joins_clause=joins_clause, where_clause=where_clause)
 
     params.append(limit)
-
-    print(f"PRESENCE SQL: {query}")
-    print(f"PRESENCE params: {tuple(params)}")
+    logger.debug(f"PRESENCE SQL with {len(params)} params")
 
     rows = db.execute_query(query, tuple(params))
     return build_result(
@@ -388,22 +376,20 @@ def get_top_global(
     # Temporal filters
     if days_back is not None:
         validated = validate_days_back(days_back, default=7)
-        print(
-            f"get_top_global | days_back={days_back} → validated={validated}")
+        logger.debug(f"get_top_global | days_back={days_back} → validated={validated}")
         window = compute_window_anchored_to_table(validated)
         if window:
             df, dt = window
-            print(
-                f"get_top_global | Computed window: {df} to {dt} ({validated} days)")
+            logger.debug(f"get_top_global | Computed window: {df} to {dt} ({validated} days)")
             where.append("h.date_hits BETWEEN %s AND %s")
             params.extend([df, dt])
     else:
         if date_from:
-            print(f"get_top_global | Using date_from: {date_from}")
+            logger.debug(f"get_top_global | Using date_from: {date_from}")
             where.append("h.date_hits >= %s")
             params.append(date_from)
         if date_to:
-            print(f"get_top_global | Using date_to: {date_to}")
+            logger.debug(f"get_top_global | Using date_to: {date_to}")
             where.append("h.date_hits <= %s")
             params.append(date_to)
 
@@ -436,10 +422,7 @@ def get_top_global(
         joins_clause=joins_clause, where_clause=where_clause)
 
     params.append(limit)
-
-    # Debug opcional
-    print(f"GLOBAL SQL: {query}")
-    print(f"GLOBAL params: {tuple(params)}")
+    logger.debug(f"GLOBAL SQL with {len(params)} params")
 
     rows = db.execute_query(query, tuple(params)) or []
     return rows
@@ -488,9 +471,7 @@ def build_result(
         (f"year_to={year_to}" if year_to is not None else ""),
     ]
     ident = " ".join(p for p in ident_parts if p)
-
-    print(f"{query_type.upper()}: {ident}")
-    print(f"rows={len(rows or [])}")
+    logger.debug(f"{query_type.upper()}: {ident}, rows={len(rows or [])}")
 
     # Normalize to ensure year/currentyear in final payload
     def _normalize_row(r: Any) -> Dict[str, Any]:
@@ -522,7 +503,7 @@ def build_result(
 def get_top_generic_tool(*args, **kwargs) -> str:
     """Tool-safe wrapper for generic top query specific for LangGraph."""
     params = normalize_langgraph_params(*args, **kwargs)
-    print(f"get_top_generic_tool | Raw params received: {params}")
+    logger.debug(f"get_top_generic_tool | Raw params received: {params}")
 
     # Extract parameters
     country = params.get("country")
@@ -539,15 +520,10 @@ def get_top_generic_tool(*args, **kwargs) -> str:
     year_to = params.get("year_to")
     region = params.get("region")
 
-    print(
-        f"get_top_generic_tool | Extracted time params: "
-        f"days_back={days_back}, date_from={date_from}, date_to={date_to}, "
-        f"year={year}, currentyear={currentyear}, year_from={year_from}, year_to={year_to}"
-    )
-
-    print(
-        f"get_top_generic_tool | Filters: country={country}, platform={platform}, "
-        f"genre={genre}, content_type={content_type}, limit={limit}"
+    logger.debug(
+        f"get_top_generic_tool | Time: days_back={days_back}, dates={date_from} to {date_to}, "
+        f"year={year}, years={year_from}-{year_to} | "
+        f"Filters: country={country}, platform={platform}, genre={genre}, ct={content_type}, limit={limit}"
     )
 
     # Call main function
@@ -594,16 +570,12 @@ def get_top_generic_tool(*args, **kwargs) -> str:
 def new_top_by_country_tool(*args, **kwargs) -> str:
     """New function specific for LangGraph for tops by country."""
     params = normalize_langgraph_params(*args, **kwargs)
-    print(f"new_top_by_country_tool | Raw params received: {params}")
-
+    
     country = params.get("country") or params.get("iso_alpha2")
     year = params.get("year")
     limit = params.get("limit", 20)
 
-    print(
-        f"new_top_by_country_tool | Extracted params: "
-        f"country={country}, year={year}, limit={limit}"
-    )
+    logger.debug(f"new_top_by_country_tool | country={country}, year={year}, limit={limit}")
 
     if not country:
         return json.dumps(

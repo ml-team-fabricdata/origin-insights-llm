@@ -26,20 +26,6 @@ def get_actor_coactors(actor_id: str, limit: int = MAX_LIMIT) -> Dict[str, Any]:
     return handle_query_result(results, "actor_coactors", actor_id)
 
 
-def _format_actor_options(options: List[Dict[str, Any]]) -> str:
-    """Format actor validation options for display."""
-    return "\n".join(
-        f"- {opt['name']} (id: {opt['id']}" +
-        (f", score: {opt['score']:.2f}" if opt.get("score") else "") + ")"
-        for opt in options
-    )
-
-
-def _get_query_text(actor_name: Union[str, List[str], Any]) -> str:
-    """Extract normalized query text from actor name input."""
-    return normalize_input(actor_name)
-
-
 def get_actor_filmography_by_name(
     actor_name: Union[str, List[str], Any], 
     limit: int = DEFAULT_LIMIT
@@ -51,10 +37,10 @@ def get_actor_filmography_by_name(
         filmography = get_actor_filmography(validation["id"], limit)
         return json.dumps(filmography, indent=2, ensure_ascii=False)
     
-    query_text = _get_query_text(actor_name)
+    query_text = normalize_input(actor_name)
     
     if validation["status"] == "ambiguous":
-        options_text = _format_actor_options(validation["options"])
+        options_text = format_validation_options(validation["options"], "actor")
         return f"Encontré varios posibles para '{query_text}'. Elige uno:\n{options_text}"
     
     return f"No encontré coincidencias para '{query_text}'."
@@ -71,10 +57,10 @@ def get_actor_coactors_by_name(
         coactors = get_actor_coactors(validation["id"], limit)
         return json.dumps(coactors, indent=2, ensure_ascii=False)
     
-    query_text = _get_query_text(actor_name)
+    query_text = normalize_input(actor_name)
     
     if validation["status"] == "ambiguous":
-        options_text = _format_actor_options(validation["options"])
+        options_text = format_validation_options(validation["options"], "actor")
         return f"Encontré varios posibles para '{query_text}'. Elige uno:\n{options_text}"
     
     return f"No encontré coincidencias para '{query_text}'."

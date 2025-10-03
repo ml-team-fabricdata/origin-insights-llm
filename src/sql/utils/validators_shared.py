@@ -185,6 +185,79 @@ def resolve_content_type(content_type: Optional[str]) -> Optional[str]:
 # GEOGRAPHIC VALIDATORS
 # =============================================================================
 
+def validate_uid(uid: Optional[str]) -> Optional[str]:
+    """
+    Validate and normalize UID.
+    
+    Args:
+        uid: UID string to validate
+        
+    Returns:
+        Normalized UID or None if invalid
+        
+    Examples:
+        >>> validate_uid("  tt1234567  ")
+        'tt1234567'
+        >>> validate_uid("")
+        None
+        >>> validate_uid(None)
+        None
+    """
+    if not uid or not isinstance(uid, str):
+        return None
+    uid = uid.strip()
+    return uid if uid else None
+
+
+def parse_uid_with_country(uid: str, country: Optional[str] = None) -> Tuple[Optional[str], Optional[str]]:
+    """
+    Parse UID removing query params and extracting country suffix if present.
+    
+    Handles formats like:
+    - "tt1234567?param=value" -> removes query params
+    - "tt1234567_US" -> extracts country suffix
+    - "tt1234567_US?param=value" -> both
+    
+    Args:
+        uid: UID string to parse (may contain query params or country suffix)
+        country: Explicit country code (takes precedence over suffix)
+        
+    Returns:
+        Tuple of (cleaned_uid, country_code)
+        
+    Examples:
+        >>> parse_uid_with_country("tt1234567?foo=bar")
+        ('tt1234567', None)
+        >>> parse_uid_with_country("tt1234567_US")
+        ('tt1234567', 'US')
+        >>> parse_uid_with_country("tt1234567_US", "GB")
+        ('tt1234567', 'GB')
+        >>> parse_uid_with_country("")
+        (None, None)
+    """
+    if not uid:
+        return None, country
+    
+    # Remove query parameters
+    if '?' in uid:
+        uid = uid.split('?')[0]
+    
+    if not uid:
+        return None, country
+    
+    # Extract country suffix if present (format: uid_CC where CC is 2-letter ISO)
+    if '_' in uid:
+        parts = uid.split('_')
+        if len(parts) == 2 and len(parts[1]) == 2 and parts[1].isalpha():
+            base_uid, suffix = parts[0], parts[1].upper()
+            # Only use suffix if no explicit country was provided
+            if not country:
+                country = suffix
+            uid = base_uid
+    
+    return uid if uid else None, country
+
+
 def normalize_iso(iso_code: Optional[str]) -> str:
     """
     Normalize ISO code to uppercase and strip whitespace.

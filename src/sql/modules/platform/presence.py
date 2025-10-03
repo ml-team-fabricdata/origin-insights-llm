@@ -48,7 +48,7 @@ def build_where_clause(filters: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
 
     if filters.get("title_like"):
         conditions.append("p.clean_title ILIKE %(title_like)s")
-        params["title_like"] = f"%{filters['title_like']}%"
+        params["title_like"] = build_like_pattern(filters['title_like'])
 
     # Boolean filters
     for field in ["is_kids", "is_exclusive", "is_original"]:
@@ -197,84 +197,6 @@ def presence_statistics(country: str = None, platform_name: str = None, type: st
     result = db.execute_query(sql, query_params)
     return result if result else [{"message": "No results found"}]
 
-def get_availability_by_uid_price(uid: str, country: str = None, with_prices: bool = False) -> List[Dict]:
-    """Get availability information for a specific UID"""
-    
-
-    if not uid:
-        return [{"message": "UID parameter is required"}]
-
-    # Clean UID and strip query params
-    if '?' in uid:
-        uid = uid.split('?')[0]
-
-    if '_' in uid:
-        parts = uid.split('_')
-        if len(parts) == 2 and len(parts[1]) == 2:
-            base_uid, suffix = parts[0], parts[1]
-            uid = base_uid
-            if not country:
-                country = suffix
-
-    query_params = {"uid": uid}
-    country_condition = ""
-
-    if country:
-        country_iso = resolve_country_iso(country)
-        if country_iso:
-            country_condition = "AND p.iso_alpha2 = %(country_iso)s"
-            query_params["country_iso"] = country_iso.upper()
-
-    # Select appropriate query
-    if with_prices:
-        sql = QUERY_AVAILABILITY_WITH_PRICES.format(country_condition=country_condition)
-    else:
-        sql = QUERY_AVAILABILITY_WITHOUT_PRICES.format(country_condition=country_condition)
-
-    result = db.execute_query(sql, query_params)
-
-    if not result:
-        error_context = {"uid": uid, "message": "No availability found"}
-        if country:
-            error_context["country"] = country
-        return [error_context]
-
-    # Add metadata
-    response_data = {
-        "uid": uid,
-        "country_filter": country,
-        "with_prices": with_prices,
-        "total_platforms": len(result),
-        "results": result
-    }
-
-    # Add price statistics if requested
-    if with_prices:
-        prices_found = [r for r in result if r.get('price') is not None]
-        response_data.update({
-            "platforms_with_prices": len(prices_found),
-            "platforms_without_prices": len(result) - len(prices_found)
-        })
-
-        if prices_found:
-            all_prices = [
-                float(r['price']) for r in prices_found 
-                if r.get('price') and str(r['price']).replace('.', '').isdigit()
-            ]
-            if all_prices:
-                response_data.update({
-                    "price_range": {
-                        "min": min(all_prices),
-                        "max": max(all_prices),
-                        "currencies": list(set(
-                            r['currency'] for r in prices_found 
-                            if r.get('currency')
-                        ))
-                    }
-                })
-
-    return [response_data]
-
 def platform_count_by_country(country: str = None) -> List[Dict]:
     """Get count of platforms by country or for a specific country"""
     
@@ -305,10 +227,10 @@ def country_platform_summary(country: str = None) -> List[Dict]:
         isos = [iso for iso in isos if iso]  # Filter out None values
         
         if isos:
-            # Build the condition with placeholders
-            placeholders = ', '.join(['%s'] * len(isos))
-            country_condition = f"AND p.iso_alpha2 IN ({placeholders})"
-            params = tuple(isos)
+            # Use build_in_clause helper
+            in_clause, params_list = build_in_clause("p.iso_alpha2", isos)
+            country_condition = f"AND {in_clause}"
+            params = tuple(params_list)
     
     logger.info(f"Countries: {params}")
     logger.info(f"Country condition: {country_condition}")
@@ -317,16 +239,3 @@ def country_platform_summary(country: str = None) -> List[Dict]:
     result = db.execute_query(sql, params)
     
     return result if result else [{"message": "No results found"}]
-
-
-# =============================================================================
-# COMPATIBILITY
-# =============================================================================
-
-def new_cp_presence_count(*args, **kwargs) -> List[Dict]:
-    """Legacy compatibility function"""
-    return presence_count(**kwargs)
-
-def fetch_availability_by_uid(*args, **kwargs) -> List[Dict]:
-    """Legacy compatibility function"""
-    return get_availability_by_uid_price(**kwargs)

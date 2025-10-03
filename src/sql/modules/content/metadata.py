@@ -5,21 +5,18 @@ from src.sql.utils.validators_shared import *
 from src.sql.queries.content.queries_content import *
 
 
-def _normalize_tool_call(args, kwargs):
-    if args:
-        if len(args) == 1:
-            a0 = args[0]
-            if isinstance(a0, dict):
-                merged = dict(a0)
-                merged.update(kwargs or {})
-                return merged
-            merged = dict(kwargs or {})
-            merged.setdefault("__arg1", a0)
-            return merged
-        merged = dict(kwargs or {})
-        merged.setdefault("__arg1", args[0])
-        return merged
-    return kwargs or {}
+def _normalize_args_kwargs(args, kwargs, parse_arg1=False):
+    kwargs = normalize_args_kwargs(args, kwargs)
+    
+    # Parse __arg1 if requested
+    if parse_arg1 and "__arg1" in kwargs:
+        arg1_value = kwargs.get("__arg1", "")
+        if str(arg1_value).strip().lower() not in NO_FILTER_KEYWORDS:
+            kwargs = _parse_arg1_basic(kwargs.pop("__arg1"), kwargs)
+        else:
+            kwargs.pop("__arg1", None)
+    
+    return kwargs
 
 NO_FILTER_KEYWORDS = {
     "*", "all", "any", "todos", "todo", 
@@ -83,7 +80,7 @@ def _build_filters_common(kwargs):
     return conditions, params, applied_filters
 
 def tool_metadata_count(*args, **kwargs):
-    kwargs = _normalize_tool_call(args, kwargs)
+    kwargs = _normalize_args_kwargs(args, kwargs)
     
     primary_arg = str(kwargs.get("__arg1", "")).strip().lower()
     if primary_arg in NO_FILTER_KEYWORDS:
@@ -105,7 +102,7 @@ def tool_metadata_count(*args, **kwargs):
     return handle_query_result(rows, "metadata_simple_all.count", filter_desc)
 
 def tool_metadata_list(*args, **kwargs):
-    kwargs = _normalize_tool_call(args, kwargs)
+    kwargs = _normalize_args_kwargs(args, kwargs)
     
     primary_arg = kwargs.get("__arg1")
     if primary_arg and not kwargs.get("title_like"):
@@ -139,7 +136,7 @@ def tool_metadata_list(*args, **kwargs):
     return handle_query_result(rows, "metadata_simple_all.distinct", f"column={col_norm} limit={limit}")
 
 def tool_metadata_stats(*args, **kwargs):
-    kwargs = _normalize_tool_call(args, kwargs)
+    kwargs = _normalize_args_kwargs(args, kwargs)
     
     primary_arg = str(kwargs.get("__arg1", "")).strip().lower()
     if primary_arg in NO_FILTER_KEYWORDS:
@@ -191,11 +188,6 @@ def _parse_arg1_basic(a1: str, kwargs: dict) -> dict:
 
     return out
 
-def _like(value: str) -> str:
-    if not value:
-        return "%"
-    escaped = str(value).strip().replace('%', '\\%').replace('_', '\\_')
-    return f"%{escaped}%"
 
 def _validate_order_by(order_by: Optional[str], default: str = "year") -> str:
     if not order_by:
@@ -244,19 +236,6 @@ class MetadataSimpleQuery:
     offset: Optional[int] = 0
     count_only: bool = False
 
-def _build_like_any(col: str, values: List[str], params: Dict[str, Any], ph_prefix: str) -> str:
-    if not values:
-        return ""
-        
-    parts = []
-    for i, v in enumerate(values):
-        if not v or not str(v).strip():
-            continue
-        key = f"{ph_prefix}{i}"
-        params[key] = _like(str(v))
-        parts.append(f"{col} ILIKE %({key})s")
-        
-    return "(" + " OR ".join(parts) + ")" if parts else ""
 
 def build_metadata_simple_all_query(q: MetadataSimpleQuery) -> Tuple[str, Dict[str, Any]]:
     params: Dict[str, Any] = {}
@@ -288,7 +267,7 @@ def build_metadata_simple_all_query(q: MetadataSimpleQuery) -> Tuple[str, Dict[s
             
     if q.age:
         where.append("age ILIKE %(age)s")
-        params["age"] = _like(q.age)
+        params["age"] = build_like_pattern(q.age)
         
     if q.duration_min is not None:
         where.append("duration >= %(dmin)s")
@@ -300,17 +279,17 @@ def build_metadata_simple_all_query(q: MetadataSimpleQuery) -> Tuple[str, Dict[s
         
     if q.title_like:
         where.append("title ILIKE %(tlike)s")
-        params["tlike"] = _like(q.title_like)
+        params["tlike"] = build_like_pattern(q.title_like)
         
     if q.synopsis_like:
         where.append("synopsis ILIKE %(slike)s")
-        params["slike"] = _like(q.synopsis_like)
+        params["slike"] = build_like_pattern(q.synopsis_like)
         
     if q.primary_genre:
         resolved_genre = resolve_primary_genre(q.primary_genre)
         if resolved_genre:
             where.append("primary_genre ILIKE %(pgen)s")
-            params["pgen"] = _like(resolved_genre)
+            params["pgen"] = build_like_pattern(resolved_genre)
 
     array_conditions = [
         ("languages", q.languages_any, "l_"),
@@ -321,7 +300,7 @@ def build_metadata_simple_all_query(q: MetadataSimpleQuery) -> Tuple[str, Dict[s
     
     for col, values, prefix in array_conditions:
         if values:
-            cond = _build_like_any(col, values, params, prefix)
+            cond = build_like_any(col, values, params, prefix)
             if cond:
                 where.append(cond)
 
@@ -330,7 +309,7 @@ def build_metadata_simple_all_query(q: MetadataSimpleQuery) -> Tuple[str, Dict[s
         norm_vals = [resolve_country_iso(v) for v in vals if v]
         norm_vals = [v for v in norm_vals if v]
         if norm_vals:
-            cond = _build_like_any("countries_iso", norm_vals, params, "ci_")
+            cond = build_like_any("countries_iso", norm_vals, params, "ci_")
             if cond:
                 where.append(cond)
 
@@ -357,21 +336,9 @@ def build_metadata_simple_all_query(q: MetadataSimpleQuery) -> Tuple[str, Dict[s
 
     return sql, params
 
-def _normalize_call_kwargs(args, kwargs):
-    if args and len(args) == 1 and isinstance(args[0], str):
-        kwargs = dict(kwargs or {})
-        kwargs["__arg1"] = args[0]
-        
-    if "__arg1" in kwargs:
-        if str(kwargs.get("__arg1", "")).lower() not in NO_FILTER_KEYWORDS:
-            kwargs = _parse_arg1_basic(kwargs.pop("__arg1"), kwargs)
-        else:
-            kwargs.pop("__arg1", None)
-        
-    return kwargs
 
 def query_metadata_simple_all(*args, **kwargs) -> List[Dict[str, Any]]:
-    kwargs = _normalize_call_kwargs(args, kwargs)
+    kwargs = _normalize_args_kwargs(args, kwargs, parse_arg1=True)
     q = MetadataSimpleQuery(**kwargs)
     sql, params = build_metadata_simple_all_query(q)
     logger.debug(f"Executing query: {sql} with params: {params}")
@@ -379,7 +346,7 @@ def query_metadata_simple_all(*args, **kwargs) -> List[Dict[str, Any]]:
     return db.execute_query(sql, params) or []
 
 def query_metadata_simple_all_tool(*args, **kwargs) -> List[Dict]:
-    kwargs = _normalize_call_kwargs(args, kwargs)
+    kwargs = _normalize_args_kwargs(args, kwargs, parse_arg1=True)
     rows = query_metadata_simple_all(**kwargs) or []
     
     ident_parts = []

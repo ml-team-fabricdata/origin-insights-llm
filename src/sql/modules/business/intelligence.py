@@ -124,8 +124,6 @@ def titles_in_A_not_in_B_sql(
     isos_out = resolve_region_isos(country_not_in) or [
         resolve_country_iso(country_not_in)]
 
-    print(isos_in, isos_out)
-
     # Filter out None values
     isos_in = [iso for iso in isos_in if iso]
     isos_out = [iso for iso in isos_out if iso]

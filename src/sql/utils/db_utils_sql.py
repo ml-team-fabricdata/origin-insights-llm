@@ -16,6 +16,60 @@ _CJK_RE = re.compile(r"[\u4E00-\u9FFF\u3040-\u30FF\uAC00-\uD7AF]")
 # =============================================================================
 
 
+def build_like_pattern(value: Optional[str]) -> str:
+    """
+    Build SQL LIKE pattern with proper escaping.
+    
+    Args:
+        value: String value to convert to LIKE pattern
+        
+    Returns:
+        Escaped LIKE pattern with % wildcards
+        
+    Examples:
+        >>> build_like_pattern("test")
+        '%test%'
+        >>> build_like_pattern("50%")
+        '%50\\%%'
+    """
+    if not value:
+        return "%"
+    escaped = str(value).strip().replace('%', '\\%').replace('_', '\\_')
+    return f"%{escaped}%"
+
+
+def build_like_any(col: str, values: List[str], params: Dict[str, Any], ph_prefix: str) -> str:
+    """
+    Build OR-combined ILIKE conditions for multiple values.
+    
+    Args:
+        col: Column name
+        values: List of values to match
+        params: Dictionary to add named parameters to
+        ph_prefix: Prefix for parameter names
+        
+    Returns:
+        SQL condition string like "(col ILIKE %(prefix0)s OR col ILIKE %(prefix1)s)"
+        
+    Examples:
+        >>> params = {}
+        >>> build_like_any("title", ["test", "demo"], params, "t_")
+        "(title ILIKE %(t_0)s OR title ILIKE %(t_1)s)"
+    """
+    if not values:
+        return ""
+        
+    parts = []
+    for i, v in enumerate(values):
+        if not v or not str(v).strip():
+            continue
+        key = f"{ph_prefix}{i}"
+        params[key] = build_like_pattern(str(v))
+        parts.append(f"{col} ILIKE %({key})s")
+        
+    return "(" + " OR ".join(parts) + ")" if parts else ""
+
+
 def build_in_clause(field: str, values: Optional[List[Any]]) -> Tuple[str, List[Any]]:
     """
     Construye cláusula IN parametrizada para SQL.
@@ -570,6 +624,70 @@ def validate_days_back(
         validate_days_back("5y") → 1825
     """
     return parse_time_to_days(value, default=default, max_days=max_days)
+
+
+def normalize_args_kwargs(args, kwargs, parse_arg1=False):
+    """
+    Unified normalization function for args/kwargs in tool functions.
+    
+    Args:
+        args: Positional arguments
+        kwargs: Keyword arguments
+        parse_arg1: If True, parse __arg1 for filters (requires NO_FILTER_KEYWORDS)
+        
+    Returns:
+        Normalized kwargs dictionary
+        
+    Examples:
+        >>> normalize_args_kwargs(("US",), {})
+        {'__arg1': 'US'}
+        >>> normalize_args_kwargs(({"country": "US"},), {"limit": 10})
+        {'country': 'US', 'limit': 10}
+    """
+    # Handle positional args
+    if args:
+        if len(args) == 1:
+            a0 = args[0]
+            if isinstance(a0, dict):
+                merged = dict(a0)
+                merged.update(kwargs or {})
+                kwargs = merged
+            else:
+                kwargs = dict(kwargs or {})
+                kwargs.setdefault("__arg1", a0)
+        else:
+            kwargs = dict(kwargs or {})
+            kwargs.setdefault("__arg1", args[0])
+    else:
+        kwargs = kwargs or {}
+    
+    return kwargs
+
+
+def format_validation_options(options: List[Dict[str, Any]], entity_type: str = "option") -> str:
+    """
+    Format validation options for display (actors, directors, etc.).
+    
+    Args:
+        options: List of option dictionaries with 'name', 'id', and optional 'score'
+        entity_type: Type of entity for error messages (not used in current implementation)
+        
+    Returns:
+        Formatted string with options list
+        
+    Examples:
+        >>> opts = [{"name": "Brad Pitt", "id": "1234", "score": 0.95}]
+        >>> format_validation_options(opts)
+        '- Brad Pitt (id: 1234, score: 0.95)'
+    """
+    if not options:
+        return ""
+    
+    return "\n".join(
+        f"- {opt['name']} (id: {opt['id']}" +
+        (f", score: {opt['score']:.2f}" if opt.get("score") else "") + ")"
+        for opt in options
+    )
 
 
 def clamp_rolling(

@@ -1,4 +1,4 @@
-from langchain_core.tools import StructuredTool
+from langchain_core.tools import StructuredTool, Tool
 from typing import Optional, Dict, List, Any, Union
 from src.sql.modules.platform.availability import *
 
@@ -6,28 +6,16 @@ from src.sql.modules.platform.availability import *
 # Availability
 # =============================================================================
 
-# GET_AVAILABILITY_BY_UID_TOOL = StructuredTool.from_function(
-#     name="get_availability_by_uid",
-#     description=(
-#         "Disponibilidad por UID; si se indica 'country' restringe por país. "
-#         "Con 'with_prices'=True agrega resumen de precios."
-#     ),
-#     func=get_availability_by_uid,
-# )
-
-
-# QUERY_PLATFORMS_FOR_TITLE_TOOL = Tool.from_function(
-#     name="query_platforms_for_title",
-#     description="Plataformas que llevan un UID (con límite configurable)",
-#     func=query_platforms_for_title,
-# )
-
-
-# QUERY_PLATFORMS_FOR_UID_BY_COUNTRY_TOOL = Tool.from_function(
-#     name="query_platforms_for_uid_by_country",
-#     description="Plataformas para un UID dentro de un país (si no hay país, cae a consulta genérica)",
-#     func=query_platforms_for_uid_by_country,
-# )
+GET_AVAILABILITY_BY_UID_TOOL = StructuredTool.from_function(
+    name="get_availability_by_uid",
+    description=(
+        "Get platform availability for a title by UID with optional price information. "
+        "Parameters: uid (required), country (optional ISO-2 code for filtering), with_prices (boolean, default False). "
+        "When with_prices=True, includes comprehensive price summary: price range (min/max), available currencies, and platform counts with/without prices. "
+        "Returns detailed platform availability across countries and regions."
+    ),
+    func=get_availability_by_uid,
+)
 
 
 GET_PLATFORM_EXCLUSIVES_TOOL = Tool.from_function(
@@ -57,10 +45,7 @@ GET_RECENT_PREMIERES_BY_COUNTRY_TOOL = Tool.from_function(
 
 
 ALL_AVAILABILITY_TOOLS = [
-    # Availability
-    # GET_AVAILABILITY_BY_UID_TOOL,
-    # QUERY_PLATFORMS_FOR_TITLE_TOOL,
-    # QUERY_PLATFORMS_FOR_UID_BY_COUNTRY_TOOL,
+    GET_AVAILABILITY_BY_UID_TOOL,
     GET_PLATFORM_EXCLUSIVES_TOOL,
     COMPARE_PLATFORMS_FOR_TITLE_TOOL,
     GET_RECENT_PREMIERES_BY_COUNTRY_TOOL,

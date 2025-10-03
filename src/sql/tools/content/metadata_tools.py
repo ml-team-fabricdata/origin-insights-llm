@@ -7,7 +7,11 @@ from src.sql.modules.content.metadata import *
 # =============================================================================
 METADATA_COUNT_TOOL = Tool.from_function(
     name="metadata_simple_all_count",
-    description="Get total count of titles in the metadata catalog. Supports optional filters by content type (Movie/Series), country (ISO-2 code), and year range (year_from, year_to). Returns the total number of titles matching the criteria.",
+    description=(
+        "Get SIMPLE COUNT of titles in metadata catalog (single number only). "
+        "Filters: type (Movie/Series), country (ISO-2), year_from, year_to. "
+        "Returns only total count. Use for quick counts. For detailed statistics (year ranges, durations), use metadata_simple_all_stats instead."
+    ),
     func=tool_metadata_count,
 )
 
@@ -23,7 +27,10 @@ METADATA_LIST_TOOL = Tool.from_function(
 METADATA_STATS_TOOL = Tool.from_function(
     name="metadata_simple_all_stats",
     description=(
-        "Get statistical summary of metadata catalog including: total count, min/max year range, average and median duration. Supports optional filters by content type (Movie/Series), country (ISO-2), and year range. Provides quick overview of catalog composition."
+        "Get STATISTICAL SUMMARY of metadata catalog (5 metrics). "
+        "Returns: total count, min_year, max_year, avg_duration, median_duration. "
+        "Filters: type (Movie/Series), country (ISO-2), year range. "
+        "Use for catalog overview. For simple count only, use metadata_simple_all_count instead."
     ),
     func=tool_metadata_stats,
 )

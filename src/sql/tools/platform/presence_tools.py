@@ -7,7 +7,12 @@ from src.sql.modules.platform.presence import *
 
 PRESENCE_COUNT_TOOL = Tool.from_function(
     name="presence_count",
-    description="Get total count of content presence records with optional filters. Supports filtering by country (ISO-2), platform_name, uid, type (Movie/Series), and title_like (text search). Returns total count of active content availability records matching the criteria. Useful for measuring catalog size.",
+    description=(
+        "Get SIMPLE COUNT of content presence records (single number only). "
+        "Filters: country (ISO-2), platform_name, uid, type (Movie/Series), title_like. "
+        "Returns only total count of matching records. "
+        "Use for quick counts. For detailed statistics (platforms, countries, durations, etc.), use presence_statistics instead."
+    ),
     func=presence_count,
 )
 
@@ -35,44 +40,46 @@ PRESENCE_DISTINCT_TOOL = Tool.from_function(
 
 PRESENCE_STATISTICS_TOOL = Tool.from_function(
     name="presence_statistics",
-    description="Get comprehensive statistical summary of content presence data. Returns: total records, unique platforms count, unique countries count, unique content count, average/median duration, exclusive content count, kids content count, movies vs series breakdown. Supports optional filters by country, platform_name, and type.",
-    func=presence_statistics,
-)
-
-
-GET_AVAILABILITY_BY_UID_PRICE_TOOL = StructuredTool.from_function(
-    name="get_availability_by_uid_price",
     description=(
-        "Get platform availability for a title by UID with optional price information. Parameters: uid (required), country (optional ISO-2 for filtering), with_prices (boolean). "
-        "When with_prices=True, includes comprehensive price data: individual platform prices with currency/type/definition/license, price range (min/max), currencies available, and platform counts with/without prices. "
-        "Returns detailed availability across platforms and countries."
+        "Get COMPREHENSIVE STATISTICAL summary of content presence (10+ metrics). "
+        "Returns: total_records, unique_platforms, unique_countries, unique_content, avg/median duration, "
+        "exclusive_count, kids_count, movies_count, series_count. Filters: country, platform_name, type. "
+        "Use for detailed analysis. For simple count only, use presence_count instead."
     ),
-    func=get_availability_by_uid_price,
+    func=presence_statistics,
 )
 
 
 PLATFORM_COUNT_BY_COUNTRY_TOOL = Tool.from_function(
     name="platform_count_by_country",
-    description="Get count of streaming platforms available by country. If country (ISO-2) is specified, returns platform count and list of platforms for that specific country. If no country specified, returns platform counts for all countries sorted by count. Useful for comparing platform availability across markets.",
+    description=(
+        "Get QUICK COUNT of streaming platforms by country (lightweight query). "
+        "If country (ISO-2) specified: returns platform_count + platforms array for that country. "
+        "If no country: returns platform_count for ALL countries sorted by count. "
+        "Use this for simple platform counting. For detailed statistics including content counts, use country_platform_summary instead."
+    ),
     func=platform_count_by_country,
 )
 
 
 COUNTRY_PLATFORM_SUMMARY_TOOL = Tool.from_function(
     name="country_platform_summary",
-    description="Get comprehensive summary of platforms and content availability by country or region. Returns detailed statistics per country: unique platforms count, unique content count, total records, movies/series breakdown, exclusive content count, and list of available platforms. Supports country/region filtering or returns global summary for all countries.",
+    description=(
+        "Get COMPREHENSIVE DETAILED summary of platforms and content by country/region (complete analysis). "
+        "Returns per country: unique_platforms (count), unique_content (count), total_records, movies count, series count, "
+        "exclusive_content count, and platforms array. Supports country/region filtering or global summary. "
+        "Use this for detailed market analysis. For simple platform counting only, use platform_count_by_country instead."
+    ),
     func=country_platform_summary,
 )
 
 
 
 ALL_PRESENCE_TOOLS = [
-    # Presence
     PRESENCE_COUNT_TOOL,
     PRESENCE_LIST_TOOL,
     PRESENCE_DISTINCT_TOOL,
     PRESENCE_STATISTICS_TOOL,
-    GET_AVAILABILITY_BY_UID_PRICE_TOOL,
     PLATFORM_COUNT_BY_COUNTRY_TOOL,
     COUNTRY_PLATFORM_SUMMARY_TOOL,
 ]

@@ -32,14 +32,14 @@ from src.sql.modules.platform.availability import *
 
 GET_PLATFORM_EXCLUSIVES_TOOL = Tool.from_function(
     name="get_platform_exclusives",
-    description="Títulos exclusivos de una plataforma dentro de un país (ISO-2)",
+    description="Get exclusive titles available on a specific platform within a country. Requires platform_name and country (ISO-2 code, defaults to US). Returns list of exclusive content (uid, title, type) available only on that platform in the specified country. Useful for discovering platform-specific content.",
     func=get_platform_exclusives,
 )
 
 
 COMPARE_PLATFORMS_FOR_TITLE_TOOL = StructuredTool.from_function(
     name="compare_platforms_for_title",
-    description="Comparación de dos o más plataformas que tienen el mismo título (match exacto)",
+    description="Compare which streaming platforms carry a specific title (exact title match). Returns distinct list of platform names and countries where the title is available. Useful for finding where to watch a specific movie or series across different platforms and regions.",
     func=compare_platforms_for_title,
 )
 
@@ -47,7 +47,10 @@ COMPARE_PLATFORMS_FOR_TITLE_TOOL = StructuredTool.from_function(
 GET_RECENT_PREMIERES_BY_COUNTRY_TOOL = Tool.from_function(
     name="get_recent_premieres_by_country",
     description=(
-        "Estrenos recientes disponibles en un país dentro de la ventana 'days_back' (policy: 7 días)."
+        "Get recent content premieres available in a specific country within the last 7 days. "
+        "Requires country (ISO-2 code). Parameter days_back is fixed at 7 days (policy restriction). "
+        "Returns titles with release dates, aggregated platforms, and platform countries where available. "
+        "Useful for discovering new releases in a specific market."
     ),
     func=get_recent_premieres_by_country,
 )

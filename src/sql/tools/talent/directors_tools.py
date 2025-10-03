@@ -9,7 +9,8 @@ from src.sql.modules.talent.directors import *
 DIRECTOR_FILMOGRAPHY_BY_NAME_TOOL = Tool.from_function(
     name="get_director_filmography_by_name",
     description=(
-        "Filmography of a DIRECTOR (by name). Validates the name; if ambiguous, returns options."
+        "Get complete filmography for a director by name. Validates the director name and returns their complete list of directed films/series with title, type, year, and IMDb ID. "
+        "If the name is ambiguous, returns options to choose from. If name not found, returns error message. Use this when you only have the director's name."
     ),
     func=get_director_filmography_by_name
 )
@@ -17,7 +18,9 @@ DIRECTOR_FILMOGRAPHY_BY_NAME_TOOL = Tool.from_function(
 DIRECTOR_FILMOGRAPHY_BY_ID_TOOL = Tool.from_function(
     name="get_director_filmography",
     description=(
-        "Filmography of a DIRECTOR by ID (efficient path, no hits). Use if you already resolved the director_id."
+        "Get director's filmography using their ID (efficient direct query). "
+        "Requires director_id. Returns complete list of films/series the director has directed. "
+        "Use this method when you already have the validated director ID from a previous query."
     ),
     func=get_director_filmography
 )
@@ -25,8 +28,9 @@ DIRECTOR_FILMOGRAPHY_BY_ID_TOOL = Tool.from_function(
 DIRECTOR_CODIRECTORS_BY_ID_TOOL = Tool.from_function(
     name="get_director_collaborators",
     description=(
-        "Co-directors of a DIRECTOR by ID. Use if you already resolved the "
-        "director_id."
+        "Get co-directors (directors who have worked on the same films) using director's ID. "
+        "Requires director_id. Returns list of co-directors with their IDs, names, and number of shared titles. "
+        "Use this method when you already have the validated director ID from a previous query. Useful for discovering professional collaborations."
     ),
     func=get_director_collaborators
 )

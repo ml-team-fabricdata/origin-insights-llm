@@ -6,7 +6,11 @@ from .constants_sql import REGION_TO_ISO2, REGION_ALIASES
 # MODULE INITIALIZATION
 # =============================================================================
 
-def get_validation(field_name: str) -> List[Dict]:
+# Global cache for validation data (lazy loaded)
+_VALIDATION_CACHE: Dict[str, List[Dict]] = {}
+
+
+def _get_validation(field_name: str) -> List[Dict]:
     """
     Load validation data from a JSONL file.
 
@@ -63,13 +67,61 @@ def get_validation(field_name: str) -> List[Dict]:
     return handle_query_result(result, field_name, "all")
 
 
+def _get_validation_cached(field_name: str) -> List[Dict]:
+    """
+    Get validation data with caching to avoid repeated file I/O.
+    
+    Args:
+        field_name: Name of the validation file
+        
+    Returns:
+        Cached validation data
+        
+    Note:
+        This function caches validation data in memory on first access.
+        All resolve_* functions use this to avoid repeated disk reads.
+    """
+    if field_name not in _VALIDATION_CACHE:
+        _VALIDATION_CACHE[field_name] = _get_validation(field_name)
+    return _VALIDATION_CACHE[field_name]
+
+
+# Backward compatibility alias
+def get_validation(field_name: str) -> List[Dict]:
+    """
+    Public API for getting validation data.
+    Prefer using this over _get_validation() for automatic caching.
+    """
+    return _get_validation_cached(field_name)
+
+
+def clear_validation_cache(field_name: Optional[str] = None) -> None:
+    """
+    Clear validation cache for testing or when data files are updated.
+    
+    Args:
+        field_name: Specific field to clear, or None to clear all cache
+    """
+    global _VALIDATION_CACHE, _GENRE_ALIAS_MAP
+    
+    if field_name:
+        _VALIDATION_CACHE.pop(field_name, None)
+        if field_name == "primary_genre":
+            _GENRE_ALIAS_MAP = None
+        logger.info(f"Cleared cache for: {field_name}")
+    else:
+        _VALIDATION_CACHE.clear()
+        _GENRE_ALIAS_MAP = None
+        logger.info("Cleared all validation cache")
+
+
 def _initialize_allowed_iso_codes() -> Set[str]:
     """
     Initialize the set of allowed ISO-2 codes from validation catalog.
     This is called once at module load time.
     
     Returns:
-        Set of allowed ISO-2 codes in lowercase
+        Set of allowed ISO-2 codes in uppercase
     """
     validation_rows = get_validation("platform_name_iso")
     allowed_codes = set()
@@ -80,7 +132,7 @@ def _initialize_allowed_iso_codes() -> Set[str]:
             
         iso_code = row.get("platform_name_iso")
         if isinstance(iso_code, str) and len(iso_code.strip()) == 2:
-            allowed_codes.add(iso_code.strip().lower())
+            allowed_codes.add(iso_code.strip().upper())
             
     return allowed_codes
 
@@ -135,24 +187,24 @@ def resolve_content_type(content_type: Optional[str]) -> Optional[str]:
 
 def normalize_iso(iso_code: Optional[str]) -> str:
     """
-    Normalize ISO code to lowercase and strip whitespace.
+    Normalize ISO code to uppercase and strip whitespace.
     
     Args:
         iso_code: Raw ISO code
         
     Returns:
-        Normalized ISO code in lowercase
+        Normalized ISO code in uppercase
         
     Examples:
         >>> normalize_iso(" US ")
-        'us'
+        'US'
         >>> normalize_iso("GB")
-        'gb'
+        'GB'
     """
     if not iso_code:
         return ""
     
-    return str(iso_code).strip().lower()
+    return str(iso_code).strip().upper()
 
 
 def resolve_country_iso(country: Optional[str]) -> Optional[str]:
@@ -179,8 +231,8 @@ def resolve_country_iso(country: Optional[str]) -> Optional[str]:
     if not country:
         return None
     
-    # Get validation data
-    validation_rows = get_validation("platform_name_iso")
+    # Get validation data (cached)
+    validation_rows = _get_validation_cached("platform_name_iso")
     if not validation_rows:
         return None
     
@@ -217,17 +269,17 @@ def get_region_iso_list(region_key: str) -> Optional[List[str]]:
     if not region_key:
         return None
     
-    # Normalize the key
-    normalized_key = normalize_iso(region_key)
+    # Normalize the key to lowercase for lookup (constants use lowercase keys)
+    normalized_key = region_key.strip().lower()
     
-    # Check for aliases first
+    # Check for aliases first (keys are lowercase)
     if normalized_key in REGION_ALIASES:
         normalized_key = REGION_ALIASES[normalized_key]
     
-    # Check if it's a known region
+    # Check if it's a known region (keys are lowercase, values are uppercase)
     if normalized_key in REGION_TO_ISO2:
-        # Return uppercase ISO codes
-        return [code.upper() for code in REGION_TO_ISO2[normalized_key]]
+        # Values are already uppercase in constants
+        return list(REGION_TO_ISO2[normalized_key])
     
     # Check if it's a single country ISO-2 code
     if len(normalized_key) == 2 and normalized_key.isalpha():
@@ -260,12 +312,12 @@ def resolve_region_isos(region: Optional[str]) -> List[str]:
     if not iso_list:
         return []
     
-    # Filter against allowed countries
+    # Filter against allowed countries (all in uppercase)
     valid_isos = []
     for iso_code in iso_list:
-        normalized = normalize_iso(iso_code)
-        if normalized in ALLOWED_ISO_CODES:
-            valid_isos.append(iso_code.upper())
+        normalized = normalize_iso(iso_code)  # Returns uppercase
+        if normalized in ALLOWED_ISO_CODES:  # Set is now uppercase
+            valid_isos.append(normalized)
     
     return valid_isos
 
@@ -294,8 +346,8 @@ def resolve_platform_name(platform_name: Optional[str]) -> Optional[str]:
     if not platform_name:
         return None
     
-    # Get validation data
-    validation_rows = get_validation("platform_name")
+    # Get validation data (cached)
+    validation_rows = _get_validation_cached("platform_name")
     if not validation_rows:
         return None
     
@@ -341,8 +393,8 @@ def resolve_currency(currency_name: Optional[str]) -> Optional[str]:
     if not currency_name:
         return None
     
-    # Get validation data
-    validation_rows = get_validation("currency")
+    # Get validation data (cached)
+    validation_rows = _get_validation_cached("currency")
     if not validation_rows:
         return None
     
@@ -364,6 +416,33 @@ def resolve_currency(currency_name: Optional[str]) -> Optional[str]:
 # CONTENT METADATA VALIDATORS
 # =============================================================================
 
+# Cache for genre alias map (lazy loaded)
+_GENRE_ALIAS_MAP: Optional[Dict[str, str]] = None
+
+
+def _build_genre_alias_map() -> Dict[str, str]:
+    """Build and cache genre alias map."""
+    global _GENRE_ALIAS_MAP
+    
+    if _GENRE_ALIAS_MAP is not None:
+        return _GENRE_ALIAS_MAP
+    
+    validation_rows = _get_validation_cached("primary_genre")
+    if not validation_rows:
+        _GENRE_ALIAS_MAP = {}
+        return _GENRE_ALIAS_MAP
+    
+    alias_map = {}
+    for row in validation_rows:
+        canonical = row.get("primary_genre")
+        terms = row.get("terms", []) + [canonical]
+        for t in terms:
+            alias_map[t] = canonical
+    
+    _GENRE_ALIAS_MAP = alias_map
+    return alias_map
+
+
 def resolve_primary_genre(genre: Optional[str]) -> Optional[str]:
     """
     Normalize content genre to standard classification.
@@ -377,25 +456,17 @@ def resolve_primary_genre(genre: Optional[str]) -> Optional[str]:
     if not genre:
         return None
     
-    # Ahora el validation_rows es tu JSONL cargado
-    validation_rows = get_validation("primary_genre")
-    if not validation_rows:
+    # Get cached alias map
+    alias_map = _build_genre_alias_map()
+    if not alias_map:
         return None
-    
-    # Aplanamos todas las opciones de alias con su canónico
-    alias_map = {}
-    for row in validation_rows:
-        canonical = row.get("primary_genre")
-        terms = row.get("terms", []) + [canonical]
-        for t in terms:
-            alias_map[t] = canonical
     
     # 1) Exact match rápido
     if genre in alias_map:
         return alias_map[genre]
     
     # 2) Fuzzy matching con RapidFuzz sobre los alias
-    match, _ , _ = process.extractOne(
+    match, _, _ = process.extractOne(
         genre,
         alias_map.keys(),
         score_cutoff=75
@@ -444,56 +515,6 @@ def validate_country_list(countries: List[str]) -> List[str]:
             result.append(code)
     
     return result
-
-
-def validate_all_fields(
-    content_type: Optional[str] = None,
-    country: Optional[str] = None,
-    platform: Optional[str] = None,
-    currency: Optional[str] = None,
-    genre: Optional[str] = None
-) -> dict:
-    """
-    Validate multiple fields in a single call.
-    
-    Args:
-        content_type: Content type to validate
-        country: Country to validate
-        platform: Platform to validate
-        currency: Currency to validate
-        genre: Genre to validate
-        
-    Returns:
-        Dictionary with validated values
-        
-    Example:
-        >>> validate_all_fields(content_type="movie", country="US")
-        {'content_type': 'Movie', 'country': 'US', ...}
-    """
-    return {
-        'content_type': resolve_content_type(content_type) if content_type else None,
-        'country': resolve_country_iso(country) if country else None,
-        'platform': resolve_platform_name(platform) if platform else None,
-        'currency': resolve_currency(currency) if currency else None,
-        'genre': resolve_primary_genre(genre) if genre else None
-    }
-# VALIDATION STATUS HELPERS
-# =============================================================================
-
-def get_validation_report() -> dict:
-    """
-    Get a report of available validation data.
-    
-    Returns:
-        Dictionary with counts and status of validation data
-    """
-    return {
-        'allowed_countries': len(ALLOWED_ISO_CODES),
-        'regions_defined': len(REGION_TO_ISO2),
-        'region_aliases': len(REGION_ALIASES),
-        'movie_types': len(MOVIE_TYPES),
-        'series_types': len(SERIES_TYPES)
-    }
 
 
 # =============================================================================

@@ -136,7 +136,7 @@ def tool_metadata_list(*args, **kwargs):
     )
     
     rows = db.execute_query(sql, (limit,))
-    return as_tool_payload(rows, ident=f"metadata_simple_all.distinct | column={col_norm} limit={limit}")
+    return handle_query_result(rows, "metadata_simple_all.distinct", f"column={col_norm} limit={limit}")
 
 def tool_metadata_stats(*args, **kwargs):
     kwargs = _normalize_tool_call(args, kwargs)
@@ -156,7 +156,7 @@ def tool_metadata_stats(*args, **kwargs):
     
     rows = db.execute_query(sql, tuple(params))
     filter_desc = ", ".join(applied_filters) or "no-filters"
-    return as_tool_payload(rows, ident=f"metadata_simple_all.stats | {filter_desc}")
+    return handle_query_result(rows, "metadata_simple_all.stats", filter_desc)
 
 _DEF_SEP = re.compile(r"[\s,;/]+")
 
@@ -374,12 +374,11 @@ def query_metadata_simple_all(*args, **kwargs) -> List[Dict[str, Any]]:
     kwargs = _normalize_call_kwargs(args, kwargs)
     q = MetadataSimpleQuery(**kwargs)
     sql, params = build_metadata_simple_all_query(q)
-    
     logger.debug(f"Executing query: {sql} with params: {params}")
     
     return db.execute_query(sql, params) or []
 
-def query_metadata_simple_all_tool(*args, **kwargs) -> str:
+def query_metadata_simple_all_tool(*args, **kwargs) -> List[Dict]:
     kwargs = _normalize_call_kwargs(args, kwargs)
     rows = query_metadata_simple_all(**kwargs) or []
     
@@ -391,8 +390,6 @@ def query_metadata_simple_all_tool(*args, **kwargs) -> str:
         if value not in (None, ""):
             ident_parts.append(f"{param}={value}")
     
-    ident = "metadata_simple_all.query"
-    if ident_parts:
-        ident += " | " + " ".join(ident_parts)
+    ident = " | ".join(ident_parts) if ident_parts else "all"
         
-    return as_tool_payload(rows, ident=ident)
+    return handle_query_result(rows, "metadata_simple_all.query", ident)

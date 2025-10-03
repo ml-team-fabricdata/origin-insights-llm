@@ -19,14 +19,14 @@ _CJK_RE = re.compile(r"[\u4E00-\u9FFF\u3040-\u30FF\uAC00-\uD7AF]")
 def build_in_clause(field: str, values: Optional[List[Any]]) -> Tuple[str, List[Any]]:
     """
     Construye cláusula IN parametrizada para SQL.
-    
+
     Args:
         field: Nombre del campo SQL
         values: Lista de valores para la cláusula IN
-        
+
     Returns:
         Tupla (sql_clause, params_list)
-        
+
     Examples:
         >>> build_in_clause("country", ["US", "GB"])
         ("country IN (%s, %s)", ["US", "GB"])
@@ -81,27 +81,6 @@ def validate_limit(
         return int(default)
 
     return min(n, int(max_limit))
-
-
-def validate_days_back(days_back: Optional[int], default: int = 30) -> int:
-    """
-    Validate relative days window (1..365).
-
-    Args:
-        days_back: Number of days to look back
-        default: Default value if days_back is invalid
-
-    Returns:
-        Validated days value between 1 and 365
-    """
-    if days_back is None or not isinstance(days_back, (int, float)):
-        return default
-
-    days = int(days_back)
-    if days <= 0:
-        return default
-
-    return min(days, 365)
 
 
 def normalize_threshold(threshold: Optional[float] = None) -> float:
@@ -489,12 +468,9 @@ def get_date_range(days_back: int) -> Tuple[str, str]:
     return (date_from.isoformat(), today.isoformat())
 
 
-
-
 # ============================================================================
 # REGEX Y CONSTANTES
 # ============================================================================
-
 _TIME_AGO_PATTERN = re.compile(
     r"^\s*(?:hace\s+)?(\d+(?:\.\d+)?)\s+"
     r"(anio|ano|año|anos|años|year|years|"
@@ -516,7 +492,7 @@ _DAYS_PATTERN = re.compile(
 )
 
 _UNIT_TO_DAYS = {
-    'y': 365, 'anio': 365, 'ano': 365, 'año': 365, 
+    'y': 365, 'anio': 365, 'ano': 365, 'año': 365,
     'anos': 365, 'años': 365, 'year': 365, 'years': 365,
     'm': 30, 'mes': 30, 'meses': 30, 'month': 30, 'months': 30,
     'w': 7, 'semana': 7, 'semanas': 7, 'week': 7, 'weeks': 7,
@@ -541,15 +517,15 @@ def parse_time_to_days(
     """
     if value is None:
         return default
-    
+
     # Caso numérico (path rápido)
     if isinstance(value, (int, float)):
         days = int(value)
         return default if days <= 0 else min(days, max_days)
-    
+
     # Normalizar string
     s = str(value).strip().lower().translate(_ACCENT_TRANS)
-    
+
     # Intentar con patrón "hace X tiempo"
     match = _TIME_AGO_PATTERN.match(s)
     if match:
@@ -558,7 +534,7 @@ def parse_time_to_days(
         factor = _UNIT_TO_DAYS.get(unit, 1)
         days = int(qty * factor)
         return default if days <= 0 else min(days, max_days)
-    
+
     # Intentar con patrón simple (5y, 3m, 30, etc)
     match = _DAYS_PATTERN.match(s)
     if match:
@@ -567,7 +543,7 @@ def parse_time_to_days(
         factor = _UNIT_TO_DAYS.get(unit, 1)
         days = int(qty * factor)
         return default if days <= 0 else min(days, max_days)
-    
+
     # Si no matchea nada, retornar default
     return default
 
@@ -580,13 +556,13 @@ def validate_days_back(
 ) -> int:
     """
     Versión mejorada de validate_days_back que acepta expresiones naturales.
-    
+
     Compatible con código existente pero ahora también acepta:
     - "hace 5 años"
     - "3 semanas atrás"
     - "2 meses"
     - "5y", "3m", "2w"
-    
+
     Ejemplos:
         validate_days_back(30) → 30
         validate_days_back("hace 5 años") → 1825
@@ -603,25 +579,24 @@ def clamp_rolling(
 ) -> Tuple[date, date, date, date]:
     """
     Calcula rangos para período actual y anterior.
-    
+
     Args:
         max_date: Fecha máxima de referencia
         current_days: Días del período actual
         previous_days: Días del período anterior
-    
+
     Returns:
         (cur_from, cur_to, prev_from, prev_to)
     """
     # Período actual: desde max_date hacia atrás
     cur_to = max_date
     cur_from = max_date - timedelta(days=current_days - 1)
-    
+
     # Período anterior: justo antes del período actual
     prev_to = cur_from - timedelta(days=1)
     prev_from = prev_to - timedelta(days=previous_days - 1)
-    
-    return cur_from, cur_to, prev_from, prev_to
 
+    return cur_from, cur_to, prev_from, prev_to
 
 
 # =============================================================================
@@ -659,6 +634,7 @@ def handle_query_result(
 
     return result
 
+
 def _is_valid_json(text: str) -> Union[Dict, List, None]:
     """
     Parse JSON string and return the object, or None if invalid.
@@ -685,47 +661,6 @@ def _is_valid_json(text: str) -> Union[Dict, List, None]:
             return None
 
     return None
-
-
-def as_tool_payload(rows: Any, *, ident: str = "") -> str:
-    """
-    Convert query results to JSON for tools, ensuring non-empty response.
-
-    Args:
-        rows: Query result (list, dict, etc.)
-        ident: Identifier for context in empty messages
-
-    Returns:
-        Valid JSON string, never empty
-    """
-    # Handle None and empty collections
-    if rows is None or (hasattr(rows, '__len__') and len(rows) == 0):
-        message = "No results found"
-        if ident:
-            message += f" for {ident}"
-        return json.dumps({"message": message, "count": 0}, ensure_ascii=False)
-
-    # Handle string input
-    if isinstance(rows, str):
-        rows = rows.strip()
-        if not rows:
-            return json.dumps({"message": "Empty result", "count": 0}, ensure_ascii=False)
-
-        # Check if already valid JSON
-        parsed = _is_valid_json(rows)
-        if parsed is not None:
-            return rows
-
-        # Encapsulate non-JSON string
-        return json.dumps({"data": rows}, ensure_ascii=False)
-
-    # Normal serialization with safe fallback
-    serialized = _safe_json_dumps(rows)
-
-    if serialized and serialized.strip():
-        return serialized
-
-    return json.dumps({"message": "Empty serialization"}, ensure_ascii=False)
 
 
 def _safe_json_dumps(obj: Any) -> Optional[str]:

@@ -100,16 +100,13 @@ def catalog_similarity_for_platform(
 
 
 def _build_pin_pout_filters(platform: Optional[str]) -> Tuple[str, List[str], str, List[str]]:
-    pin = ""
-    pout = ""
-    pin_params: List[str] = []
-    pout_params: List[str] = []
-    if platform:
-        pin = "AND p_in.platform_name ilike %s"
-        pout = "AND p_out.platform_name ilike %s"
-        pin_params.append(platform)
-        pout_params.append(platform)
-    return pin, pin_params, pout, pout_params
+    """Construye filtros de plataforma para queries IN/OUT."""
+    if not platform:
+        return "", [], "", []
+    return (
+        "AND p_in.platform_name ILIKE %s", [platform],
+        "AND p_out.platform_name ILIKE %s", [platform]
+    )
 
 
 def titles_in_A_not_in_B_sql(
@@ -146,12 +143,9 @@ def titles_in_A_not_in_B_sql(
     pin_filter, pin_params, pout_filter, pout_params = _build_pin_pout_filters(
         plat)
 
-    # Build country conditions
-    placeholders_in = ', '.join(['%s'] * len(isos_in))
-    placeholders_out = ', '.join(['%s'] * len(isos_out))
-
-    in_condition = f"p_in.iso_alpha2 IN ({placeholders_in})"
-    out_condition = f"p_out.iso_alpha2 IN ({placeholders_out})"
+    # Build country conditions using helper
+    in_condition, _ = build_in_clause("p_in.iso_alpha2", isos_in)
+    out_condition, _ = build_in_clause("p_out.iso_alpha2", isos_out)
 
     # Replace placeholders
     sql = (SQL_TITLES_IN_A_NOT_IN_B

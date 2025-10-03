@@ -1,10 +1,67 @@
 from src.sql.utils.default_import import *
-from .db_utils_sql import get_validation, resolve_value_rapidfuzz
+from .db_utils_sql import resolve_value_rapidfuzz, handle_query_result, _is_valid_json
 from .constants_sql import REGION_TO_ISO2, REGION_ALIASES
 
 # =============================================================================
 # MODULE INITIALIZATION
 # =============================================================================
+
+def get_validation(field_name: str) -> List[Dict]:
+    """
+    Load validation data from a JSONL file.
+
+    Handles empty lines and malformed JSON gracefully.
+
+    Args:
+        field_name: Name of the field/file to load
+
+    Returns:
+        List of validation dictionaries or error message
+    """
+    if not field_name:
+        return [{"error": "Field name is required"}]
+
+    result = []
+    print(f"Loading validation data from {field_name}")
+    file_path = Path(f"src/data/{field_name}.jsonl")
+
+    # Check if file exists
+    if not file_path.exists():
+        logger.error(f"Validation file not found: {file_path}")
+        return [{"error": f"Validation file not found: {field_name}"}]
+
+    # Check if it's a file
+    if not file_path.is_file():
+        logger.error(f"Path is not a file: {file_path}")
+        return [{"error": f"Invalid file path: {field_name}"}]
+
+    # Read file line by line
+    with open(file_path, "r", encoding="utf-8") as f:
+        for line_num, line in enumerate(f, 1):
+            line = line.strip()
+            if not line:  # Skip empty lines
+                continue
+
+            # Parse JSON without try/except
+            # First check if it looks like JSON
+            if not (line.startswith('{') or line.startswith('[')):
+                logger.warning(
+                    f"Skipping non-JSON line {line_num} in {field_name}.jsonl"
+                )
+                continue
+
+            # Attempt to parse
+            parsed = _is_valid_json(line)
+            if parsed:
+                result.append(parsed)
+            else:
+                logger.warning(
+                    f"Skipping malformed JSON in {field_name}.jsonl line {line_num}"
+                )
+
+    logger.info(f"✅ {field_name} consultados, total: {len(result)}")
+    return handle_query_result(result, field_name, "all")
+
 
 def _initialize_allowed_iso_codes() -> Set[str]:
     """
@@ -443,28 +500,9 @@ def get_validation_report() -> dict:
 # DATE UTILITIES
 # =============================================================================
 
-def get_date_range(days_back: int) -> Tuple[str, str]:
-    """
-    Get ISO date range for the last N days.
-    
-    Args:
-        days_back: Number of days to look back from today
-        
-    Returns:
-        Tuple of (date_from, date_to) in ISO format (YYYY-MM-DD)
-        
-    Examples:
-        >>> get_date_range(7)
-        ('2025-09-25', '2025-10-02')
-        >>> get_date_range(30)
-        ('2025-09-02', '2025-10-02')
-    """
-    from datetime import date, timedelta
-    
-    today = date.today()
-    date_from = (today - timedelta(days=days_back)).isoformat()
-    date_to = today.isoformat()
-    return (date_from, date_to)
+# get_date_range() moved to db_utils_sql.py to avoid duplication
+# Import it from there if needed:
+# from src.sql.utils.db_utils_sql import get_date_range
 
 
 def normalize_langgraph_params(*args, **kwargs) -> dict:

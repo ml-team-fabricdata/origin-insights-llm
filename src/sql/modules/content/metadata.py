@@ -95,7 +95,6 @@ def tool_metadata_count(*args, **kwargs):
     
     where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
     sql = METADATA_COUNT_SQL.format(
-        table_name=META_TBL,
         where_clause=where_clause
     )
     
@@ -103,61 +102,14 @@ def tool_metadata_count(*args, **kwargs):
     
     rows = db.execute_query(sql, tuple(params))
     filter_desc = ", ".join(applied_filters) or "no-filters"
-    return as_tool_payload(rows, ident=f"metadata_simple_all.count | {filter_desc}")
+    return handle_query_result(rows, "metadata_simple_all.count", filter_desc)
 
 def tool_metadata_list(*args, **kwargs):
     kwargs = _normalize_tool_call(args, kwargs)
     
     primary_arg = kwargs.get("__arg1")
-    if primary_arg:
-        primary_str = str(primary_arg).strip().lower()
-        
-        if primary_str in NO_FILTER_KEYWORDS:
-            kwargs.pop("__arg1", None)
-        elif not kwargs.get("title_like"):
-            kwargs["title_like"] = str(primary_arg).strip()
-            kwargs.pop("__arg1", None)
-    
-    limit = validate_limit(kwargs.get("limit", DEFAULT_LIMIT))
-    order_by = str(kwargs.get("order_by", "title")).lower()
-    order_dir = "DESC" if str(kwargs.get("order_dir", "ASC")).upper() == "DESC" else "ASC"
-    
-    if order_by not in META_ALLOWED_ORDER:
-        order_by = "title"
-    
-    conditions, params, applied_filters = _build_filters_common(kwargs)
-    
-    title_like = kwargs.get("title_like")
-    if title_like:
-        conditions.append("title ILIKE %s")
-        params.append(f"%{title_like}%")
-        applied_filters.append(f"title_like={title_like}")
-    
-    where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
-    sql = METADATA_LIST_SQL.format(
-        table_name=META_TBL,
-        where_clause=where_clause,
-        order_by=order_by,
-        order_dir=order_dir
-    )
-    
-    params.append(limit)
-    
-    logger.debug(f"Executing list query: {sql} with params: {params}")
-    
-    rows = db.execute_query(sql, tuple(params))
-    
-    filter_desc = ", ".join(applied_filters) or "no-filters"
-    ident = (
-        f"metadata_simple_all.list | {filter_desc} | "
-        f"order={order_by} {order_dir} | limit={limit}"
-    )
-    return as_tool_payload(rows, ident=ident)
-
-def tool_metadata_distinct(*args, **kwargs):
-    kwargs = _normalize_tool_call(args, kwargs)
-    
-    if kwargs.get("__arg1") and not kwargs.get("column"):
+    if primary_arg and not kwargs.get("title_like"):
+        kwargs["title_like"] = str(primary_arg).strip()
         kwargs["column"] = str(kwargs["__arg1"]).strip()
     
     limit = validate_limit(kwargs.get("limit", MAX_LIMIT))

@@ -16,6 +16,29 @@ _CJK_RE = re.compile(r"[\u4E00-\u9FFF\u3040-\u30FF\uAC00-\uD7AF]")
 # =============================================================================
 
 
+def build_in_clause(field: str, values: Optional[List[Any]]) -> Tuple[str, List[Any]]:
+    """
+    Construye cláusula IN parametrizada para SQL.
+    
+    Args:
+        field: Nombre del campo SQL
+        values: Lista de valores para la cláusula IN
+        
+    Returns:
+        Tupla (sql_clause, params_list)
+        
+    Examples:
+        >>> build_in_clause("country", ["US", "GB"])
+        ("country IN (%s, %s)", ["US", "GB"])
+        >>> build_in_clause("price_type", None)
+        ("", [])
+    """
+    if not values:
+        return "", []
+    placeholders = ", ".join(["%s"] * len(values))
+    return f"{field} IN ({placeholders})", list(values)
+
+
 def validate_limit(
     limit: Optional[int] = None,
     default: int = 20,
@@ -635,123 +658,6 @@ def handle_query_result(
             return result
 
     return result
-
-
-def safe_tool_response(result: Any, operation_name: str = "operation") -> str:
-    """
-    Ensure tool response is never empty for Bedrock API compliance.
-    
-    Converts query results to JSON format with proper status and metadata.
-    Handles empty results, errors, and various data types.
-    
-    Args:
-        result: Query result (list, dict, string, or None)
-        operation_name: Name of the operation for logging
-        
-    Returns:
-        JSON string with status, data, and count
-        
-    Examples:
-        >>> safe_tool_response([{"title": "Movie"}], "search")
-        '{"status": "success", "data": [{"title": "Movie"}], "count": 1, ...}'
-        >>> safe_tool_response([], "search")
-        '{"status": "no_results", "message": "No data found...", ...}'
-    """
-    if result is None or (isinstance(result, list) and len(result) == 0):
-        return json.dumps(
-            {
-                "status": "no_results",
-                "message": f"No data found for {operation_name}.",
-                "data": [],
-                "count": 0,
-            },
-            ensure_ascii=False,
-            indent=2,
-        )
-
-    if isinstance(result, str) and not result.strip():
-        return json.dumps(
-            {
-                "status": "empty_response",
-                "message": f"Empty response from {operation_name}.",
-                "data": [],
-                "count": 0,
-            },
-            ensure_ascii=False,
-            indent=2,
-        )
-
-    if isinstance(result, (list, dict)):
-        return json.dumps(
-            {
-                "status": "success",
-                "data": result,
-                "count": len(result) if isinstance(result, list) else 1,
-                "operation": operation_name,
-            },
-            ensure_ascii=False,
-            indent=2,
-        )
-
-    return str(result) or f"No content from {operation_name}."
-
-
-def get_validation(field_name: str) -> List[Dict]:
-    """
-    Load validation data from a JSONL file.
-
-    Handles empty lines and malformed JSON gracefully.
-
-    Args:
-        field_name: Name of the field/file to load
-
-    Returns:
-        List of validation dictionaries or error message
-    """
-    if not field_name:
-        return [{"error": "Field name is required"}]
-
-    result = []
-    print(f"Loading validation data from {field_name}")
-    file_path = Path(f"src/data/{field_name}.jsonl")
-
-    # Check if file exists
-    if not file_path.exists():
-        logger.error(f"Validation file not found: {file_path}")
-        return [{"error": f"Validation file not found: {field_name}"}]
-
-    # Check if it's a file
-    if not file_path.is_file():
-        logger.error(f"Path is not a file: {file_path}")
-        return [{"error": f"Invalid file path: {field_name}"}]
-
-    # Read file line by line
-    with open(file_path, "r", encoding="utf-8") as f:
-        for line_num, line in enumerate(f, 1):
-            line = line.strip()
-            if not line:  # Skip empty lines
-                continue
-
-            # Parse JSON without try/except
-            # First check if it looks like JSON
-            if not (line.startswith('{') or line.startswith('[')):
-                logger.warning(
-                    f"Skipping non-JSON line {line_num} in {field_name}.jsonl"
-                )
-                continue
-
-            # Attempt to parse
-            parsed = _is_valid_json(line)
-            if parsed:
-                result.append(parsed)
-            else:
-                logger.warning(
-                    f"Skipping malformed JSON in {field_name}.jsonl line {line_num}"
-                )
-
-    logger.info(f"✅ {field_name} consultados, total: {len(result)}")
-    return handle_query_result(result, field_name, "all")
-
 
 def _is_valid_json(text: str) -> Union[Dict, List, None]:
     """

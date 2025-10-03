@@ -10,18 +10,13 @@ from src.sql.modules.content.metadata import _normalize_tool_call, _validate_sel
 # ================================================================
 
 
-def _normalize_string(s: Optional[str]) -> str:
-    """Normaliza para matching de alias (strip + lower)."""
-    return (s or "").strip().lower()
-
-
 def _resolve_definition(values: Optional[List[str]]) -> Optional[List[str]]:
     """Normaliza/valida definiciones (e.g., "sd hd" -> "SD/HD")."""
     if not values:
         return None
     resolved: List[str] = []
     for value in values:
-        key = _normalize_string(value)
+        key = normalize(value)
         canonical = DEF_ALIASES.get(key)
         if not canonical:
             upper_val = value.strip().upper()
@@ -41,7 +36,7 @@ def _resolve_license(values: Optional[List[str]]) -> Optional[List[str]]:
         return None
     resolved: List[str] = []
     for value in values:
-        key = _normalize_string(value)
+        key = normalize(value)
         canonical = LIC_ALIASES.get(key, value.strip().upper())
         if canonical in VALID_LICENSES:
             resolved.append(canonical)
@@ -51,27 +46,49 @@ def _resolve_license(values: Optional[List[str]]) -> Optional[List[str]]:
 
 
 # ================================================================
-# Bloque: HITS con calidad (definition/license)
+# HITS con calidad (definition/license)
 # ================================================================
+
+def _normalize_price_filters(
+    country: Optional[str] = None,
+    platform_name: Optional[str] = None,
+    price_type: Optional[Union[str, List[str]]] = None,
+    currency: Optional[Union[str, List[str]]] = None,
+) -> Tuple[Optional[str], Optional[str], Optional[List[str]], Optional[List[str]]]:
+    """Normaliza filtros comunes de precio.
+
+    Returns:
+        (iso, plat_name, price_type_list, currency_list)
+    """
+    iso = resolve_country_iso(country) if country else None
+    plat_name = resolve_platform_name(platform_name) if platform_name else None
+
+    # Normalizar price_type a lista
+    if isinstance(price_type, str):
+        price_type = [price_type]
+
+    # Normalizar currency a lista uppercase
+    if isinstance(currency, str):
+        currency = [currency]
+    currency_list = [c.upper() for c in (currency or [])]
+
+    return iso, plat_name, price_type, currency_list
+
 
 def _build_filters_and_params(
     definition: Optional[List[str]],
     license_: Optional[List[str]],
 ) -> Tuple[str, str, List[str]]:
     """Construye filtros SQL y parámetros para las columnas derivadas (x.*)."""
-    def_filter = ""
-    lic_filter = ""
     params: List[str] = []
-
-    if definition:
-        placeholders = ", ".join(["%s"] * len(definition))
-        def_filter = f"AND COALESCE(x.definition,'') IN ({placeholders})"
-        params.extend(definition)
-
-    if license_:
-        placeholders = ", ".join(["%s"] * len(license_))
-        lic_filter = f"AND COALESCE(x.license,'') IN ({placeholders})"
-        params.extend(license_)
+    
+    def_clause, def_params = build_in_clause("COALESCE(x.definition,'')", definition)
+    def_filter = f"AND {def_clause}" if def_clause else ""
+    params.extend(def_params)
+    
+    lic_clause, lic_params = build_in_clause("COALESCE(x.license,'')", license_)
+    lic_filter = f"AND {lic_clause}" if lic_clause else ""
+    params.extend(lic_params)
 
     return def_filter, lic_filter, params
 
@@ -120,12 +137,12 @@ def tool_hits_with_quality(
     *,
     scoped_by_country: bool = True,
     fallback_when_empty: bool = True,
-) -> str:
+) -> List[Dict]:
     """Devuelve hits con filtros de calidad (definition/license)."""
     if not uid:
-        return as_tool_payload([{"error": "Falta uid"}], ident="hits + quality | missing-uid")
+        return [{"error": "Falta uid"}]
 
-    limit = max(1, min(int(limit) if isinstance(limit, int) else 50, 200))
+    limit = validate_limit(limit, default=50, max_limit=200)
     country = resolve_country_iso(country_input) if country_input else None
     resolved_definition = _resolve_definition(definition)
     resolved_license = _resolve_license(license_)
@@ -156,8 +173,7 @@ def tool_hits_with_quality(
         f"| lic={resolved_license or 'any'} | limit={limit}"
     )
 
-    payload = handle_query_result(rows, "hits + quality", ident)
-    return as_tool_payload(payload, ident=f"hits_with_quality | {ident}")
+    return handle_query_result(rows, "hits + quality", ident)
 
 
 # ================================================================
@@ -204,11 +220,10 @@ def build_presence_with_price_query(q: PresenceWithPriceQuery) -> Tuple[str, Dic
     params: Dict[str, Any] = {}
     where: List[str] = []
 
-    # Presencia activa
-    if q.active_only_presence:
-        today = q.today or date.today()
-        params["today_p"] = today
-        where.append("(p.out_on IS NULL)")
+    # Presencia activa (filtro opcional basado en today)
+    if q.today:
+        params["today_p"] = q.today
+        where.append("(p.out_on IS NULL OR p.out_on >= %(today_p)s)")
 
     # Filtros de presencia
     if q.uid:
@@ -346,14 +361,10 @@ def tool_prices_latest(*args, **kwargs):
     limit = validate_limit(kwargs.get("limit", MAX_LIMIT),
                            DEFAULT_LIMIT, MAX_LIMIT)
 
-    iso = resolve_country_iso(country) if country else None
-    plat_name = resolve_platform_name(platform_name) if platform_name else None
-
-    if isinstance(price_type, str):
-        price_type = [price_type]
-    if isinstance(currency, str):
-        currency = [currency]
-    currency = [c.upper() for c in (currency or [])]
+    # Normalizar filtros comunes
+    iso, plat_name, price_type, currency = _normalize_price_filters(
+        country, platform_name, price_type, currency
+    )
 
     # Desambiguación de __arg1
     if arg1 and not (hash_unique or uid or country):
@@ -408,18 +419,27 @@ def tool_prices_latest(*args, **kwargs):
 
     # Filtros post (EXTRA_FILTERS)
     extra_filters, post_params = "TRUE", []
-    if price_type:
-        extra_filters += f" AND price_type IN ({', '.join(['%s']*len(price_type))})"
-        post_params += price_type
-    if definition:
-        extra_filters += f" AND definition IN ({', '.join(['%s']*len(definition))})"
-        post_params += definition
-    if license_:
-        extra_filters += f" AND license IN ({', '.join(['%s']*len(license_))})"
-        post_params += license_
-    if currency:
-        extra_filters += f" AND currency IN ({', '.join(['%s']*len(currency))})"
-        post_params += currency
+
+    pt_clause, pt_params = build_in_clause("price_type", price_type)
+    if pt_clause:
+        extra_filters += f" AND {pt_clause}"
+        post_params.extend(pt_params)
+
+    def_clause, def_params = build_in_clause("definition", definition)
+    if def_clause:
+        extra_filters += f" AND {def_clause}"
+        post_params.extend(def_params)
+
+    lic_clause, lic_params = build_in_clause("license", license_)
+    if lic_clause:
+        extra_filters += f" AND {lic_clause}"
+        post_params.extend(lic_params)
+
+    curr_clause, curr_params = build_in_clause("currency", currency)
+    if curr_clause:
+        extra_filters += f" AND {curr_clause}"
+        post_params.extend(curr_params)
+
     if min_price is not None:
         extra_filters += " AND price >= %s"
         post_params.append(min_price)
@@ -461,14 +481,10 @@ def tool_prices_history(*args, **kwargs):
     max_price = kwargs.get("max_price")
     limit = validate_limit(kwargs.get("limit", 500), 500, MAX_LIMIT)
 
-    iso = resolve_country_iso(country) if country else None
-    plat_name = resolve_platform_name(platform_name) if platform_name else None
-
-    if isinstance(price_type, str):
-        price_type = [price_type]
-    if isinstance(currency, str):
-        currency = [currency]
-    currency = [c.upper() for c in (currency or [])]
+    # Normalizar filtros comunes
+    iso, plat_name, price_type, currency = _normalize_price_filters(
+        country, platform_name, price_type, currency
+    )
 
     # __arg1 heurístico
     if arg1 and not (hash_unique or uid):
@@ -517,22 +533,28 @@ def tool_prices_history(*args, **kwargs):
     if platform_code:
         where_parts.append("pr.platform_code = %s")
         params.append(platform_code)
-    if price_type:
-        where_parts.append(
-            f"pr.price_type IN ({', '.join(['%s']*len(price_type))})")
-        params += price_type
-    if definition:
-        where_parts.append(
-            f"pr.definition IN ({', '.join(['%s']*len(definition))})")
-        params += definition
-    if license_:
-        where_parts.append(
-            f"pr.license IN ({', '.join(['%s']*len(license_))})")
-        params += license_
-    if currency:
-        where_parts.append(
-            f"pr.currency IN ({', '.join(['%s']*len(currency))})")
-        params += currency
+
+    # Usar helper para cláusulas IN
+    pt_clause, pt_params = build_in_clause("pr.price_type", price_type)
+    if pt_clause:
+        where_parts.append(pt_clause)
+        params.extend(pt_params)
+
+    def_clause, def_params = build_in_clause("pr.definition", definition)
+    if def_clause:
+        where_parts.append(def_clause)
+        params.extend(def_params)
+
+    lic_clause, lic_params = build_in_clause("pr.license", license_)
+    if lic_clause:
+        where_parts.append(lic_clause)
+        params.extend(lic_params)
+
+    curr_clause, curr_params = build_in_clause("pr.currency", currency)
+    if curr_clause:
+        where_parts.append(curr_clause)
+        params.extend(curr_params)
+
     if min_price is not None:
         where_parts.append("pr.price >= %s")
         params.append(min_price)
@@ -617,10 +639,12 @@ def tool_prices_changes_last_n_days(*args, **kwargs):
     if platform_code:
         scopes.append("pr.platform_code = %s")
         scope_params.append(platform_code)
-    if price_type:
-        scopes.append(
-            f"pr.price_type IN ({', '.join(['%s']*len(price_type))})")
-        scope_params += price_type
+
+    # Usar helper para cláusula IN
+    pt_clause, pt_params = build_in_clause("pr.price_type", price_type)
+    if pt_clause:
+        scopes.append(pt_clause)
+        scope_params.extend(pt_params)
 
     where_scopes = " AND ".join(scopes) if scopes else "TRUE"
 
@@ -658,14 +682,10 @@ def tool_prices_stats(*args, **kwargs):
     license_ = _resolve_license(kwargs.get("license_"))
     currency = kwargs.get("currency")
 
-    iso = resolve_country_iso(country) if country else None
-    plat_name = resolve_platform_name(platform_name) if platform_name else None
-
-    if isinstance(currency, str):
-        currency = [currency]
-    currency = [c.upper() for c in (currency or [])]
-    if isinstance(price_type, str):
-        price_type = [price_type]
+    # Normalizar filtros comunes
+    iso, plat_name, price_type, currency = _normalize_price_filters(
+        country, platform_name, price_type, currency
+    )
 
     join_pres = (
         f"JOIN {PRES_TBL} p ON p.hash_unique = pr.hash_unique" if (
@@ -682,20 +702,27 @@ def tool_prices_stats(*args, **kwargs):
     if platform_code:
         scopes.append("pr.platform_code = %s")
         params.append(platform_code)
-    if price_type:
-        scopes.append(
-            f"pr.price_type IN ({', '.join(['%s']*len(price_type))})")
-        params += price_type
-    if definition:
-        scopes.append(
-            f"pr.definition IN ({', '.join(['%s']*len(definition))})")
-        params += definition
-    if license_:
-        scopes.append(f"pr.license IN ({', '.join(['%s']*len(license_))})")
-        params += license_
-    if currency:
-        scopes.append(f"pr.currency IN ({', '.join(['%s']*len(currency))})")
-        params += currency
+
+    # Usar helper para cláusulas IN
+    pt_clause, pt_params = build_in_clause("pr.price_type", price_type)
+    if pt_clause:
+        scopes.append(pt_clause)
+        params.extend(pt_params)
+
+    def_clause, def_params = build_in_clause("pr.definition", definition)
+    if def_clause:
+        scopes.append(def_clause)
+        params.extend(def_params)
+
+    lic_clause, lic_params = build_in_clause("pr.license", license_)
+    if lic_clause:
+        scopes.append(lic_clause)
+        params.extend(lic_params)
+
+    curr_clause, curr_params = build_in_clause("pr.currency", currency)
+    if curr_clause:
+        scopes.append(curr_clause)
+        params.extend(curr_params)
 
     where_scopes = " AND ".join(scopes) if scopes else "TRUE"
     sql = (

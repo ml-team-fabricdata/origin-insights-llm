@@ -13,8 +13,13 @@ BUILD_META = {
 }
 
 @router.post("/llm/ask")
-def ask_llm(query: str):
-    return handle_query(query)
+def ask_llm(
+    query: str,
+    user_id: str | None = None,
+    thread_id: str | None = None,
+    lang: str | None = None,
+):
+    return handle_query(query, user_id=user_id, thread_id=thread_id, lang=lang)
 
 @router.get("/llm/ping")
 def ping_llm():

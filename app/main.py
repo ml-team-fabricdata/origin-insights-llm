@@ -6,9 +6,8 @@ from pydantic import BaseModel
 
 from infra.db import db_health
 from app.supervisor import handle_query
-from app.router_determinista import router as determinista_router
 from app.router_llm import router as llm_router
-from app.router_query import router as query_router
+from app.routers.api import router as api_router
 
 # -----------------------------------------------------------------------------
 # FastAPI App
@@ -26,9 +25,8 @@ app.add_middleware(
 )
 
 # --- Routers ---
-app.include_router(determinista_router)
 app.include_router(llm_router)
-app.include_router(query_router)
+app.include_router(api_router)
 
 # -----------------------------------------------------------------------------
 # Endpoints básicos
@@ -58,7 +56,14 @@ class AskIn(BaseModel):
     query: str
     user_id: str | None = None
     lang: str | None = None
+    thread_id: str | None = None
+
 
 @app.post("/ask")
 def ask(payload: AskIn):
-    return handle_query(payload.query)
+    return handle_query(
+        payload.query,
+        user_id=payload.user_id,
+        lang=payload.lang,
+        thread_id=payload.thread_id,
+    )

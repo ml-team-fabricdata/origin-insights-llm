@@ -19,12 +19,10 @@ WITH prices_filtered AS (
   FROM {PRICES_TBL} pr
   {{JOIN_PRES}}
   WHERE {{WHERE_SCOPES}}
-  ORDER BY pr.hash_unique, pr.created_at DESC
 )
 SELECT *
 FROM prices_filtered
 WHERE {{EXTRA_FILTERS}}
-ORDER BY created_at DESC
 LIMIT %s;
 """
 

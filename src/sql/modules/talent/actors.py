@@ -5,7 +5,12 @@ from src.sql.utils.default_import import *
 from src.sql.modules.common.validation import *
 
 def get_actor_filmography(actor_id: str, limit: int = DEFAULT_LIMIT) -> Dict[str, Any]:
-    """Get an actor's filmography - sync version."""
+    """Get an actor's filmography - sync version.
+    
+    Args:
+        actor_id: Actor ID
+        limit: Maximum number of films to return (default 10, use 5 for faster response)
+    """
     
     results = db.execute_query(
         FILMOGRAPHY_SQL_ACTOR, 
@@ -15,7 +20,12 @@ def get_actor_filmography(actor_id: str, limit: int = DEFAULT_LIMIT) -> Dict[str
     return handle_query_result(results, "actor_filmography", actor_id)
 
 def get_actor_coactors(actor_id: str, limit: int = MAX_LIMIT) -> Dict[str, Any]:
-    """Get an actor's co-actors - sync version."""
+    """Get an actor's co-actors - sync version.
+    
+    Args:
+        actor_id: Actor ID
+        limit: Maximum number of co-actors to return (default 20, use 10 for faster response)
+    """
     
     results = db.execute_query(
         COACTORS_SQL, 

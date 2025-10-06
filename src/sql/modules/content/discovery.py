@@ -37,7 +37,7 @@ def get_title_rating(uid: str, country: Optional[str] = None) -> List[Dict[str, 
 
     Args:
         uid: Identificador único del título
-        country: Código de país opcional (ISO-2) para rating específico por país
+        country: Código de país opcional (ISO-2) o región (e.g., 'US', 'LATAM', 'EU') para rating específico
 
     Returns:
         Lista de diccionarios con información de rating.
@@ -64,11 +64,42 @@ def get_title_rating(uid: str, country: Optional[str] = None) -> List[Dict[str, 
         return handle_query_result(results, "title rating global", uid)
     
     country = country.strip() if isinstance(country, str) else str(country).strip()
+    
+    # Try to resolve as region first
+    region_isos = get_region_iso_list(country)
+    if region_isos:
+        # Handle region with multiple countries
+        if len(region_isos) == 1:
+            results = db.execute_query(RATING_QUERY_COUNTRY, (uid, region_isos[0]))
+            if results is None:
+                logger.error(f"Database query failed for country rating UID: {uid}, country: {region_isos[0]}")
+                return [{"error": "Database query failed"}]
+            logger.info(f"Country rating queried for {uid}:{region_isos[0]}, results: {len(results)}")
+            return handle_query_result(results, "title rating by country", uid)
+        else:
+            # Multiple countries - aggregate results
+            all_results = []
+            for iso in region_isos:
+                results = db.execute_query(RATING_QUERY_COUNTRY, (uid, iso))
+                if results:
+                    # Add country info to each result
+                    for r in results:
+                        r['queried_country'] = iso
+                    all_results.extend(results)
+            
+            if not all_results:
+                logger.info(f"No rating found for {uid} in region {country}")
+                return [{"message": f"No rating found for UID {uid} in region {country}"}]
+            
+            logger.info(f"Region rating queried for {uid}:{country}, results: {len(all_results)}")
+            return all_results
+    
+    # Try as individual country
     resolved_country_iso = resolve_country_iso(country)
     
     if not resolved_country_iso:
-        logger.warning(f"Invalid country code provided: {country}")
-        return [{"error": f"Invalid country code: {country}"}]
+        logger.warning(f"Invalid country code or region provided: {country}")
+        return [{"error": f"Invalid country code or region: {country}"}]
     
     results = db.execute_query(RATING_QUERY_COUNTRY, (uid, resolved_country_iso))
     

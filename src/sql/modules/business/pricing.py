@@ -308,7 +308,7 @@ def query_presence_with_price(**kwargs) -> List[Dict[str, Any]]:
 
 def tool_prices_latest(*args, **kwargs):
     """Últimos precios con filtros flexibles (hash/uid/país/plataforma, etc.)."""
-    kwargs = _normalize_tool_call(args, kwargs)
+    kwargs = normalize_args_kwargs(args, kwargs)
     arg1 = kwargs.get("__arg1")
     hash_unique = kwargs.get("hash_unique")
     uid = kwargs.get("uid")
@@ -533,7 +533,7 @@ def tool_prices_history(*args, **kwargs):
 
 def tool_prices_changes_last_n_days(*args, **kwargs):
     """Cambios de precio en los últimos N días (up/down/all)."""
-    kwargs = _normalize_tool_call(args, kwargs)
+    kwargs = normalize_args_kwargs(args, kwargs)
     arg1 = kwargs.get("__arg1")
     hash_unique = kwargs.get("hash_unique")
     uid = kwargs.get("uid")

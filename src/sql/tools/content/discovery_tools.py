@@ -10,7 +10,12 @@ FILMOGRAPHY_UID_TOOL = Tool(
 
 TITLE_RATING_TOOL = Tool.from_function(
     name="get_title_rating",
-    description=f"Get rating and popularity metrics for a title by UID. Supports global ratings or country-specific ratings (provide ISO-2 country code). Returns total hits, average hits, and hit count from popularity data. {POLICY_TITLE}",
+    description=(
+        f"Get rating and popularity metrics for a title by UID. "
+        f"Supports global ratings or country/region-specific ratings (provide ISO-2 country code OR region name like 'LATAM', 'EU'). "
+        f"Supports regions: LATAM/latin_america, EU, north_america, south_america, europe, asia, africa, oceania. "
+        f"Returns total hits, average hits, and hit count from popularity data. {POLICY_TITLE}"
+    ),
     func=get_title_rating,
 )
 

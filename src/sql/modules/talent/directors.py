@@ -5,7 +5,12 @@ from src.sql.utils.default_import import *
 from src.sql.modules.common.validation import *
 
 def get_director_filmography(director_id: str, limit: int = DEFAULT_LIMIT) -> Dict[str, Any]:
-    """Get a director's filmography - sync version."""
+    """Get a director's filmography - sync version.
+    
+    Args:
+        director_id: Director ID
+        limit: Maximum number of films to return (default 10, use 5 for faster response)
+    """
    
     results = db.execute_query(
         FILMOGRAPHY_SQL_DIRECTOR,
@@ -15,7 +20,12 @@ def get_director_filmography(director_id: str, limit: int = DEFAULT_LIMIT) -> Di
     return handle_query_result(results, "director_filmography", director_id)
 
 def get_director_collaborators(director_id: str, limit: int = MAX_LIMIT) -> Dict[str, Any]:
-    """Get a director's collaborators (actors they've worked with) - sync version."""
+    """Get a director's collaborators (co-directors) - sync version.
+    
+    Args:
+        director_id: Director ID
+        limit: Maximum number of collaborators to return (default 20, use 10 for faster response)
+    """
    
     results = db.execute_query(
         CODIRECTORS_SQL,
@@ -28,7 +38,12 @@ def get_director_filmography_by_name(
     director_name: Union[str, List[str], Any],
     limit: int = DEFAULT_LIMIT
 ) -> str:
-    """Get director filmography by name with validation - sync version."""
+    """Get director filmography by name with validation - sync version.
+    
+    Args:
+        director_name: Director name
+        limit: Maximum number of films to return (default 10, use 5 for faster response)
+    """
     validation = validate_director(director_name)
    
     if validation["status"] == "ok":

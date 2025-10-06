@@ -288,11 +288,11 @@ def get_hashes_by_uid(uid: str, pres_tbl: str, *, iso: Optional[str] = None, pla
         return []
     where, params = ["p.uid = %s"], [uid]
     if iso:
-        where.append("LOWER(p.iso_alpha2) = %s")
-        params.append(iso.lower())
+        where.append("p.iso_alpha2 = %s")
+        params.append(iso)
     if platform_name:
         where.append("LOWER(p.platform_name) = %s")
-        params.append(platform_name)
+        params.append(platform_name.lower())
     sql = f"SELECT DISTINCT p.hash_unique FROM {pres_tbl} p WHERE " + " AND ".join(
         where)
     rows = db.execute_query(sql, tuple(params)) or []

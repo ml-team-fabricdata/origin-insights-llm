@@ -9,7 +9,8 @@ METADATA_COUNT_TOOL = Tool.from_function(
     name="metadata_simple_all_count",
     description=(
         "Get SIMPLE COUNT of titles in metadata catalog (single number only). "
-        "Filters: type (Movie/Series), country (ISO-2), year_from, year_to. "
+        "Filters: type (Movie/Series), country (ISO-2 OR region like 'LATAM', 'EU'), year_from, year_to. "
+        "Supports regions: LATAM/latin_america, EU, north_america, south_america, europe, asia, africa, oceania. "
         "Returns only total count. Use for quick counts. For detailed statistics (year ranges, durations), use metadata_simple_all_stats instead."
     ),
     func=tool_metadata_count,
@@ -29,7 +30,8 @@ METADATA_STATS_TOOL = Tool.from_function(
     description=(
         "Get STATISTICAL SUMMARY of metadata catalog (5 metrics). "
         "Returns: total count, min_year, max_year, avg_duration, median_duration. "
-        "Filters: type (Movie/Series), country (ISO-2), year range. "
+        "Filters: type (Movie/Series), country (ISO-2 OR region like 'LATAM', 'EU'), year range. "
+        "Supports regions: LATAM/latin_america, EU, north_america, south_america, europe, asia, africa, oceania. "
         "Use for catalog overview. For simple count only, use metadata_simple_all_count instead."
     ),
     func=tool_metadata_stats,
@@ -39,9 +41,10 @@ METADATA_QUERY_TOOL = Tool.from_function(
     name="metadata_simple_all_query",
     description=(
         "Advanced metadata search with comprehensive filtering and pagination. "
-        "Filters: type (Movie/Series), countries_iso (ISO-2), year_from/year_to, "
+        "Filters: type (Movie/Series), countries_iso (ISO-2 OR region like 'LATAM', 'EU'), year_from/year_to, "
         "duration_min/duration_max, age rating, primary_genre, title_like/synopsis_like (text search), "
         "languages_any/countries_iso_any/directors_any/writers_any/cast_any (array searches). "
+        "Supports regions: LATAM/latin_america, EU, north_america, south_america, europe, asia, africa, oceania. "
         "Supports: custom field selection (select=[]), ordering (order_by, order_dir), "
         "pagination (limit, offset), and count_only=True for totals. Returns complete title metadata."
     ),

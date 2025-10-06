@@ -73,7 +73,22 @@ def get_select_fields(requested_fields: Optional[List[str]] = None) -> List[str]
 
 def presence_count(country: str = None, platform_name: str = None, uid: str = None, 
                   type: str = None, title_like: str = None) -> List[Dict]:
-    """Count presence records with optional filters"""
+    """Get SIMPLE COUNT of content presence records (single number only).
+    
+    Filters: country (ISO-2), platform_name, uid, type (Movie/Series), title_like.
+    Returns only total count of matching records.
+    Use this for quick counts without detailed data.
+    
+    Args:
+        country: Country ISO-2 code (optional)
+        platform_name: Platform name (optional)
+        uid: Unique identifier (optional)
+        type: Content type - Movie or Series (optional)
+        title_like: Title search pattern (optional)
+    
+    Returns:
+        List with single dict containing count
+    """
     
     filters = {
         "country": country,
@@ -94,7 +109,25 @@ def presence_count(country: str = None, platform_name: str = None, uid: str = No
 def presence_list(country: str = None, platform_name: str = None, type: str = None,
                  title_like: str = None, limit: int = 25, offset: int = 0,
                  order_by: str = "clean_title", order_dir: str = "ASC") -> List[Dict]:
-    """List presence records with pagination and filtering"""
+    """List content presence records with pagination and ordering.
+    
+    Filters: country (ISO-2), platform_name, type (Movie/Series), title_like.
+    Supports pagination (limit, offset) and ordering (order_by with allowed fields, order_dir: ASC/DESC).
+    Returns detailed presence information including title, uid, platform details, country, duration, and availability status.
+    
+    Args:
+        country: Country ISO-2 code (optional)
+        platform_name: Platform name (optional)
+        type: Content type - Movie or Series (optional)
+        title_like: Title search pattern (optional)
+        limit: Maximum results (default 25)
+        offset: Pagination offset (default 0)
+        order_by: Field to order by (default 'clean_title')
+        order_dir: Order direction - ASC or DESC (default 'ASC')
+    
+    Returns:
+        List of presence records with detailed information
+    """
     
     filters = {
         "country": country,
@@ -133,7 +166,22 @@ def presence_list(country: str = None, platform_name: str = None, type: str = No
 
 def presence_distinct(column: str, country: str = None, platform_name: str = None,
                      type: str = None, limit: int = 100) -> List[Dict]:
-    """Get distinct values from content presence table columns"""
+    """Get distinct/unique values from presence table columns.
+    
+    Specify column parameter from allowed list: iso_alpha2, plan_name, platform_code, platform_name, type, content_type.
+    Supports optional filters: country, platform_name, type.
+    Returns unique values for the specified column, useful for discovering available options and filter values.
+    
+    Args:
+        column: Column name to get distinct values from (required)
+        country: Country ISO-2 code filter (optional)
+        platform_name: Platform name filter (optional)
+        type: Content type filter (optional)
+        limit: Maximum results (default 100)
+    
+    Returns:
+        List of distinct values for the specified column
+    """
     
     if not column:
         return [{"message": "Column parameter is required"}]
@@ -164,7 +212,21 @@ def presence_distinct(column: str, country: str = None, platform_name: str = Non
     return result if result else [{"message": "No results found", "column": column}]
 
 def presence_statistics(country: str = None, platform_name: str = None, type: str = None) -> List[Dict]:
-    """Get statistical summary of presence data"""
+    """Get COMPREHENSIVE STATISTICAL summary of content presence (10+ metrics).
+    
+    Returns: total_records, unique_platforms, unique_countries, unique_content, avg/median duration,
+    exclusive_count, kids_count, movies_count, series_count.
+    Filters: country, platform_name, type.
+    Use for detailed analysis. For simple count only, use presence_count instead.
+    
+    Args:
+        country: Country ISO-2 code filter (optional)
+        platform_name: Platform name filter (optional)
+        type: Content type filter - Movie or Series (optional)
+    
+    Returns:
+        List with comprehensive statistical metrics
+    """
     
     filters = {
         "country": country,
@@ -181,7 +243,19 @@ def presence_statistics(country: str = None, platform_name: str = None, type: st
     return result if result else [{"message": "No results found"}]
 
 def platform_count_by_country(country: str = None) -> List[Dict]:
-    """Get count of platforms by country or for a specific country"""
+    """Get QUICK COUNT of streaming platforms by country (lightweight query).
+    
+    If country (ISO-2) specified: returns platform_count + platforms array for that country.
+    If no country: returns platform_count for ALL countries sorted by count.
+    Use this for simple platform counting. For detailed statistics including content counts,
+    use country_platform_summary instead.
+    
+    Args:
+        country: Country ISO-2 code (optional). If not provided, returns all countries.
+    
+    Returns:
+        List with platform counts by country
+    """
     
     if country:
         country_iso = resolve_country_iso(country)
@@ -199,7 +273,19 @@ def platform_count_by_country(country: str = None) -> List[Dict]:
     return result if result else [{"message": "No results found"}]
 
 def country_platform_summary(country: str = None) -> List[Dict]:
-    """Get summary statistics of platforms and content by country or region"""
+    """Get COMPREHENSIVE DETAILED summary of platforms and content by country/region (complete analysis).
+    
+    Returns per country: unique_platforms (count), unique_content (count), total_records,
+    movies count, series count, exclusive_content count, and platforms array.
+    Supports country/region filtering or global summary.
+    Use this for detailed market analysis. For simple platform counting only, use platform_count_by_country instead.
+    
+    Args:
+        country: Country ISO-2 code or region name (optional). If not provided, returns global summary.
+    
+    Returns:
+        List with comprehensive platform and content statistics by country
+    """
    
     country_condition = ""
     params = ()

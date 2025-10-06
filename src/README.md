@@ -19,222 +19,335 @@ src/
 │   └── prompt.py
 ├── sql/                   # Main SQL and database logic
 │   ├── __init__.py
-│   ├── core/              # Core system logic (validation, admin, queries)
-│   │   ├── admin.py
-│   │   ├── validation.py
-│   │   ├── queries.py
-│   │   └── ...
-│   ├── modules/           # Domain modules
+│   ├── modules/           # Domain modules (business logic)
 │   │   ├── business/      # Business analytics, pricing, rankings
-│   │   │   ├── intelligence.py
-│   │   │   ├── pricing.py
-│   │   │   ├── rankings.py
-│   │   │   └── ...
-│   │   ├── common/        # Shared logic (admin, query detection, validation)
-│   │   │   ├── admin.py
-│   │   │   ├── query_detection.py
-│   │   │   ├── query_handler.py
-│   │   │   ├── validation.py
-│   │   │   └── ...
+│   │   │   ├── intelligence.py    # Market analysis, catalog comparisons
+│   │   │   ├── pricing.py         # Price queries, stats, changes
+│   │   │   └── rankings.py        # Genre momentum, top content
+│   │   ├── common/        # Shared logic (admin, validation)
+│   │   │   ├── admin.py           # SQL builder, executor, system management
+│   │   │   └── validation.py      # Title, actor, director validation
 │   │   ├── content/       # Content discovery and metadata
-│   │   │   ├── discovery.py
-│   │   │   ├── metadata.py
-│   │   │   └── ...
+│   │   │   ├── discovery.py       # Filmography, ratings
+│   │   │   └── metadata.py        # Metadata queries, counts, lists
 │   │   ├── platform/      # Platform availability and presence
-│   │   │   ├── availability.py
-│   │   │   ├── presence.py
-│   │   │   └── ...
-│   │   ├── talent/        # Talent (actors, directors, collaborations)
-│   │   │   ├── actors.py
-│   │   │   ├── directors.py
-│   │   │   ├── collaborations.py
-│   │   │   └── ...
+│   │   │   ├── availability.py    # Availability by UID, exclusives, premieres
+│   │   │   └── presence.py        # Presence queries, counts, distinct values
+│   │   └── talent/        # Talent (actors, directors, collaborations)
+│   │       ├── actors.py          # Actor filmography, co-actors
+│   │       ├── directors.py       # Director filmography, collaborators
+│   │       └── collaborations.py  # Actor-director common projects
 │   ├── queries/           # Centralized SQL query templates
 │   │   ├── business/
+│   │   │   ├── intelligence_queries.py
+│   │   │   ├── pricing_queries.py
+│   │   │   └── rankings_queries.py
 │   │   ├── common/
+│   │   │   └── queries_validation.py
 │   │   ├── content/
+│   │   │   ├── queries_discovery.py
+│   │   │   └── queries_metadata.py
 │   │   ├── platform/
-│   │   ├── talent/
-│   │   └── ...
-│   ├── tools/             # Tool wrappers for each domain
-│   │   ├── all_tools.py
+│   │   │   ├── queries_availability.py
+│   │   │   └── queries_presence.py
+│   │   └── talent/
+│   │       ├── queries_actors.py
+│   │       ├── queries_directors.py
+│   │       └── queries_collaborations.py
+│   ├── tools/             # LangChain tool wrappers for each domain
+│   │   ├── all_tools.py           # Aggregates all tools
 │   │   ├── business/
+│   │   │   ├── intelligence_tools.py
+│   │   │   ├── pricing_tools.py
+│   │   │   └── rankings_tools.py
 │   │   ├── common/
+│   │   │   ├── admin_tools.py
+│   │   │   └── validation_tools.py
 │   │   ├── content/
+│   │   │   ├── discovery_tools.py
+│   │   │   └── metadata_tools.py
 │   │   ├── platform/
-│   │   ├── talent/
-│   │   └── ...
-│   ├── utils/             # Shared utilities
-│   │   ├── constants_sql.py
-│   │   ├── db_utils_sql.py
-│   │   ├── default_import.py
-│   │   ├── sql_db.py
-│   │   ├── table_constants.py
-│   │   ├── validators_shared.py
-│   │   └── ...
-│   └── __init__.py
+│   │   │   ├── availability_tools.py
+│   │   │   └── presence_tools.py
+│   │   └── talent/
+│   │       ├── actors_tools.py
+│   │       ├── directors_tools.py
+│   │       └── collaborations_tools.py
+│   └── utils/             # Shared utilities
+│       ├── constants_sql.py       # DB tables, limits, regions, policies
+│       ├── db_utils_sql.py        # Query helpers, fuzzy matching, validation
+│       ├── default_import.py      # Common imports
+│       ├── sql_db.py              # DB connection manager
+│       └── validators_shared.py   # Country/platform/region resolvers
 └── __init__.py
 ```
 
 
 ## SQL Module Documentation
 
-### Core Module (`sql/core/`)
+### Common Module (`sql/modules/common/`)
 
 **validation.py**
-- Title, actor, and director validation (exact/fuzzy matching, similarity, count-based)
+- Title, actor, and director validation
+- Exact and fuzzy matching with RapidFuzz
+- Similarity scoring and ambiguity resolution
+- Functions: `validate_title()`, `validate_actor()`, `validate_director()`
 
 **admin.py**
-- System management, administrative operations
-
-**queries.py**
-- Centralized query logic for core system operations
+- SQL query builder and executor
+- System management and administrative operations
+- Dynamic SQL generation with safety checks
+- Functions: `build_sql()`, `run_sql()`
 
 ### Business Module (`sql/modules/business/`)
 
 **intelligence.py**
-- Market analysis, performance metrics, business insights
+- Market analysis and catalog comparisons
+- Platform exclusivity analysis by country
+- Catalog similarity between platforms
+- Content gap analysis (titles in A not in B)
+- Functions: `platform_exclusivity_country()`, `catalog_similarity()`, `titles_in_A_not_in_B_sql()`
 
 **pricing.py**
-- Price analysis, strategy, market rate comparisons
+- Price queries with latest, history, and changes tracking
+- Price statistics (min, max, avg, median, percentiles)
+- Presence with price information (JOIN with prices table)
+- Hits with quality filters (definition, license)
+- Functions: `query_presence_with_price()`, `tool_prices_latest()`, `tool_prices_history()`, `tool_prices_changes_last_n_days()`, `tool_prices_stats()`, `tool_hits_with_quality()`
 
 **rankings.py**
-- Content and platform rankings, popularity metrics
+- Genre momentum analysis (growth comparison between periods)
+- Top content by presence or global hits
+- Rolling window calculations for time-based rankings
+- Functions: `get_genre_momentum()`, `top_by_uid()`, `compute_window_anchored_to_table()`
 
 ### Content Module (`sql/modules/content/`)
 
 **discovery.py**
-- Content recommendation, similarity search, topic-based queries
+- Content filmography by UID
+- Title ratings and popularity metrics
+- Functions: `get_filmography_by_uid()`, `get_title_rating()`
 
 **metadata.py**
-- Metadata extraction, processing, standardization
+- Metadata queries with flexible filtering
+- Count, list, and distinct value queries
+- Support for type, year, genre, language, country filters
+- Functions: `query_metadata_count()`, `query_metadata_list()`, `query_metadata_distinct()`
 
 ### Platform Module (`sql/modules/platform/`)
 
 **availability.py**
-- Content availability by ID, summary formatting, platform checks
+- Content availability by UID with country/region support
+- **NEW: Region support (LATAM, EU, etc.) - expands to multiple countries**
+- Platform exclusives by country
+- Recent premieres by country (last 7 days)
+- Price information integration (optional)
+- Functions: `get_availability_by_uid()`, `query_platforms_for_uid_by_country()`, `get_platform_exclusives()`, `get_recent_premieres_by_country()`
 
 **presence.py**
-- Content presence verification, coverage analysis, distribution tracking
+- Presence queries with count, list, and distinct operations
+- Platform and country filtering
+- Active/inactive presence tracking
+- Functions: `query_presence_count()`, `query_presence_list()`, `query_presence_distinct()`
 
 ### Talent Module (`sql/modules/talent/`)
 
 **actors.py**
-- Actor lookup, validation, filmography, performance tracking
+- Actor filmography by name or ID
+- Co-actors analysis (actors who worked together)
+- **Validation: Checks if actor exists before querying**
+- Functions: `get_actor_filmography()`, `get_actor_filmography_by_name()`, `get_actor_coactors()`, `get_actor_coactors_by_name()`
 
 **directors.py**
-- Director validation, filmography, project management
+- Director filmography by name or ID
+- Director collaborators (co-directors on same films)
+- **Validation: Checks if director exists before querying**
+- Functions: `get_director_filmography()`, `get_director_filmography_by_name()`, `get_director_collaborators()`
 
 **collaborations.py**
-- Actor-director partnerships, team analytics, project connections
+- Common projects between actors and directors
+- Collaboration analysis by IDs or names
+- Functions: `get_common_projects_actor_director()`, `get_common_projects_actor_director_by_name()`
 
 ### Utility Modules (`sql/utils/`)
 
-**db_utils_sql.py**
-- Core DB functions, connection pool, query execution
-
 **constants_sql.py**
-- Query templates, DB configs, system parameters
+- Database schemas and table names (`META_TBL`, `PRES_TBL`, `PRICES_TBL`, `HITS_PRESENCE_TBL`, etc.)
+- Query defaults and limits (`DEFAULT_LIMIT`, `MAX_LIMIT`, `DEFAULT_DAYS_BACK`)
+- Fuzzy search configuration (`FUZZY_THRESHOLD`, `MAX_CANDIDATES`)
+- Column whitelists by table (for security)
+- Content definitions and licenses (`VALID_DEFINITIONS`, `VALID_LICENSES`)
+- **Geographical regions** (`REGION_TO_ISO2`, `REGION_ALIASES`) - LATAM, EU, Asia, etc.
+- System policies and validation rules
+
+**db_utils_sql.py**
+- Input validation functions (`validate_limit()`, `validate_days_back()`, `normalize_input()`)
+- Text processing and normalization (`normalize()`, `clean_text()`)
+- **Fuzzy matching with RapidFuzz** (`best_match_rapidfuzz()`, `resolve_value_rapidfuzz()`)
+- CJK-aware tokenization for multilingual support
+- Date and time functions (`get_date_range()`, `parse_time_to_days()`)
+- Data handling functions (`handle_query_result()`, `format_validation_options()`)
+- SQL helpers (`build_like_pattern()`, `build_in_clause()`)
 
 **validators_shared.py**
-- Input sanitization, data validation, format verification
+- Country and platform resolution (`resolve_country_iso()`, `resolve_platform_name()`)
+- **Region to ISO list conversion** (`get_region_iso_list()`, `resolve_region_isos()`)
+- UID and country parsing (`parse_uid_with_country()`)
+- Validation data caching for performance
 
-**default_import.py, sql_db.py, table_constants.py**
-- Shared imports, DB logic, table constants
+**sql_db.py**
+- PostgreSQL connection manager (`SQLConnectionManager`)
+- AWS Secrets Manager integration for credentials
+- Connection pooling and retry logic
+- Query execution with error handling
+- Functions: `get_secret()`, `execute_query()`
 
-## Directory Structure
+**default_import.py**
+- Common imports for all modules
+- Standard library imports (json, logging, datetime, etc.)
+- Third-party imports (RapidFuzz, psycopg2, etc.)
+- Type hints and typing utilities
 
+## Tools Layer (`sql/tools/`)
 
-### Core Components
+The tools layer provides LangChain-compatible wrappers for all SQL functions, enabling easy integration with LLM agents.
 
-#### `/sql` - SQL Related Modules
-Organized for code reuse and minimal redundancy:
+### Tool Organization
 
-**core/**
-- `admin.py`: Administrative operations and system management
-- `validation.py`: Central validation logic for all entities
-- `queries.py`: Core system queries and logic
+**all_tools.py**
+- Aggregates all tools from all domains
+- Exports: `ALL_SQL_TOOLS`, `ALL_BUSINESS_TOOLS`, `ALL_CONTENT_TOOLS`, `ALL_PLATFORM_TOOLS`, `ALL_TALENT_TOOLS`, `ALL_COMMON_TOOLS`
+- Total: ~40+ tools available
 
-**modules/**
-- `business/`: Business analytics, pricing, and rankings
-- `common/`: Shared admin, query detection, and validation
-- `content/`: Content discovery and metadata
-- `platform/`: Platform availability and presence
-- `talent/`: Actor, director, and collaboration management
+### Tool Categories
 
-**queries/**
-- Centralized SQL query templates, organized by domain (business, content, platform, talent)
+**Business Tools** (`business/`)
+- `intelligence_tools.py`: Platform exclusivity, catalog similarity, gap analysis
+- `pricing_tools.py`: Price queries, stats, changes, hits with quality
+- `rankings_tools.py`: Genre momentum, top content rankings
 
-**tools/**
-- Tool wrappers for each domain, enabling modular access to business, content, platform, and talent logic
+**Common Tools** (`common/`)
+- `admin_tools.py`: SQL builder and executor for dynamic queries
+- `validation_tools.py`: Title, actor, director validation
 
-**utils/**
-- Shared utilities for database operations, validation, constants, and configuration
+**Content Tools** (`content/`)
+- `discovery_tools.py`: Filmography, ratings
+- `metadata_tools.py`: Metadata count, list, distinct queries
 
-**data/**
-- Reference data files in JSONL format for currencies, platforms, countries, genres
+**Platform Tools** (`platform/`)
+- `availability_tools.py`: Availability by UID (with region support), exclusives, premieres
+- `presence_tools.py`: Presence count, list, distinct queries
 
-**embedding/**
-- Embedding models and related operations
+**Talent Tools** (`talent/`)
+- `actors_tools.py`: Actor filmography, co-actors
+- `directors_tools.py`: Director filmography, collaborators
+- `collaborations_tools.py`: Actor-director common projects
 
-**prompt_templates/**
-- Prompt templates and configuration for LLMs and automation
+### Tool Features
 
-#### `/data` - Data Files
-Contains essential data files in JSONL format:
-- `currency.jsonl` - Currency reference data
-- `platform_name_iso.jsonl` - Platform names with ISO codes
-- `platform_name.jsonl` - Platform naming references
-- `primary_country.jsonl` - Country reference data
-- `primary_genre.jsonl` - Genre classification data
+- **Type Safety**: All tools use `StructuredTool` or `Tool.from_function()` with proper schemas
+- **Error Handling**: Consistent error messages and validation
+- **Documentation**: Each tool has detailed descriptions for LLM understanding
+- **Region Support**: Platform tools support both individual countries and regions (LATAM, EU, etc.)
 
-#### `/embedding` 
-Directory for embedding-related operations and models
+## Queries Layer (`sql/queries/`)
 
-#### `/prompt_templates`
-- `prompt.py` - Contains prompt templates and configurations
+Centralized SQL query templates organized by domain. Each query file contains parameterized SQL strings using f-strings and placeholders.
 
-### Utility Components
+### Query Organization
 
-#### Shared Utilities (`/sql/utils/`)
-Centralized utilities to avoid code duplication:
+**business/**
+- `intelligence_queries.py`: Market analysis queries
+- `pricing_queries.py`: Price-related queries with JOINs
+- `rankings_queries.py`: Genre momentum, top content, max date queries
 
-- **Database Operations**
-  - `db_utils.py` - Connection management and query execution
-  - `sql_db.py` - Core database operations
-  - `connection_pool.py` - Database connection pooling
+**common/**
+- `queries_validation.py`: Title, actor, director search queries (exact and fuzzy)
 
-- **Validation & Processing**
-  - `validators.py` - Common validation functions
-  - `formatters.py` - Data formatting utilities
-  - `sanitizers.py` - Input sanitization
+**content/**
+- `queries_discovery.py`: Filmography and rating queries
+- `queries_metadata.py`: Metadata queries with flexible filtering
 
-- **Configuration**
-  - `constants.py` - System-wide constants
-  - `config.py` - Configuration management
-  - `defaults.py` - Default settings and imports
+**platform/**
+- `queries_availability.py`: Availability queries with/without prices
+- `queries_presence.py`: Presence queries with various aggregations
+
+**talent/**
+- `queries_actors.py`: Actor filmography and co-actors queries
+- `queries_directors.py`: Director filmography and collaborators queries
+- `queries_collaborations.py`: Actor-director collaboration queries
+
+### Query Features
+
+- **Parameterized**: Use `%s` placeholders for safe parameter binding
+- **Template Strings**: Use f-strings for table names from `constants_sql.py`
+- **Flexible Filtering**: Support dynamic WHERE clauses via `{placeholder}` format
+- **Performance**: Optimized with proper JOINs, indexes, and LIMIT clauses
 
 ## Key Features
 
-### Data Validation
+### 🔍 Data Validation
 The system includes robust validation for:
-- Directors and actors
-- Content titles
-- Platform availability
-- Business intelligence data
+- **Titles**: Exact and fuzzy matching with similarity scoring
+- **Actors**: Name validation with disambiguation
+- **Directors**: Name validation with title count ranking
+- **Countries**: ISO-2 code resolution with fuzzy matching
+- **Platforms**: Platform name normalization and validation
+- **Regions**: Support for LATAM, EU, Asia, and other multi-country regions
 
-### Database Operations
-- Structured query organization by domain
-- Utility functions for database operations
-- Connection management and pooling
+### 🗄️ Database Operations
+- **Connection Management**: PostgreSQL with AWS Secrets Manager integration
+- **Query Organization**: Centralized SQL templates by domain
+- **Safety**: Parameterized queries, column whitelists, input sanitization
+- **Performance**: Connection pooling, retry logic, optimized queries
+- **Multilingual**: CJK-aware text processing and tokenization
 
-### Content Management
-- Content discovery and recommendations
-- Metadata handling
-- Availability tracking across platforms
+### 📊 Content Management
+- **Discovery**: Filmography by UID, title ratings, popularity metrics
+- **Metadata**: Flexible filtering by type, year, genre, language, country
+- **Availability**: Platform availability with country/region support
+- **Presence**: Active/inactive tracking, platform distribution analysis
 
-### Business Intelligence
-- Pricing analysis
-- Rankings and performance metrics
-- Analytics and reporting tools
+### 💼 Business Intelligence
+- **Pricing**: Latest prices, history, changes, statistics (min/max/avg/median/percentiles)
+- **Rankings**: Genre momentum, top content by presence or global hits
+- **Intelligence**: Platform exclusivity, catalog similarity, content gap analysis
+- **Quality Filters**: Hits with definition (4K/HD/SD) and license (EST/VOD) filters
+
+### 🎭 Talent Analysis
+- **Actors**: Filmography, co-actors who worked together
+- **Directors**: Filmography, co-directors on same films
+- **Collaborations**: Common projects between actors and directors
+- **Validation**: Existence checks before querying to provide helpful error messages
+
+### 🌍 Region Support (NEW)
+- **Multi-Country Queries**: Single parameter expands to multiple countries
+- **Supported Regions**: 
+  - LATAM/latin_america (20+ countries)
+  - EU (27 countries)
+  - Europe, Asia, Africa, Oceania
+  - North/South/Central America
+  - Middle East, Caribbean
+- **Automatic Expansion**: `country="LATAM"` → queries all Latin American countries
+- **Backward Compatible**: Still supports individual country codes (US, AR, BR, etc.)
+
+## Architecture Patterns
+
+### Separation of Concerns
+- **Queries**: Pure SQL templates (no business logic)
+- **Modules**: Business logic and data processing
+- **Tools**: LangChain wrappers for LLM integration
+- **Utils**: Shared utilities and helpers
+
+### Error Handling
+- Consistent error message format
+- Validation before expensive queries
+- Helpful suggestions when entities not found
+- Graceful degradation for missing data
+
+### Code Reuse
+- Shared validation logic in `validators_shared.py`
+- Common query patterns in `db_utils_sql.py`
+- Centralized constants in `constants_sql.py`
+- Default imports in `default_import.py`
 

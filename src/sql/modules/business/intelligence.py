@@ -9,6 +9,19 @@ def get_platform_exclusivity_by_country(
     country: str,
     limit: int = 100,
 ) -> List[Dict]:
+    """Count of exclusive titles for a platform in a given country (ISO-2).
+    
+    Returns a JSON-serializable list of rows showing titles that are exclusive to the specified platform
+    in the given country. Useful for market analysis and competitive intelligence.
+    
+    Args:
+        platform_name: Name of the platform
+        country: Country ISO-2 code
+        limit: Maximum number of results (default 100, max 1000)
+    
+    Returns:
+        List of exclusive titles with metadata
+    """
     if not platform_name or not country:
         return [{"message": "platform_name and country (ISO-2) required."}]
 
@@ -31,6 +44,21 @@ def catalog_similarity_for_platform(
     iso_b: Any = None,
     __arg1: Any = None
 ) -> Dict[str, Any]:
+    """Similarity of a platform's catalog between two countries (ISO-2).
+    
+    Returns totals, shared/unique counts, and similarity_percentage (0–100).
+    Compares the content catalog of a platform across two different countries to identify
+    overlap and differences. Useful for understanding regional content strategies.
+    
+    Args:
+        platform: Platform name
+        iso_a: First country ISO-2 code
+        iso_b: Second country ISO-2 code
+        __arg1: Alternative combined format (optional)
+    
+    Returns:
+        Dict with similarity metrics and counts
+    """
     if not all([platform, iso_a, iso_b]) and __arg1:
         s = str(__arg1).strip()
         parts = [p.strip() for p in s.replace(
@@ -100,7 +128,23 @@ def titles_in_A_not_in_B_sql(
     platform: Optional[str] = None,
     limit: int = 50,
 ) -> List[Dict]:
-    """Get titles available in country/region A but not in country/region B."""
+    """Find titles available on a platform in location A but NOT in location B.
+    
+    Both parameters accept either individual countries (ISO-2 codes like 'US', 'JP', 'MX')
+    or regions ('LATAM', 'EU', 'ASIA', 'OCEANIA', 'AFRICA', 'MENA').
+    Optional platform filter (e.g., 'netflix', 'prime', 'disney+') applies to both locations.
+    Examples: US vs JP, US vs ASIA, LATAM vs EU, MX vs LATAM.
+    Returns up to 'limit' titles (default 50, max 200).
+    
+    Args:
+        country_in: Country/region where titles ARE available
+        country_not_in: Country/region where titles are NOT available
+        platform: Optional platform filter (applies to both locations)
+        limit: Maximum results (default 50, max 200)
+    
+    Returns:
+        List of titles available in A but not in B
+    """
 
     isos_in = resolve_region_isos(country_in) or [
         resolve_country_iso(country_in)]

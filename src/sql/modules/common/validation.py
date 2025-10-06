@@ -272,13 +272,24 @@ def search_title_fuzzy(
 
     params = (normalized_title, threshold, threshold, threshold, limit)
     return db.execute_query(FUZZY_SEARCH_SQL, params, "fuzzy search")
-
 def search_title(title: str, *, threshold: float = DEFAULT_FUZZY_THRESHOLD) -> Dict[str, Any]:
     """Searches for a title with validation."""
     return validate_title(title, threshold)
 
 def validate_title(title: str, threshold: Optional[float] = None) -> Dict[str, Any]:
-    """Validates a movie/TV show title."""
+    """Valida y resuelve títulos para asegurar una identificación única.
+    
+    Validates and resolves movie/TV show titles for unique identification.
+    Returns status 'ok' with UID if found, 'ambiguous' with options if multiple matches,
+    or 'not_found' if no matches. Requires the title to validate as parameter.
+    
+    Args:
+        title: Title to validate
+        threshold: Optional similarity threshold for fuzzy matching
+    
+    Returns:
+        Dict with validation result (status, uid, title, options, etc.)
+    """
     normalized_query = _normalize_and_validate_input(title)
     if not normalized_query:
         return ValidationResponseBuilder.not_found()
@@ -293,7 +304,19 @@ def validate_title(title: str, threshold: Optional[float] = None) -> Dict[str, A
     return _try_fuzzy_title_search(normalized_query, threshold)
 
 def validate_actor(name: Union[str, List[str], Any], threshold: Optional[float] = None) -> Dict[str, Any]:
-    """Validates an actor name."""
+    """Valida y resuelve nombres de actores para identificación única.
+    
+    Validates and resolves actor names for unique identification.
+    Returns status 'ok' with actor ID if found, 'ambiguous' with options if multiple matches,
+    or 'not_found' if no matches. Requires the actor name to validate as parameter.
+    
+    Args:
+        name: Actor name to validate
+        threshold: Optional similarity threshold for fuzzy matching
+    
+    Returns:
+        Dict with validation result (status, id, name, options, etc.)
+    """
     return _validate_person_entity(
         query_text=name,
         exact_sql=ACTOR_EXACT_SQL,
@@ -304,12 +327,23 @@ def validate_actor(name: Union[str, List[str], Any], threshold: Optional[float] 
     )
 
 def validate_director(name: Union[str, List[str], Any], threshold: Optional[float] = None) -> Dict[str, Any]:
-    """Validates a director name."""
+    """Valida y resuelve nombres de directores para identificación única.
+    
+    Validates and resolves director names for unique identification.
+    Returns status 'ok' with director ID if found, 'ambiguous' with options if multiple matches,
+    or 'not_found' if no matches. Requires the director name to validate as parameter.
+    
+    Args:
+        name: Director name to validate
+        threshold: Optional similarity threshold for fuzzy matching
+    
+    Returns:
+        Dict with validation result (status, id, name, options, etc.)
+    """
     return _validate_person_entity(
         query_text=name,
         exact_sql=DIRECTOR_EXACT_SQL,
         fuzzy_sql=DIRECTOR_FUZZY_SQL_ILIKE,
         entity_type="director",
-        threshold=threshold,
         sort_by_titles=True
     )

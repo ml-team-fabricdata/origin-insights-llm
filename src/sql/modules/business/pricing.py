@@ -123,7 +123,24 @@ def tool_hits_with_quality(
     scoped_by_country: bool = True,
     fallback_when_empty: bool = True,
 ) -> List[Dict]:
-    """Devuelve hits con filtros de calidad (definition/license)."""
+    """Hits (popularidad) con filtros de calidad.
+    
+    Scope global o por país ISO-2. Si 'fallback_when_empty' está activo,
+    reintenta sin 'definition' cuando no hay resultados.
+    Returns popularity/hits data with quality filters (definition/license).
+    
+    Args:
+        uid: Unique identifier for the title
+        country_input: Country ISO-2 code (optional)
+        definition: List of definitions to filter (e.g., ['HD', '4K'])
+        license_: List of licenses to filter
+        limit: Maximum number of results (default 50, max 200)
+        scoped_by_country: Scope by country if True
+        fallback_when_empty: Retry without definition filter if no results
+    
+    Returns:
+        List of hits/popularity data with quality filters
+    """
     if not uid:
         return [{"error": "Falta uid"}]
 
@@ -308,7 +325,7 @@ def query_presence_with_price(**kwargs) -> List[Dict[str, Any]]:
 
 def tool_prices_latest(*args, **kwargs):
     """Últimos precios con filtros flexibles (hash/uid/país/plataforma, etc.)."""
-    kwargs = _normalize_tool_call(args, kwargs)
+    kwargs = normalize_args_kwargs(args, kwargs)
     arg1 = kwargs.get("__arg1")
     hash_unique = kwargs.get("hash_unique")
     uid = kwargs.get("uid")
@@ -533,7 +550,7 @@ def tool_prices_history(*args, **kwargs):
 
 def tool_prices_changes_last_n_days(*args, **kwargs):
     """Cambios de precio en los últimos N días (up/down/all)."""
-    kwargs = _normalize_tool_call(args, kwargs)
+    kwargs = normalize_args_kwargs(args, kwargs)
     arg1 = kwargs.get("__arg1")
     hash_unique = kwargs.get("hash_unique")
     uid = kwargs.get("uid")

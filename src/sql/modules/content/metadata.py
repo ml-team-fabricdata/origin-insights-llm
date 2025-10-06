@@ -56,11 +56,26 @@ def _build_filters_common(kwargs):
     
     country_iso = kwargs.get("countries_iso")
     if country_iso:
-        iso_code = resolve_country_iso(country_iso)
-        if iso_code:
-            conditions.append("countries_iso = %s")
-            params.append(iso_code)
-            applied_filters.append(f"country={iso_code}")
+        # Try to resolve as region first
+        region_isos = get_region_iso_list(country_iso)
+        if region_isos:
+            if len(region_isos) == 1:
+                conditions.append("countries_iso = %s")
+                params.append(region_isos[0])
+                applied_filters.append(f"country={region_isos[0]}")
+            else:
+                # Multiple countries - use IN clause
+                placeholders = ", ".join(["%s"] * len(region_isos))
+                conditions.append(f"countries_iso IN ({placeholders})")
+                params.extend(region_isos)
+                applied_filters.append(f"region={country_iso}")
+        else:
+            # Try as individual country
+            iso_code = resolve_country_iso(country_iso)
+            if iso_code:
+                conditions.append("countries_iso = %s")
+                params.append(iso_code)
+                applied_filters.append(f"country={iso_code}")
     
     for year_param, operator, label in [
         ("year_from", ">=", "from"),
@@ -90,6 +105,7 @@ def tool_metadata_count(*args, **kwargs):
     
     where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
     sql = METADATA_COUNT_SQL.format(
+        table_name=META_TBL,
         where_clause=where_clause
     )
     

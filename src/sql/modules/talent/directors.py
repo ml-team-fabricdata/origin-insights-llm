@@ -5,7 +5,19 @@ from src.sql.utils.default_import import *
 from src.sql.modules.common.validation import *
 
 def get_director_filmography(director_id: str, limit: int = DEFAULT_LIMIT) -> Dict[str, Any]:
-    """Get a director's filmography - sync version."""
+    """Get director's filmography using their ID (efficient direct query).
+    
+    Single parameter: director_id. Returns default 10 films (most recent).
+    Returns list of films/series the director has directed with title, type, year, and IMDb ID.
+    Use this method when you already have the validated director ID from a previous query.
+    
+    Args:
+        director_id: Director ID
+        limit: Maximum number of films to return (default 10)
+    
+    Returns:
+        Dict with filmography data or error message
+    """
    
     results = db.execute_query(
         FILMOGRAPHY_SQL_DIRECTOR,
@@ -15,7 +27,19 @@ def get_director_filmography(director_id: str, limit: int = DEFAULT_LIMIT) -> Di
     return handle_query_result(results, "director_filmography", director_id)
 
 def get_director_collaborators(director_id: str, limit: int = MAX_LIMIT) -> Dict[str, Any]:
-    """Get a director's collaborators (actors they've worked with) - sync version."""
+    """Get co-directors (directors who have worked on the same films) using director's ID.
+    
+    Single parameter: director_id. Returns default 20 collaborators (most frequent).
+    Returns list of co-directors with their IDs, names, and number of shared titles.
+    Use this method when you already have the validated director ID from a previous query. Useful for discovering professional collaborations.
+    
+    Args:
+        director_id: Director ID
+        limit: Maximum number of collaborators to return (default 20)
+    
+    Returns:
+        Dict with collaborators data or error message
+    """
    
     results = db.execute_query(
         CODIRECTORS_SQL,
@@ -28,7 +52,19 @@ def get_director_filmography_by_name(
     director_name: Union[str, List[str], Any],
     limit: int = DEFAULT_LIMIT
 ) -> str:
-    """Get director filmography by name with validation - sync version."""
+    """Get complete filmography for a director by name.
+    
+    Validates the director name and returns their complete list of directed films/series with title, type, year, and IMDb ID.
+    If the name is ambiguous, returns options to choose from. If name not found, returns error message.
+    Use this when you only have the director's name.
+    
+    Args:
+        director_name: Director name to search for
+        limit: Maximum number of films to return (default 10)
+    
+    Returns:
+        JSON string with filmography data, options, or error message
+    """
     validation = validate_director(director_name)
    
     if validation["status"] == "ok":

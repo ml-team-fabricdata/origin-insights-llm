@@ -44,21 +44,22 @@ def get_genre_momentum(
     days_back: Optional[int] = None,
     prev_days_back: Optional[int] = None
 ) -> List[Dict]:
-    """
-    Ranking de géneros por crecimiento, comparando un período actual vs. uno previo.
-
-    - Ventanas rolling ancladas a MAX(date_hits) de la tabla.
-    - Con país (ISO-2) consulta sobre presencia; sin país, consulta global.
-
+    """Ranking de géneros por crecimiento comparando un período actual vs. uno previo.
+    
+    Si se especifica país, usa presencia (ms.hits_presence); sin país usa global.
+    Parámetros: country (ISO-2 opcional), content_type ('Movie'/'Series' opcional),
+    limit (por defecto 20), days_back (días del período actual; el previo replica ese tamaño).
+    Las ventanas se anclan a MAX(date_hits) de la tabla.
+    
     Args:
-        country: Código ISO-2 (opcional).
-        content_type: 'Movie' o 'Series' (opcional).
-        limit: Máximo de géneros (por defecto 20).
-        days_back: Días del período actual.
-        prev_days_back: Días del período previo (por defecto replica days_back).
-
+        country: Country ISO-2 code (optional)
+        content_type: Content type - 'Movie' or 'Series' (optional)
+        limit: Maximum results (default 20)
+        days_back: Days for current period (optional)
+        prev_days_back: Days for previous period (optional, defaults to days_back)
+    
     Returns:
-        Lista de dicts con métricas de momentum por género.
+        List with genre momentum rankings and growth metrics
     """
     if days_back is None or days_back <= 0:
         days_back = 30

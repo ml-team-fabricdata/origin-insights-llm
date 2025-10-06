@@ -52,7 +52,7 @@ def get_agent(model_api='bedrock'):
     if model_api == 'bedrock':
         llm = ChatBedrock(
             model_id="us.anthropic.claude-3-5-haiku-20241022-v1:0",
-            temperature=0
+            temperature=0.5
         )
     else:
         raise ValueError("Invalid 'model_api' value")

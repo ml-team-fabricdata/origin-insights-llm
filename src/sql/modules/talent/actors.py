@@ -5,11 +5,18 @@ from src.sql.utils.default_import import *
 from src.sql.modules.common.validation import *
 
 def get_actor_filmography(actor_id: str, limit: int = DEFAULT_LIMIT) -> Dict[str, Any]:
-    """Get an actor's filmography - sync version.
+    """Get actor's filmography using their ID (efficient direct query).
+    
+    Single parameter: actor_id (cast_id). Returns default 10 films (most recent).
+    Returns list of films/series the actor appeared in with title, type, year, and IMDb ID.
+    Use this method when you already have the validated actor ID from a previous query.
     
     Args:
-        actor_id: Actor ID
-        limit: Maximum number of films to return (default 10, use 5 for faster response)
+        actor_id: Actor ID (cast_id)
+        limit: Maximum number of films to return (default 10)
+    
+    Returns:
+        Dict with filmography data or error message
     """
     
     results = db.execute_query(
@@ -20,11 +27,18 @@ def get_actor_filmography(actor_id: str, limit: int = DEFAULT_LIMIT) -> Dict[str
     return handle_query_result(results, "actor_filmography", actor_id)
 
 def get_actor_coactors(actor_id: str, limit: int = MAX_LIMIT) -> Dict[str, Any]:
-    """Get an actor's co-actors - sync version.
+    """Get co-actors using the actor's ID (efficient direct query).
+    
+    Single parameter: actor_id (cast_id). Returns default 20 co-actors (most frequent).
+    Returns actors who have worked with this actor, showing number of shared films.
+    Use this method when you already have the validated actor ID from a previous query.
     
     Args:
-        actor_id: Actor ID
-        limit: Maximum number of co-actors to return (default 20, use 10 for faster response)
+        actor_id: Actor ID (cast_id)
+        limit: Maximum number of co-actors to return (default 20)
+    
+    Returns:
+        Dict with co-actors data or error message
     """
     
     results = db.execute_query(
@@ -38,7 +52,20 @@ def get_actor_filmography_by_name(
     actor_name: Union[str, List[str], Any], 
     limit: int = DEFAULT_LIMIT
 ) -> str:
-    """Get actor filmography by name with validation - sync version."""
+    """Get actor's filmography by name.
+    
+    Validates the actor name and returns their films/series from the database with title, type, year, and IMDb ID.
+    Returns exactly what is in the database - no more, no less. Default limit is 10 films (most recent).
+    If the name is ambiguous, returns options to choose from. If name not found, returns error message.
+    Use this when you only have the actor's name.
+    
+    Args:
+        actor_name: Actor name to search for
+        limit: Maximum number of films to return (default 10)
+    
+    Returns:
+        JSON string with filmography data, options, or error message
+    """
     validation = validate_actor(actor_name)
     
     if validation["status"] == "ok":
@@ -57,7 +84,18 @@ def get_actor_coactors_by_name(
     actor_name: Union[str, List[str], Any], 
     limit: int = DEFAULT_LIMIT
 ) -> str:
-    """Get actor co-actors by name with validation - sync version."""
+    """Find co-actors (actors who have worked with a specific actor) by searching for the actor's name.
+    
+    Returns list of co-actors with their IDs, names, and number of films worked together.
+    Validates the actor name first; if ambiguous, returns options. Useful for discovering professional collaborations.
+    
+    Args:
+        actor_name: Actor name to search for
+        limit: Maximum number of co-actors to return (default 10)
+    
+    Returns:
+        JSON string with co-actors data, options, or error message
+    """
     validation = validate_actor(actor_name)
     
     if validation["status"] == "ok":

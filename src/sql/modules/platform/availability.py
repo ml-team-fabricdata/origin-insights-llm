@@ -4,8 +4,12 @@ from src.sql.queries.platform.queries_availability import *
 from src.sql.utils.validators_shared import *
 
 def get_availability_by_uid(uid: str, country: Optional[str] = None, with_prices: bool = False, limit: int = 100) -> List[Dict]:
-    """
-    Get platform availability for a title by UID with optional price information.
+    """Get platform availability for a title by UID with optional price information.
+    
+    Parameters: uid (required), country (optional - accepts ISO-2 code like 'US' OR region name like 'LATAM', 'EU', 'latin_america'),
+    with_prices (boolean, default False), limit (int, default 100 - max platforms to return).
+    Supports regions: LATAM/latin_america, EU, north_america, south_america, europe, asia, africa, oceania, and more.
+    Returns platform availability data including platform names, countries, and optionally pricing information.
     
     Args:
         uid: Unique identifier for the title
@@ -174,9 +178,13 @@ def query_platforms_for_uid_by_country(uid: str, country: str = None) -> List[Di
     
     return handle_query_result(result, "platforms for title by country", f"{uid} @ {resolved_country}")
 
-def get_platform_exclusives(platform_name: str, country: str = "US", limit: int = 30) -> List[Dict]:
-    """
-    Get titles exclusive to a platform within a country or region.
+def get_platform_exclusives(platform_name: str, country: str = "US", limit: int = 50) -> List[Dict]:
+    """Get exclusive titles available on a specific platform within a country or region.
+    
+    Requires platform_name and country (ISO-2 code OR region name like 'LATAM', 'EU', defaults to US).
+    Supports regions: LATAM/latin_america, EU, north_america, south_america, europe, asia, africa, oceania.
+    Returns list of titles that are exclusively available on the specified platform in the given country/region,
+    including title, type, year, and IMDb ID.
 
     Args:
         platform_name: Name of the platform
@@ -228,8 +236,10 @@ def get_platform_exclusives(platform_name: str, country: str = "US", limit: int 
     return handle_query_result(result, "platform exclusives", f"exclusives {resolved_platform} @ {resolved_country}")
 
 def compare_platforms_for_title(title_: str) -> List[Dict]:
-    """
-    Compare which platforms carry a given title (exact match).
+    """Compare which streaming platforms carry a specific title (exact title match).
+    
+    Returns distinct list of platform names and countries where the title is available.
+    Useful for finding where to watch a specific movie or series across different platforms and regions.
 
     Args:
         title_: Exact title to search for

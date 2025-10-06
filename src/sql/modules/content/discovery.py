@@ -5,16 +5,19 @@ from src.sql.utils.sql_db import db
 from src.sql.utils.validators_shared import *
 
 def get_filmography_by_uid(uid: str) -> List[Dict[str, Any]]:
-    """
-    Obtiene la filmografía/ficha para un UID específico.
+    """Get complete filmography and profile information for a specific title using its UID.
+    
+    Returns detailed metadata including title, type, year, duration, and countries.
+    ONLY use after UID has been confirmed or validated.
+    
     Args:
-        uid (str): Identificador único del título
+        uid: Unique identifier for the title
        
     Returns:
-        Lista con información del título, vacía si no se encuentra o UID inválido
+        List with title information, empty if not found or invalid UID
         
     Raises:
-        ValueError: Si el UID tiene formato inválido
+        ValueError: If UID has invalid format
     """
     uid = validate_uid(uid)
     if not uid:
@@ -32,12 +35,15 @@ def get_filmography_by_uid(uid: str) -> List[Dict[str, Any]]:
     return handle_query_result(results, "filmography", uid)
 
 def get_title_rating(uid: str, country: Optional[str] = None) -> List[Dict[str, Any]]:
-    """
-    Obtiene información de rating para un título por UID.
+    """Get rating and popularity metrics for a title by UID.
+    
+    Supports global ratings or country/region-specific ratings (provide ISO-2 country code OR region name like 'LATAM', 'EU').
+    Supports regions: LATAM/latin_america, EU, north_america, south_america, europe, asia, africa, oceania.
+    Returns total hits, average hits, and hit count from popularity data.
 
     Args:
-        uid: Identificador único del título
-        country: Código de país opcional (ISO-2) o región (e.g., 'US', 'LATAM', 'EU') para rating específico
+        uid: Unique identifier for the title
+        country: Optional country code (ISO-2) or region (e.g., 'US', 'LATAM', 'EU') for specific rating
 
     Returns:
         Lista de diccionarios con información de rating.

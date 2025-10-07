@@ -20,6 +20,14 @@ import os
 from pathlib import Path
 from dataclasses import dataclass
 
+try:  # pragma: no cover - extremely defensive
+    from app._build_meta_snapshot import BUILD_SNAPSHOT
+except Exception:  # noqa: BLE001 - best effort fallback
+    BUILD_SNAPSHOT = {
+        "sha": "unknown",
+        "ref": "unknown",
+        "time": "unknown",
+    }
 
 @dataclass(frozen=True)
 class BuildMeta:
@@ -108,6 +116,25 @@ def get_build_meta() -> BuildMeta:
             if time == "unknown":
                 time = loaded_time
             break
+
+    # 3) fallback to baked snapshot module --------------------------------
+    snapshot_used = False
+    snapshot_sha = _clean(str(BUILD_SNAPSHOT.get("sha")))
+    snapshot_ref = _clean(str(BUILD_SNAPSHOT.get("ref")))
+    snapshot_time = _clean(str(BUILD_SNAPSHOT.get("time")))
+
+    if sha == "unknown" and snapshot_sha != "unknown":
+        sha = snapshot_sha
+        snapshot_used = True
+    if ref == "unknown" and snapshot_ref != "unknown":
+        ref = snapshot_ref
+        snapshot_used = True
+    if time == "unknown" and snapshot_time != "unknown":
+        time = snapshot_time
+        snapshot_used = True
+
+    if snapshot_used:
+        source_parts.append("module")
 
     short_sha = sha[:7] if sha not in {"", "unknown"} else "unknown"
 

@@ -6,11 +6,18 @@ then expose them as environment variables at runtime.  Centralising the logic
 for reading and shaping these values makes it easier to reuse from different
 routers and to add debugging information when something goes wrong (for
 instance, when ``/version`` keeps returning ``"unknown"`` during deployments).
+
+In App Runner we noticed sporadic situations where the environment variables are
+temporarily unavailable when the process starts.  To make the automation more
+robust we also persist the metadata to a JSON file during the Docker build and
+fall back to that snapshot if needed.
 """
 
 from __future__ import annotations
 
+import json
 import os
+from pathlib import Path
 from dataclasses import dataclass
 
 
@@ -60,17 +67,75 @@ def get_build_meta() -> BuildMeta:
     repeated ``{"build":"unknown"}`` responses seen in App Runner health checks).
     """
 
+    # 1) collect from environment ------------------------------------------
     sha = _clean(os.getenv("BUILD_SHA"))
     ref = _clean(os.getenv("BUILD_REF"))
     time = _clean(os.getenv("BUILD_TIME"))
 
+    source_parts: list[str] = []
+    if any(v != "unknown" for v in (sha, ref, time)):
+        source_parts.append("env")
+
+    # 2) fallback to persisted file ----------------------------------------
+    meta_path = os.getenv("BUILD_META_FILE")
+    if meta_path:
+        candidate_paths = [Path(meta_path)]
+    else:
+        candidate_paths = [
+            Path(__file__).resolve().parent.parent / ".build-meta.json",
+            Path("/.build-meta.json"),
+        ]
+
+    loaded = {}
+    for path in candidate_paths:
+        try:
+            with path.open("r", encoding="utf-8") as fh:
+                loaded = json.load(fh) or {}
+        except FileNotFoundError:
+            continue
+        except Exception:
+            # Ignore malformed files – we just fall back to env defaults.
+            continue
+        if loaded:
+            source_parts.append(f"file:{path.name}")
+            loaded_sha = _clean(str(loaded.get("sha")))
+            loaded_ref = _clean(str(loaded.get("ref")))
+            loaded_time = _clean(str(loaded.get("time")))
+            if sha == "unknown":
+                sha = loaded_sha
+            if ref == "unknown":
+                ref = loaded_ref
+            if time == "unknown":
+                time = loaded_time
+            break
+
     short_sha = sha[:7] if sha not in {"", "unknown"} else "unknown"
 
-    source = "env"
-    if sha == "unknown" and ref == "unknown" and time == "unknown":
+    if not source_parts:
         source = "default"
+    else:
+        source = "+".join(dict.fromkeys(source_parts))  # preserve order & dedupe
 
     return BuildMeta(sha=sha, short_sha=short_sha, ref=ref, time=time, source=source)
 
 
 BUILD_META = get_build_meta()
+
+def resolve_build_meta() -> BuildMeta:
+    """Return the most up-to-date build metadata available.
+
+    If the initial snapshot (captured at import time) already contains the SHA
+    we can reuse it.  Otherwise we re-read the environment and persisted file –
+    this helps in App Runner deployments where the env vars might appear with a
+    slight delay after the process boots.
+    """
+
+    global BUILD_META  # noqa: PLW0603 – intentionally refreshing cache
+
+    if BUILD_META.sha != "unknown":
+        return BUILD_META
+
+    refreshed = get_build_meta()
+    if refreshed.sha != "unknown":
+        BUILD_META = refreshed
+    return BUILD_META

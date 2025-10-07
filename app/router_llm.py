@@ -1,16 +1,10 @@
 # app/router_llm.py
+from app.build_meta import BUILD_META
+from app.supervisor import handle_query
 from fastapi import APIRouter, Query
-import os
-from app.supervisor import handle_query  # OK mantenerlo
+
 
 router = APIRouter()
-
-# Metadatos de build inyectados por GitHub Actions
-BUILD_META = {
-    "sha": os.getenv("BUILD_SHA", "unknown"),
-    "ref": os.getenv("BUILD_REF", "unknown"),
-    "time": os.getenv("BUILD_TIME", "unknown"),
-}
 
 @router.post("/llm/ask")
 def ask_llm(
@@ -34,7 +28,7 @@ def test_llm1(prompt: str = Query(..., description="Prompt para Claude 3.5 Haiku
         "model_used": "claude-3.5-haiku",
         "prompt": prompt,
         "response": response,
-        "build": BUILD_META
+        "build": BUILD_META.as_dict(),
     }
 
 @router.get("/llm/test_llm2")
@@ -46,5 +40,5 @@ def test_llm2(prompt: str = Query(..., description="Prompt para Claude 3 Sonnet"
         "model_used": "claude-3-sonnet",
         "prompt": prompt,
         "response": response,
-        "build": BUILD_META
+        "build": BUILD_META.as_dict(),
     }

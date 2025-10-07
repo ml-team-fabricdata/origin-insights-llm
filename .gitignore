@@ -17,6 +17,7 @@ __pycache__/
 dist/
 build/
 *.ipynb
+core/
 
 # Node (solo si se suma frontend)
 node_modules/

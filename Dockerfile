@@ -38,7 +38,22 @@ payload = {
     "ref": os.getenv("BUILD_REF", "unknown"),
     "time": os.getenv("BUILD_TIME", "unknown"),
 }
-Path("/code/.build-meta.json").write_text(json.dumps(payload), encoding="utf-8")
+
+json_blob = json.dumps(payload, indent=2, sort_keys=True) + "\n"
+for target in (Path("/code/.build-meta.json"), Path("/.build-meta.json")):
+    target.write_text(json_blob, encoding="utf-8")
+
+snapshot = (
+    '"""Auto-generated build metadata snapshot.\n'
+    "\n"
+    "This file is regenerated on every Docker build so runtime code can import the\n"
+    "latest commit information even if environment variables are temporarily\n"
+    "unavailable (as observed in App Runner right after boot).\n"
+    '"""\n'
+)
+
+body = snapshot + f"BUILD_SNAPSHOT = {payload!r}\n"
+Path("/code/app/_build_meta_snapshot.py").write_text(body, encoding="utf-8")
 PY
 
 # Dependencias Python

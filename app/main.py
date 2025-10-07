@@ -8,7 +8,7 @@ from infra.db import db_health
 from app.supervisor import handle_query
 from app.router_llm import router as llm_router
 from app.routers.api import router as api_router
-from app.build_meta import BUILD_META
+from app.build_meta import resolve_build_meta
 
 # -----------------------------------------------------------------------------
 # FastAPI App
@@ -43,7 +43,7 @@ def health():
 
 @app.get("/version")
 def version():
-    data = BUILD_META.as_dict()
+    data = resolve_build_meta().as_dict()
     data["build"] = data["short"]
     return data
 

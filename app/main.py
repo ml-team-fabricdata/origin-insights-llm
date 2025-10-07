@@ -8,6 +8,7 @@ from infra.db import db_health
 from app.supervisor import handle_query
 from app.router_llm import router as llm_router
 from app.routers.api import router as api_router
+from app.build_meta import BUILD_META
 
 # -----------------------------------------------------------------------------
 # FastAPI App
@@ -39,15 +40,12 @@ def root():
 def health():
     return {"ok": True, "db": db_health()}
 
-BUILD_META = {
-    "sha": os.getenv("BUILD_SHA", "unknown"),
-    "ref": os.getenv("BUILD_REF", "unknown"),
-    "time": os.getenv("BUILD_TIME", "unknown"),
-}
 
 @app.get("/version")
 def version():
-    return BUILD_META
+    data = BUILD_META.as_dict()
+    data["build"] = data["short"]
+    return data
 
 # -----------------------------------------------------------------------------
 # Endpoint de supervisor (/ask)

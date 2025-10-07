@@ -5,8 +5,9 @@ information directly into the artifact.  Keeping a placeholder in source control
 ensures imports keep working in development and when building without metadata.
 """
 
-BUILD_SNAPSHOT: dict[str, str] = {
+BUILD_SNAPSHOT: dict[str, object] = {
     "sha": "unknown",
     "ref": "unknown",
     "time": "unknown",
+    "aliases": {},
 }

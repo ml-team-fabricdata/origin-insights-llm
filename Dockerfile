@@ -27,6 +27,20 @@ ENV BUILD_SHA=${BUILD_SHA} \
     BUILD_REF=${BUILD_REF} \
     BUILD_TIME=${BUILD_TIME}
 
+# --- Persistir metadata también en archivo para fallback en runtime ---
+RUN python - <<'PY'
+import json
+import os
+from pathlib import Path
+
+payload = {
+    "sha": os.getenv("BUILD_SHA", "unknown"),
+    "ref": os.getenv("BUILD_REF", "unknown"),
+    "time": os.getenv("BUILD_TIME", "unknown"),
+}
+Path("/code/.build-meta.json").write_text(json.dumps(payload), encoding="utf-8")
+PY
+
 # Dependencias Python
 RUN python -m pip install --no-cache-dir --upgrade pip \
  && python -m pip install --no-cache-dir -r requirements.txt

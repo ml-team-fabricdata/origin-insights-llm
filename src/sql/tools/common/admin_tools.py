@@ -35,19 +35,9 @@ VALIDATE_INTENT_TOOL = Tool.from_function(
     func=validate_intent,
 )
 
-
-SCHEMA_INFO_TOOL = Tool.from_function(
-    name="admin_get_schema_info",
-    description="Información de schema: columnas por tabla o resumen global de tablas/funciones permitidas.",
-    func=get_schema_info,
-)
-
-
 ALL_ADMIN_TOOLS = [
     # RUN SQL
     BUILD_SQL_TOOL,
     RUN_SQL_TOOL,
     VALIDATE_INTENT_TOOL,
-    SCHEMA_INFO_TOOL,
-
 ]

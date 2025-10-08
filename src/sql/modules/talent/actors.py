@@ -4,6 +4,7 @@ from src.sql.utils.constants_sql import *
 from src.sql.utils.default_import import *
 from src.sql.modules.common.validation import *
 
+@tool
 def get_actor_filmography(actor_id: str, limit: int = DEFAULT_LIMIT) -> Dict[str, Any]:
     """Get actor's filmography using their ID (efficient direct query).
     
@@ -26,6 +27,7 @@ def get_actor_filmography(actor_id: str, limit: int = DEFAULT_LIMIT) -> Dict[str
     )
     return handle_query_result(results, "actor_filmography", actor_id)
 
+@tool
 def get_actor_coactors(actor_id: str, limit: int = MAX_LIMIT) -> Dict[str, Any]:
     """Get co-actors using the actor's ID (efficient direct query).
     
@@ -48,10 +50,11 @@ def get_actor_coactors(actor_id: str, limit: int = MAX_LIMIT) -> Dict[str, Any]:
     )
     return handle_query_result(results, "actor_coactors", actor_id)
 
+@tool
 def get_actor_filmography_by_name(
     actor_name: Union[str, List[str], Any], 
     limit: int = DEFAULT_LIMIT
-) -> str:
+    ) -> str:
     """Get actor's filmography by name.
     
     Validates the actor name and returns their films/series from the database with title, type, year, and IMDb ID.
@@ -80,10 +83,11 @@ def get_actor_filmography_by_name(
     
     return f"No encontré coincidencias para '{query_text}'."
 
+@tool
 def get_actor_coactors_by_name(
     actor_name: Union[str, List[str], Any], 
     limit: int = DEFAULT_LIMIT
-) -> str:
+    ) -> str:
     """Find co-actors (actors who have worked with a specific actor) by searching for the actor's name.
     
     Returns list of co-actors with their IDs, names, and number of films worked together.

@@ -4,36 +4,39 @@ from src.sql.utils.constants_sql import *
 from src.sql.utils.validators_shared import *
 from src.sql.queries.content.queries_metadata import *
 
+
 def _normalize_args_kwargs(args, kwargs, parse_arg1=False):
     kwargs = normalize_args_kwargs(args, kwargs)
-    
+
     if parse_arg1 and "__arg1" in kwargs:
         arg1_value = kwargs.get("__arg1", "")
         if str(arg1_value).strip().lower() not in NO_FILTER_KEYWORDS:
             kwargs = _parse_arg1_basic(kwargs.pop("__arg1"), kwargs)
         else:
             kwargs.pop("__arg1", None)
-    
+
     return kwargs
 
+
 NO_FILTER_KEYWORDS = {
-    "*", "all", "any", "todos", "todo", 
+    "*", "all", "any", "todos", "todo",
     "metadata", "titles", "content", "catalog",
     "database", "db", "full", "complete", "everything",
     "total", "general", "global", "universe"
 }
 
+
 def _process_primary_argument(kwargs, allow_type=True, allow_country=True):
     primary_arg = kwargs.get("__arg1")
-    
+
     if not primary_arg or kwargs.get("countries_iso") or kwargs.get("type"):
         return
-    
+
     normalized_arg = str(primary_arg).strip().lower()
-    
+
     if normalized_arg in NO_FILTER_KEYWORDS:
         return
-    
+
     if allow_country and len(normalized_arg) == 2 and normalized_arg.isalpha():
         iso_code = resolve_country_iso(normalized_arg)
         if iso_code:
@@ -43,9 +46,10 @@ def _process_primary_argument(kwargs, allow_type=True, allow_country=True):
         if content_type in ["Movie", "Series"]:
             kwargs["type"] = normalized_arg
 
+
 def _build_filters_common(kwargs):
     conditions, params, applied_filters = [], [], []
-    
+
     type_param = kwargs.get("type")
     if type_param:
         content_type = resolve_content_type(type_param)
@@ -53,7 +57,7 @@ def _build_filters_common(kwargs):
             conditions.append("type = %s")
             params.append(content_type)
             applied_filters.append(f"type={content_type}")
-    
+
     country_iso = kwargs.get("countries_iso")
     if country_iso:
         # Try to resolve as region first
@@ -76,7 +80,7 @@ def _build_filters_common(kwargs):
                 conditions.append("countries_iso = %s")
                 params.append(iso_code)
                 applied_filters.append(f"country={iso_code}")
-    
+
     for year_param, operator, label in [
         ("year_from", ">=", "from"),
         ("year_to", "<=", "to")
@@ -89,43 +93,47 @@ def _build_filters_common(kwargs):
                     conditions.append(f"year {operator} %s")
                     params.append(year_int)
                     applied_filters.append(f"year_{label}={year_int}")
-    
+
     return conditions, params, applied_filters
 
+
+@tool
 def tool_metadata_count(*args, **kwargs):
     kwargs = _normalize_args_kwargs(args, kwargs)
-    
+
     primary_arg = str(kwargs.get("__arg1", "")).strip().lower()
     if primary_arg in NO_FILTER_KEYWORDS:
         kwargs.pop("__arg1", None)
     else:
         _process_primary_argument(kwargs)
-    
+
     conditions, params, applied_filters = _build_filters_common(kwargs)
-    
+
     where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
     sql = METADATA_COUNT_SQL.format(
         table_name=META_TBL,
         where_clause=where_clause
     )
-    
+
     logger.debug(f"Executing count query: {sql} with params: {params}")
-    
+
     rows = db.execute_query(sql, tuple(params))
     filter_desc = ", ".join(applied_filters) or "no-filters"
     return handle_query_result(rows, "metadata_simple_all.count", filter_desc)
 
+
+@tool
 def tool_metadata_list(*args, **kwargs):
     kwargs = _normalize_args_kwargs(args, kwargs)
-    
+
     primary_arg = kwargs.get("__arg1")
     if primary_arg and not kwargs.get("title_like"):
         kwargs["title_like"] = str(primary_arg).strip()
         kwargs["column"] = str(kwargs["__arg1"]).strip()
-    
+
     limit = validate_limit(kwargs.get("limit", MAX_LIMIT))
     column = str(kwargs.get("column", "")).strip()
-    
+
     alias_map = {
         "primare_genre": "primary_genre",
         "genre": "primary_genre",
@@ -134,56 +142,62 @@ def tool_metadata_list(*args, **kwargs):
         "language": "primary_language",
         "lang": "primary_language",
     }
-    
+
     col_norm = alias_map.get(column.lower(), column)
-    
+
     if col_norm not in META_ALLOWED_SELECT:
         allowed_cols = sorted(META_ALLOWED_SELECT)
-        raise ValueError(f"column '{column}' not allowed; choose one of {allowed_cols}")
-    
+        raise ValueError(
+            f"column '{column}' not allowed; choose one of {allowed_cols}")
+
     sql = METADATA_DISTINCT_SQL.format(
         column=col_norm,
         table_name=META_TBL
     )
-    
+
     rows = db.execute_query(sql, (limit,))
     return handle_query_result(rows, "metadata_simple_all.distinct", f"column={col_norm} limit={limit}")
 
+
+@tool
 def tool_metadata_stats(*args, **kwargs):
     kwargs = _normalize_args_kwargs(args, kwargs)
-    
+
     primary_arg = str(kwargs.get("__arg1", "")).strip().lower()
     if primary_arg in NO_FILTER_KEYWORDS:
         kwargs.pop("__arg1", None)
     else:
         _process_primary_argument(kwargs)
-    
+
     conditions, params, applied_filters = _build_filters_common(kwargs)
-    
+
     where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
     sql = METADATA_STATS_SQL.format(where_clause=where_clause)
-    
+
     logger.debug(f"Executing stats query: {sql} with params: {params}")
-    
+
     rows = db.execute_query(sql, tuple(params))
     filter_desc = ", ".join(applied_filters) or "no-filters"
     return handle_query_result(rows, "metadata_simple_all.stats", filter_desc)
 
+
 _DEF_SEP = re.compile(r"[\s,;/]+")
+
 
 def _parse_arg1_basic(a1: str, kwargs: dict) -> dict:
     s = (a1 or "").strip()
-    if not s: 
+    if not s:
         return kwargs
-    
+
     if s.lower() in NO_FILTER_KEYWORDS:
         return kwargs
-        
+
     toks = [t for t in _DEF_SEP.split(s) if t]
     out = dict(kwargs)
 
     if "countries_iso" not in out:
-        iso = next((t.upper() for t in toks if len(t) == 2 and t.isalpha()), None)
+        iso = next((t.upper()
+                   for t in toks if len(t) == 2 and t.isalpha()), None)
         if iso:
             resolved_iso = resolve_country_iso(iso)
             if resolved_iso:
@@ -202,28 +216,32 @@ def _parse_arg1_basic(a1: str, kwargs: dict) -> dict:
 
     return out
 
+
 def _validate_order_by(order_by: Optional[str], default: str = "year") -> str:
     if not order_by:
         return default
     fld = order_by.strip().lower()
     return fld if fld in META_ALLOWED_ORDER else default
 
+
 def _validate_select(select: Optional[List[str]]) -> List[str]:
-    default_fields = ["uid", "title", "type", "year", "duration", "primary_genre", "primary_language", "countries_iso"]
-    
+    default_fields = ["uid", "title", "type", "year", "duration",
+                      "primary_genre", "primary_language", "countries_iso"]
+
     if not select:
         return default_fields
-        
+
     safe = [c for c in select if c in META_ALLOWED_SELECT]
-    
+
     if safe:
         if "uid" not in safe:
             safe.insert(0, "uid")
         if "title" not in safe:
             safe.insert(1, "title")
         return safe
-    
+
     return ["uid", "title", "type", "year"]
+
 
 @dataclass
 class MetadataSimpleQuery:
@@ -249,18 +267,21 @@ class MetadataSimpleQuery:
     offset: Optional[int] = 0
     count_only: bool = False
 
+
 def build_metadata_simple_all_query(q: MetadataSimpleQuery) -> Tuple[str, Dict[str, Any]]:
     params: Dict[str, Any] = {}
     where: List[str] = []
 
     if q.year_from is not None:
-        year_from = int(q.year_from) if isinstance(q.year_from, (str, int)) and str(q.year_from).isdigit() else None
+        year_from = int(q.year_from) if isinstance(
+            q.year_from, (str, int)) and str(q.year_from).isdigit() else None
         if year_from and 1900 <= year_from <= 2100:
             where.append("year >= %(y_from)s")
             params["y_from"] = year_from
-            
+
     if q.year_to is not None:
-        year_to = int(q.year_to) if isinstance(q.year_to, (str, int)) and str(q.year_to).isdigit() else None
+        year_to = int(q.year_to) if isinstance(
+            q.year_to, (str, int)) and str(q.year_to).isdigit() else None
         if year_to and 1900 <= year_to <= 2100:
             where.append("year <= %(y_to)s")
             params["y_to"] = year_to
@@ -270,32 +291,32 @@ def build_metadata_simple_all_query(q: MetadataSimpleQuery) -> Tuple[str, Dict[s
         if content_type in ["Movie", "Series"]:
             where.append("type = %(type)s")
             params["type"] = content_type
-        
+
     if q.countries_iso:
         iso = resolve_country_iso(q.countries_iso)
         if iso:
             where.append("countries_iso = %(countries_iso)s")
             params["countries_iso"] = iso
-            
+
     if q.age:
         where.append("age ILIKE %(age)s")
         params["age"] = build_like_pattern(q.age)
-        
+
     if q.duration_min is not None:
         where.append("duration >= %(dmin)s")
         params["dmin"] = int(q.duration_min)
-        
+
     if q.duration_max is not None:
         where.append("duration <= %(dmax)s")
         params["dmax"] = int(q.duration_max)
-        
+
     if q.title_like:
         where.append("title ILIKE %(tlike)s")
         params["tlike"] = build_like_pattern(q.title_like)
     if q.synopsis_like:
         where.append("synopsis ILIKE %(slike)s")
         params["slike"] = build_like_pattern(q.synopsis_like)
-        
+
     if q.primary_genre:
         resolved_genre = resolve_primary_genre(q.primary_genre)
         if resolved_genre:
@@ -308,7 +329,7 @@ def build_metadata_simple_all_query(q: MetadataSimpleQuery) -> Tuple[str, Dict[s
         ("writers", q.writers_any, "wri_"),
         ("countries_iso", q.countries_iso_any, "ci_")
     ]
-    
+
     for col, values, prefix in array_conditions:
         if values:
             cond = build_like_any(col, values, params, prefix)
@@ -316,7 +337,8 @@ def build_metadata_simple_all_query(q: MetadataSimpleQuery) -> Tuple[str, Dict[s
                 where.append(cond)
 
     if q.countries_iso_any:
-        vals = q.countries_iso_any if isinstance(q.countries_iso_any, list) else [q.countries_iso_any]
+        vals = q.countries_iso_any if isinstance(q.countries_iso_any, list) else [
+            q.countries_iso_any]
         norm_vals = [resolve_country_iso(v) for v in vals if v]
         norm_vals = [v for v in norm_vals if v]
         if norm_vals:
@@ -347,26 +369,31 @@ def build_metadata_simple_all_query(q: MetadataSimpleQuery) -> Tuple[str, Dict[s
 
     return sql, params
 
+
+@tool
 def query_metadata_simple_all(*args, **kwargs) -> List[Dict[str, Any]]:
     kwargs = _normalize_args_kwargs(args, kwargs, parse_arg1=True)
     q = MetadataSimpleQuery(**kwargs)
     sql, params = build_metadata_simple_all_query(q)
     logger.debug(f"Executing query: {sql} with params: {params}")
-    
+
     return db.execute_query(sql, params) or []
 
+
+@tool
 def query_metadata_simple_all_tool(*args, **kwargs) -> List[Dict]:
     kwargs = _normalize_args_kwargs(args, kwargs, parse_arg1=True)
     rows = query_metadata_simple_all(**kwargs) or []
-    
+
     ident_parts = []
-    important_params = ["type", "year_from", "year_to", "primary_genre", "title_like", "countries_iso"]
-    
+    important_params = ["type", "year_from", "year_to",
+                        "primary_genre", "title_like", "countries_iso"]
+
     for param in important_params:
         value = kwargs.get(param)
         if value not in (None, ""):
             ident_parts.append(f"{param}={value}")
-    
+
     ident = " | ".join(ident_parts) if ident_parts else "all"
-        
+
     return handle_query_result(rows, "metadata_simple_all.query", ident)

@@ -37,6 +37,7 @@ def _clamp_rolling(max_d: date, days: int, prev_days: int) -> Tuple[date, date, 
     prev_from = prev_to - timedelta(days=prev_days-1)
     return (cur_from, cur_to, prev_from, prev_to)
 
+@tool
 def get_genre_momentum(
     country: Optional[str] = None,
     content_type: Optional[str] = None,
@@ -118,6 +119,7 @@ def get_genre_momentum(
 
     return handle_query_result(rows, "genre_momentum", ident)
 
+@tool
 def get_top_by_uid(uid: str) -> List[Dict]:
     """Get top/rating information for a specific UID."""
     if not uid:
@@ -126,6 +128,7 @@ def get_top_by_uid(uid: str) -> List[Dict]:
     rows = db.execute_query(UID_RATING_SQL, (uid,))
     return handle_query_result(rows, "Rating by uid", f"{uid}")
 
+@tool
 def get_top_generic(
     country: Optional[str] = None,
     platform: Optional[str] = None,
@@ -215,6 +218,7 @@ def get_top_generic(
             year_to=year_to,
         )
 
+@tool
 def get_top_presence(
     resolved_country: Optional[str],
     iso_set: List[str],
@@ -306,6 +310,7 @@ def get_top_presence(
         currentyear, year_from, year_to
     )
 
+@tool
 def get_top_global(
     platform: Optional[str],
     genre: Optional[str],
@@ -451,6 +456,7 @@ def build_result(
     norm_rows = [_normalize_row(r) for r in (rows or [])]
     return handle_query_result(norm_rows, f"top ({query_type})", ident)
 
+@tool
 def get_top_generic_tool(*args, **kwargs) -> str:
     """Tool-safe wrapper for generic top query specific for LangGraph."""
     params = normalize_langgraph_params(*args, **kwargs)
@@ -514,6 +520,7 @@ def get_top_generic_tool(*args, **kwargs) -> str:
 
     return json.dumps(response, ensure_ascii=False, indent=2, default=str)
 
+@tool
 def new_top_by_country_tool(*args, **kwargs) -> str:
     """New function specific for LangGraph for tops by country."""
     params = normalize_langgraph_params(*args, **kwargs)

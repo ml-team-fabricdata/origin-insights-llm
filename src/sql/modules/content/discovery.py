@@ -4,6 +4,7 @@ from src.sql.queries.content.queries_discovery import *
 from src.sql.utils.sql_db import db
 from src.sql.utils.validators_shared import *
 
+@tool
 def get_filmography_by_uid(uid: str) -> List[Dict[str, Any]]:
     """Get complete filmography and profile information for a specific title using its UID.
     
@@ -34,6 +35,7 @@ def get_filmography_by_uid(uid: str) -> List[Dict[str, Any]]:
     
     return handle_query_result(results, "filmography", uid)
 
+@tool
 def get_title_rating(uid: str, country: Optional[str] = None) -> List[Dict[str, Any]]:
     """Get rating and popularity metrics for a title by UID.
     
@@ -116,6 +118,7 @@ def get_title_rating(uid: str, country: Optional[str] = None) -> List[Dict[str, 
     logger.info(f"Country rating queried for {uid}:{resolved_country_iso}, results: {len(results)}")
     return handle_query_result(results, "title rating by country", uid)
 
+@tool
 def get_multiple_titles_info(uids: List[str]) -> List[Dict[str, Any]]:
     """
     Obtiene información básica para múltiples UIDs de una vez.

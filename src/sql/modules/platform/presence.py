@@ -3,6 +3,8 @@ from src.sql.utils.db_utils_sql import *
 from src.sql.utils.default_import import *
 from src.sql.queries.platform.queries_presence import *
 from src.sql.utils.validators_shared import *
+from strands import tool
+
 
 def build_where_clause(filters: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
     """Build WHERE clause and parameters from filters"""
@@ -71,6 +73,7 @@ def get_select_fields(requested_fields: Optional[List[str]] = None) -> List[str]
 
     return validated or ["p.uid", "p.clean_title"]
 
+@tool
 def presence_count(country: str = None, platform_name: str = None, uid: str = None, 
                   type: str = None, title_like: str = None) -> List[Dict]:
     """Get SIMPLE COUNT of content presence records (single number only).
@@ -106,6 +109,7 @@ def presence_count(country: str = None, platform_name: str = None, uid: str = No
     result = db.execute_query(sql, query_params)
     return result if result else [{"message": "No results found"}]
 
+@tool
 def presence_list(country: str = None, platform_name: str = None, type: str = None,
                  title_like: str = None, limit: int = 25, offset: int = 0,
                  order_by: str = "clean_title", order_dir: str = "ASC") -> List[Dict]:
@@ -164,6 +168,7 @@ def presence_list(country: str = None, platform_name: str = None, type: str = No
     result = db.execute_query(sql, query_params)
     return result if result else [{"message": "No results found"}]
 
+@tool
 def presence_distinct(column: str, country: str = None, platform_name: str = None,
                      type: str = None, limit: int = 100) -> List[Dict]:
     """Get distinct/unique values from presence table columns.
@@ -211,6 +216,7 @@ def presence_distinct(column: str, country: str = None, platform_name: str = Non
     result = db.execute_query(sql, query_params)
     return result if result else [{"message": "No results found", "column": column}]
 
+@tool
 def presence_statistics(country: str = None, platform_name: str = None, type: str = None) -> List[Dict]:
     """Get COMPREHENSIVE STATISTICAL summary of content presence (10+ metrics).
     
@@ -242,6 +248,7 @@ def presence_statistics(country: str = None, platform_name: str = None, type: st
     result = db.execute_query(sql, query_params)
     return result if result else [{"message": "No results found"}]
 
+@tool
 def platform_count_by_country(country: str = None) -> List[Dict]:
     """Get QUICK COUNT of streaming platforms by country (lightweight query).
     
@@ -272,6 +279,7 @@ def platform_count_by_country(country: str = None) -> List[Dict]:
     result = db.execute_query(sql, query_params)
     return result if result else [{"message": "No results found"}]
 
+@tool
 def country_platform_summary(country: str = None) -> List[Dict]:
     """Get COMPREHENSIVE DETAILED summary of platforms and content by country/region (complete analysis).
     

@@ -37,6 +37,7 @@ def _resolve_license(values: Optional[List[str]]) -> Optional[List[str]]:
             logger.warning(f"Licencia no válida ignorada: {value}")
     return resolved or None
 
+
 def _normalize_price_filters(
     country: Optional[str] = None,
     platform_name: Optional[str] = None,
@@ -59,6 +60,7 @@ def _normalize_price_filters(
     currency_list = [c.upper() for c in (currency or [])]
 
     return iso, plat_name, price_type, currency_list
+
 
 def _build_filters_and_params(
     definition: Optional[List[str]],
@@ -113,6 +115,7 @@ def _build_sql_hits_quality(
 
     return sql, params
 
+@tool
 def tool_hits_with_quality(
     uid: Optional[str] = None,
     country_input: Optional[str] = None,
@@ -205,6 +208,7 @@ class PresenceWithPriceQuery:
     count_only: bool = False
     today: Optional[date] = None
 
+@tool
 def build_presence_with_price_query(q: PresenceWithPriceQuery) -> Tuple[str, Dict[str, Any]]:
     """Genera SQL (LEFT JOIN LATERAL) para presencia con último precio."""
     params: Dict[str, Any] = {}
@@ -316,6 +320,7 @@ def build_presence_with_price_query(q: PresenceWithPriceQuery) -> Tuple[str, Dic
     """
     return sql, params
 
+@tool
 def query_presence_with_price(**kwargs) -> List[Dict[str, Any]]:
     """Ejecuta la query de presencia+precio y devuelve filas."""
     q = PresenceWithPriceQuery(**kwargs)
@@ -323,6 +328,7 @@ def query_presence_with_price(**kwargs) -> List[Dict[str, Any]]:
     rows = db.execute_query(sql, params) or []
     return rows
 
+@tool
 def tool_prices_latest(*args, **kwargs):
     """Últimos precios con filtros flexibles (hash/uid/país/plataforma, etc.)."""
     kwargs = normalize_args_kwargs(args, kwargs)
@@ -438,6 +444,7 @@ def tool_prices_latest(*args, **kwargs):
         f"hash={hash_unique or '-'} uid={uid or '-'} iso={iso or '-'} plat_name={plat_name or '-'} plat_code={platform_code or '-'} limit={limit}",
     )
 
+@tool
 def tool_prices_history(*args, **kwargs):
     """Histórico de precios con filtros flexibles."""
     kwargs = normalize_args_kwargs(args, kwargs)
@@ -548,6 +555,7 @@ def tool_prices_history(*args, **kwargs):
         f"uid={uid or '-'} iso={iso or '-'} plat_name={plat_name or '-'} limit={limit}",
     )
 
+@tool
 def tool_prices_changes_last_n_days(*args, **kwargs):
     """Cambios de precio en los últimos N días (up/down/all)."""
     kwargs = normalize_args_kwargs(args, kwargs)
@@ -636,6 +644,7 @@ def tool_prices_changes_last_n_days(*args, **kwargs):
         f"last={n_days}d uid={uid or '-'} iso={iso or '-'} dir={direction} limit={limit}",
     )
 
+@tool
 def tool_prices_stats(*args, **kwargs):
     """Estadísticas de precio (min/max/avg/medianas/pXX) con filtros comunes."""
     kwargs = normalize_args_kwargs(args, kwargs)

@@ -4,6 +4,8 @@ from src.sql.utils.constants_sql import *
 from src.sql.utils.validators_shared import *
 from src.sql.queries.business.intelligence_queries import *
 
+
+@tool
 def get_platform_exclusivity_by_country(
     platform_name: str,
     country: str,
@@ -38,6 +40,8 @@ def get_platform_exclusivity_by_country(
     ident = f"{resolved_platform} @ {resolved_country} limit={limit_norm}"
     return handle_query_result(rows, "platform exclusivity (country)", ident)
 
+
+@tool
 def catalog_similarity_for_platform(
     platform: Any,
     iso_a: Any = None,
@@ -121,6 +125,7 @@ def _build_pin_pout_filters(platform: Optional[str]) -> Tuple[str, List[str], st
         "AND p_out.platform_name ILIKE %s", [platform]
     )
 
+@tool
 def titles_in_A_not_in_B_sql(
     *,
     country_in: str,

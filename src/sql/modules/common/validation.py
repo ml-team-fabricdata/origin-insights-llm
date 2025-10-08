@@ -272,10 +272,12 @@ def search_title_fuzzy(
 
     params = (normalized_title, threshold, threshold, threshold, limit)
     return db.execute_query(FUZZY_SEARCH_SQL, params, "fuzzy search")
+    
 def search_title(title: str, *, threshold: float = DEFAULT_FUZZY_THRESHOLD) -> Dict[str, Any]:
     """Searches for a title with validation."""
     return validate_title(title, threshold)
 
+@tool
 def validate_title(title: str, threshold: Optional[float] = None) -> Dict[str, Any]:
     """Valida y resuelve títulos para asegurar una identificación única.
     
@@ -303,6 +305,7 @@ def validate_title(title: str, threshold: Optional[float] = None) -> Dict[str, A
 
     return _try_fuzzy_title_search(normalized_query, threshold)
 
+@tool
 def validate_actor(name: Union[str, List[str], Any], threshold: Optional[float] = None) -> Dict[str, Any]:
     """Valida y resuelve nombres de actores para identificación única.
     
@@ -326,6 +329,7 @@ def validate_actor(name: Union[str, List[str], Any], threshold: Optional[float] 
         sort_by_titles=False
     )
 
+@tool
 def validate_director(name: Union[str, List[str], Any], threshold: Optional[float] = None) -> Dict[str, Any]:
     """Valida y resuelve nombres de directores para identificación única.
     

@@ -204,6 +204,7 @@ def _render_filters(table_alias_map: Dict[str, str],
 
     return f" {clause} " + " AND ".join(parts) if parts else ""
 
+@tool
 def build_sql(*,
               base_table: str, base_alias: str,
               select: Sequence[str],
@@ -318,6 +319,7 @@ def build_sql(*,
 
     return sql, params
 
+@tool
 def run_sql(intent: Dict[str, Any], op_name: str = "intent_query") -> List[Dict]:
     """Ejecuta intent compilado."""
 
@@ -349,6 +351,7 @@ def _process_results(raw_rows: List[Any], op_name: str) -> List[Dict[str, Any]]:
 
     return processed
 
+@tool
 def run_sql_adapter(*args, **kwargs) -> List[Dict[str, Any]]:
     """Adaptador para múltiples formatos."""
     a1 = kwargs.pop("__arg1", None)
@@ -387,6 +390,7 @@ def run_sql_adapter(*args, **kwargs) -> List[Dict[str, Any]]:
     rows = db.execute_query(query, params)
     return _process_results(rows, "adapter_query")
 
+@tool
 def validate_intent(intent: Dict[str, Any]) -> bool:
     """Valida intent sin ejecutar."""
     return build_sql(**intent) is not None

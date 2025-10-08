@@ -4,6 +4,7 @@ from src.sql.utils.constants_sql import *
 from src.sql.utils.default_import import *
 from src.sql.modules.common.validation import *
 
+@tool
 def get_director_filmography(director_id: str, limit: int = DEFAULT_LIMIT) -> Dict[str, Any]:
     """Get director's filmography using their ID (efficient direct query).
     
@@ -26,6 +27,7 @@ def get_director_filmography(director_id: str, limit: int = DEFAULT_LIMIT) -> Di
     )
     return handle_query_result(results, "director_filmography", director_id)
 
+@tool
 def get_director_collaborators(director_id: str, limit: int = MAX_LIMIT) -> Dict[str, Any]:
     """Get co-directors (directors who have worked on the same films) using director's ID.
     
@@ -48,10 +50,11 @@ def get_director_collaborators(director_id: str, limit: int = MAX_LIMIT) -> Dict
     )
     return handle_query_result(results, "director_collaborators", director_id)
 
+@tool
 def get_director_filmography_by_name(
     director_name: Union[str, List[str], Any],
     limit: int = DEFAULT_LIMIT
-) -> str:
+    ) -> str:
     """Get complete filmography for a director by name.
     
     Validates the director name and returns their complete list of directed films/series with title, type, year, and IMDb ID.

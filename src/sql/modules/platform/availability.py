@@ -2,7 +2,11 @@ from src.sql.utils.db_utils_sql import *
 from src.sql.utils.default_import import *
 from src.sql.queries.platform.queries_availability import *
 from src.sql.utils.validators_shared import *
+from strands import tool
 
+
+
+@tool
 def get_availability_by_uid(uid: str, country: Optional[str] = None, with_prices: bool = False, limit: int = 100) -> List[Dict]:
     """Get platform availability for a title by UID with optional price information.
     
@@ -112,6 +116,7 @@ def get_availability_by_uid(uid: str, country: Optional[str] = None, with_prices
 
     return [response_data]
 
+@tool
 def query_platforms_for_title(uid: str, limit: int = 50) -> List[Dict]:
     """
     Get all platforms carrying a specific title.
@@ -132,6 +137,7 @@ def query_platforms_for_title(uid: str, limit: int = 50) -> List[Dict]:
     logger.info(f"Platforms queried for {uid}, results: {len(result) if result else 0}")
     return handle_query_result(result, "platforms for title (uid)", uid)
 
+@tool
 def query_platforms_for_uid_by_country(uid: str, country: str = None) -> List[Dict]:
     """
     Get platforms for a UID within a specific country or region.
@@ -178,6 +184,7 @@ def query_platforms_for_uid_by_country(uid: str, country: str = None) -> List[Di
     
     return handle_query_result(result, "platforms for title by country", f"{uid} @ {resolved_country}")
 
+@tool
 def get_platform_exclusives(platform_name: str, country: str = "US", limit: int = 50) -> List[Dict]:
     """Get exclusive titles available on a specific platform within a country or region.
     
@@ -235,6 +242,7 @@ def get_platform_exclusives(platform_name: str, country: str = "US", limit: int 
     
     return handle_query_result(result, "platform exclusives", f"exclusives {resolved_platform} @ {resolved_country}")
 
+@tool
 def compare_platforms_for_title(title_: str) -> List[Dict]:
     """Compare which streaming platforms carry a specific title (exact title match).
     
@@ -257,6 +265,7 @@ def compare_platforms_for_title(title_: str) -> List[Dict]:
     logger.info(f"Platforms queried for {title_}, results: {result}")
     return handle_query_result(result, "compare platforms for title", title_)
 
+@tool
 def get_recent_premieres_by_country(country: str, days_back: int = 7, limit: int = 30) -> List[Dict]:
     """
     Get recent premieres available in a country or region within the last N days.

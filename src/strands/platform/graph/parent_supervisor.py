@@ -1,37 +1,30 @@
 # parent_supervisor.py
-from langchain_aws import ChatBedrock
 from strands import Agent
-from strands.platform.prompt_platform import PLATFORM_PROMPT
+from src.strands.platform.prompt_platform import PLATFORM_PROMPT
 from src.strands.utils import MODEL_AGENT
-from .state import State
+from src.strands.platform.graph.state import State
 from src.prompt_templates.prompt import response_prompt
 from typing import Literal, Optional
 
-# LLM compartido para evitar reinicializaciones
-_classifier_llm = None
-
-def get_classifier_llm():
-    """Lazy loading del LLM para clasificación"""
-    global _classifier_llm
-    if _classifier_llm is None:
-        _classifier_llm = Agent(
-            model=MODEL_AGENT,
-            temperature=0
-        )
-    return _classifier_llm
-
-
 async def platform_classifier(state: State) -> State:
     """Clasifica la pregunta UNA SOLA VEZ al inicio del flujo"""
-    from .state import add_error
+    
+    print(f"[CLASSIFIER] Clasificando pregunta: {state['question']}")
     
     if state.get("classification_done"):
+        print("[CLASSIFIER] Ya clasificado, saltando...")
         return state
     
-    llm = get_classifier_llm()
+    agent = Agent(
+        model=MODEL_AGENT,
+        system_prompt=PLATFORM_PROMPT
+    )
 
-    response = llm.invoke(PLATFORM_PROMPT)
-    decision = response.content.strip().upper()
+    # Pasar la pregunta del usuario al agent
+    response = await agent.invoke_async(state['question'])
+    decision = getattr(response, "message", str(response)).strip().upper()
+    
+    print(f"[CLASSIFIER] Decision: {decision}")
     
     # Validación estricta
     if decision not in ["AVAILABILITY", "PRESENCE"]:
@@ -44,6 +37,7 @@ async def platform_classifier(state: State) -> State:
             decision = "PRESENCE"  # Fallback (mayoría de preguntas son presence)
     
     task = decision.lower()
+    print(f"[CLASSIFIER] Task final: {task}")
     
     return {
         **state,
@@ -57,7 +51,6 @@ async def main_supervisor(state: State) -> State:
     
     print(f"[SUPERVISOR] Evaluando estado... tools={state.get('tool_calls_count', 0)}, task={state.get('task')}")
     
-    llm = get_classifier_llm()
     tool_calls = state.get('tool_calls_count', 0)
     max_iter = state.get('max_iterations', 3)
     
@@ -88,19 +81,23 @@ async def main_supervisor(state: State) -> State:
             "supervisor_decision": "COMPLETO"
         }
     
-    # Prompt simplificado para decisión
-    prompt = f"""¿Los datos responden completamente la pregunta?
-
-PREGUNTA: {state['question']}
+    # Evaluar con LLM si los datos son suficientes
+    supervisor_agent = Agent(
+        model=MODEL_AGENT,
+        system_prompt=f"""Eres un supervisor. Evalúa si los datos obtenidos responden completamente la pregunta del usuario.
+        
+PREGUNTA DEL USUARIO: {state['question']}
 INTENTOS: {tool_calls}/{max_iter}
 
 DATOS OBTENIDOS:
 {accumulated[:800]}
 
-Responde SOLO una palabra: COMPLETO o CONTINUAR"""
+Responde EXACTAMENTE una palabra: COMPLETO (si los datos responden la pregunta) o CONTINUAR (si necesita más información)"""
+    )
     
     try:
-        decision = llm.invoke(prompt).content.strip().upper()
+        response = await supervisor_agent.invoke_async("¿Los datos responden la pregunta?")
+        decision = getattr(response, "message", str(response)).strip().upper()
         print(f"[SUPERVISOR] Decision del LLM: {decision}")
         
         if "COMPLETO" in decision or "COMPLETE" in decision:
@@ -124,7 +121,7 @@ Responde SOLO una palabra: COMPLETO o CONTINUAR"""
         }
 
 
-def route_from_main_supervisor(state: State) -> Literal["platform_classifier", "format_response"]:
+def route_from_main_supervisor(state: State) -> Literal["platform_node", "format_response"]:
     """Enruta basado en la decisión del supervisor"""
     
     decision = state.get("supervisor_decision", "COMPLETO").upper()
@@ -139,9 +136,9 @@ def route_from_main_supervisor(state: State) -> Literal["platform_classifier", "
     if decision == "COMPLETO":
         return "format_response"
     
-    # Si necesita clasificación, ir al platform_classifier
+    # Si necesita clasificación, ir al platform_node
     if "CLASIFICACION" in decision:
-        return "platform_classifier"
+        return "platform_node"
     
     # Fallback: formatear con lo que hay
     return "format_response"

@@ -5,7 +5,7 @@ class State(TypedDict, total=False):
     # Campos originales
     question: str
     answer: str
-    task: Literal["pricing", "intelligence"]
+    task: Literal["availability", "presence"]
     tool_calls_count: int
     max_iterations: int
     accumulated_data: str
@@ -19,11 +19,11 @@ class State(TypedDict, total=False):
     # Tracking de errores
     classification_error: Optional[str]
     supervisor_error: Optional[str]
-    worker_errors: Optional[List[str]]
+    node_errors: Optional[List[str]]
     
     # Metadata útil para debugging
     iteration_history: Optional[List[Dict[str, Any]]]  # Historial de decisiones
-    last_worker: Optional[Literal["pricing_worker", "intelligence_worker"]]
+    last_node: Optional[Literal["availability_node", "presence_node"]]
     
     # Control de flujo
     should_continue: bool  # Flag explícito para continuar o no
@@ -67,25 +67,25 @@ def increment_tool_calls(state: State, worker_name: str = "") -> State:
     
     history.append({
         "iteration": count,
-        "worker": worker_name,
+        "node": worker_name,
         "data_length": len(state.get("accumulated_data", ""))
     })
     
     return {
         **state,
         "tool_calls_count": count,
-        "last_worker": worker_name,
+        "last_node": worker_name,
         "iteration_history": history
     }
 
-def add_error(state: State, error: str, error_type: str = "worker") -> State:
+def add_error(state: State, error: str, error_type: str = "node") -> State:
     """Helper para registrar errores"""
-    errors = state.get("worker_errors", [])
+    errors = state.get("node_errors", [])
     if errors is None:
         errors = []
     errors.append(f"[{error_type}] {error}")
     
     return {
         **state,
-        "worker_errors": errors
+        "node_errors": errors
     }

@@ -1,10 +1,11 @@
 # prompt_platform.py - Versión mejorada
-PLATFORM_PROMPT = f"""
-Eres el agente "platform". Tu única tarea es ELEGIR UN NODO
-PREGUNTA: {state['question']}
-Nodos:
-- availability: preguntas sobre dónde/si está disponible algo, exclusivos por plataforma y país/región, comparaciones entre plataformas, estrenos en últimos 7 días, precios por UID.
-- presence: preguntas sobre conteos/listados de catálogo, filtros y orden, valores únicos por columna, estadísticas de presencia, conteo de plataformas por país, resúmenes de plataformas y contenido por país/región.
+
+PLATFORM_PROMPT = """
+Eres el agente "platform". Tu única tarea es ELEGIR UN NODO basándote en la pregunta del usuario.
+
+Nodos disponibles:
+- AVAILABILITY: preguntas sobre dónde/si está disponible algo, exclusivos por plataforma y país/región, comparaciones entre plataformas, estrenos en últimos 7 días, precios por UID.
+- PRESENCE: preguntas sobre conteos/listados de catálogo, filtros y orden, valores únicos por columna, estadísticas de presencia, conteo de plataformas por país, resúmenes de plataformas y contenido por país/región.
 
 Responde EXACTAMENTE una palabra: AVAILABILITY o PRESENCE
 """

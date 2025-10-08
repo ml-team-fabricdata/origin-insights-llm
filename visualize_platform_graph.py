@@ -11,7 +11,7 @@ from src.strands.platform.graph.graph import create_streaming_graph
 
 def main():
     print("\n" + "="*70)
-    print("FLUJO DEL GRAFO PLATFORM - PRICING & INTELLIGENCE")
+    print("FLUJO DEL GRAFO PLATFORM - AVAILABILITY & PRESENCE")
     print("="*70 + "\n")
     
     print("""

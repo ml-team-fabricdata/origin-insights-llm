@@ -1,0 +1,208 @@
+Loading validation data from platform_name_iso
+
+============================================================
+GRAFO CON NODOS INDIVIDUALES POR TOOL
+============================================================
+DIAGRAMA MERMAID DEL GRAFO:
+============================================================
+---
+config:
+  flowchart:
+    curve: linear
+---
+graph TD;
+	__start__([<p>__start__</p>]):::first
+	prices_latest(prices_latest)
+	prices_history(prices_history)
+	prices_changes(prices_changes)
+	prices_stats(prices_stats)
+	hits_quality(hits_quality)
+	platform_exclusivity(platform_exclusivity)
+	catalog_similarity(catalog_similarity)
+	titles_diff(titles_diff)
+	router_pricing(router_pricing)
+	router_intelligence(router_intelligence)
+	pricing_supervisor(pricing_supervisor)
+	intelligence_supervisor(intelligence_supervisor)
+	main_supervisor(main_supervisor)
+	format_response(format_response)
+	__end__([<p>__end__</p>]):::last
+	__start__ --> main_supervisor;
+	catalog_similarity --> intelligence_supervisor;
+	hits_quality --> pricing_supervisor;
+	intelligence_supervisor -.-> main_supervisor;
+	intelligence_supervisor -.-> router_intelligence;
+	main_supervisor -.-> format_response;
+	main_supervisor -.-> router_intelligence;
+	main_supervisor -.-> router_pricing;
+	platform_exclusivity --> intelligence_supervisor;
+	prices_changes --> pricing_supervisor;
+	prices_history --> pricing_supervisor;
+	prices_latest --> pricing_supervisor;
+	prices_stats --> pricing_supervisor;
+	pricing_supervisor -.-> main_supervisor;
+	pricing_supervisor -.-> router_pricing;
+	router_intelligence -.-> catalog_similarity;
+	router_intelligence -.-> platform_exclusivity;
+	router_intelligence -.-> titles_diff;
+	router_pricing -.-> hits_quality;
+	router_pricing -.-> prices_changes;
+	router_pricing -.-> prices_history;
+	router_pricing -.-> prices_latest;
+	router_pricing -.-> prices_stats;
+	titles_diff --> intelligence_supervisor;
+	format_response --> __end__;
+	classDef default fill:#f2f0ff,line-height:1.2
+	classDef first fill-opacity:0
+	classDef last fill:#bfb6fc
+
+============================================================
+
+Copia el c├│digo Mermaid en https://mermaid.live para visualizarlo
+
+RESUMEN DEL GRAFO:
+============================================================
+Nodos (16): ['__start__', 'prices_latest', 'prices_history', 'prices_changes', 'prices_stats', 'hits_quality', 'platform_exclusivity', 'catalog_similarity', 'titles_diff', 'router_pricing', 'router_intelligence', 'pricing_supervisor', 'intelligence_supervisor', 'main_supervisor', 'format_response', '__end__']
+
+Edges: 25
+  - __start__ ÔåÆ main_supervisor
+  - catalog_similarity ÔåÆ intelligence_supervisor
+  - hits_quality ÔåÆ pricing_supervisor
+  - intelligence_supervisor ÔåÆ main_supervisor
+  - intelligence_supervisor ÔåÆ router_intelligence
+  - main_supervisor ÔåÆ format_response
+  - main_supervisor ÔåÆ router_intelligence
+  - main_supervisor ÔåÆ router_pricing
+  - platform_exclusivity ÔåÆ intelligence_supervisor
+  - prices_changes ÔåÆ pricing_supervisor
+  - prices_history ÔåÆ pricing_supervisor
+  - prices_latest ÔåÆ pricing_supervisor
+  - prices_stats ÔåÆ pricing_supervisor
+  - pricing_supervisor ÔåÆ main_supervisor
+  - pricing_supervisor ÔåÆ router_pricing
+============================================================
+
+[SUPERVISOR] Main supervisor analizando... task=None, tools=0
+[INFO] Primera clasificaci├│n de la pregunta
+[DECISION] Main supervisor decidi├│: 'NECESITA_INTELLIGENCE'
+[ROUTING] Main supervisor routing: decision='NECESITA_INTELLIGENCE', tools=0/3
+[ROUTE] Ruta: router_intelligence
+[ROUTER] Intelligence router: seleccionando tool...
+[SELECT] Seleccion├│: titles_diff
+[TOOL] Ejecutando: titles_diff
+
+Tool #1: titles_in_A_not_in_B
+Loading validation data from platform_name
+Pel├¡culas de Netflix en US que no est├ín en MX:
+1. 17 Again (Movie)
+2. 1917 (Movie)
+3. 23 Blast (Movie)
+4. 2 Hearts (Movie)
+5. 47 Meters Down (Movie)
+6. 47 Meters Down: Uncaged (Movie)
+7. 4 Kings 2 (Movie)
+8. 5 Centimeters per Second (Movie)
+9. Aaviri (Movie)
+10. Abandoned (Movie)
+11. ABBA: Against the Odds (Movie)
+12. Adam: His Song Continues (Movie)
+13. Adhugo (Movie)
+14. A Dog's Way Home (Movie)
+15. Afraid (Movie)
+
+(Nota: La lista contin├║a, mostr├® los primeros 15 t├¡tulos. El resultado completo tiene 50 pel├¡culas/series diferentes entre Netflix US y MX)
+
+Algunos t├¡tulos notables adicionales incluyen:
+- After (Movie)
+- American Gangster (Movie)
+- American Pie (Movie)
+- Anchorman 2: The Legend Continues (Movie)[OK] titles_diff completada (tool #1)
+[SUPERVISOR] Main supervisor analizando... task=intelligence, tools=1
+[INFO] Evaluando si necesita m├ís informaci├│n
+[DECISION] Main supervisor decidi├│: 'NECESITA_INTELLIGENCE'
+[ROUTING] Main supervisor routing: decision='NECESITA_INTELLIGENCE', tools=1/3
+[ROUTE] Ruta: router_intelligence
+[ROUTER] Intelligence router: seleccionando tool...
+[SELECT] Seleccion├│: titles_diff
+[TOOL] Ejecutando: titles_diff
+
+Tool #1: titles_in_A_not_in_B
+Pel├¡culas de Netflix en US que no est├ín en MX (50 primeras):
+1. 17 Again (Pel├¡cula)
+2. 1917 (Pel├¡cula)
+3. 23 Blast (Pel├¡cula)
+4. 2 Hearts (Pel├¡cula)
+5. 47 Meters Down (Pel├¡cula)
+6. 47 Meters Down: Uncaged (Pel├¡cula)
+7. 4 Kings 2 (Pel├¡cula)
+8. 5 Centimeters per Second (Pel├¡cula)
+9. 60 Days In (Serie)
+10. Aaviri (Pel├¡cula)
+11. Abandoned (Pel├¡cula)
+12. ABBA: Against the Odds (Pel├¡cula)
+13. Act Your Age (Serie)
+14. Adam: His Song Continues (Pel├¡cula)
+15. Adhugo (Pel├¡cula)
+16. A Dog's Way Home (Pel├¡cula)
+17. Afraid (Pel├¡cula)
+18. After (Pel├¡cula)
+19. After Earth (Pel├¡cula)
+20. After Ever Happy (Pel├¡cula)
+21. After Everything (Pel├¡cula)
+22. Aftermath (Pel├¡cula)
+23. After the Sunset (Pel├¡cula)
+24. After We Collided (Pel├¡cula)
+25. After We Fell (Pel├¡cula)
+26. A Good Old Fashioned Orgy (Pel├¡cula)
+27. A Hundred Flowers (Pel├¡cula)
+28. Airport (Pel├¡cula)
+29. Airport 1975 (Pel├¡cula)
+30. Airport '77 (Pel├¡cula)
+31. Ajin: Demi-Human (Pel├¡cula)
+32. A Lagos Love Story (Pel├¡cula)
+33. Alaskan Bush People (Serie)
+34. Ali (Pel├¡cula)
+35. A Little White Lie (Pel├¡cula)
+36. All American (Serie)
+37. All American: Homecoming (Serie)
+38. All The Queens Men (Pel├¡cula)
+39. Alone Australia (Serie)
+40. Alvinnn!!! and The Chipmunks (Serie)
+41. Amend: The Fight for America (Serie)
+42. American Gangster (Pel├¡cula)
+43. American Graffiti (Pel├¡cula)
+44. American Ninja Warrior (Serie)
+45. American Ninja Warrior: Ninja vs. Ninja (Serie)
+46. American Pickers (Serie)
+47. American Pie (Pel├¡cula)
+48. A Million Ways to Die in the West (Pel├¡cula)
+49. Amina (Pel├¡cula)
+50. Anchorman 2: The Legend Continues (Pel├¡cula)[OK] titles_diff completada (tool #2)
+[SUPERVISOR] Main supervisor analizando... task=intelligence, tools=2
+[INFO] Evaluando si necesita m├ís informaci├│n
+[DECISION] Main supervisor decidi├│: 'COMPLETO'
+[ROUTING] Main supervisor routing: decision='COMPLETO', tools=2/3
+[ROUTE] Ruta: format_response (completo)
+T├¡tulos disponibles en Netflix US pero no en MX:
+
+1. 17 Again (2009) - Movie - IMDB: tt0974661
+2. 1917 (2019) - Movie - IMDB: tt8579674
+3. 23 Blast (2014) - Movie - IMDB: tt2950864
+4. 2 Hearts (2020) - Movie - IMDB: tt9551110
+5. 47 Meters Down (2017) - Movie - IMDB: tt2932536
+6. 47 Meters Down: Uncaged (2019) - Movie - IMDB: tt7329656
+7. 4 Kings 2 (2021) - Movie - IMDB: tt14262522
+8. 5 Centimeters per Second (2007) - Movie - IMDB: tt0983213
+9. 60 Days In (2016) - TV Series - IMDB: tt5564124
+10. Aaviri (2019) - Movie - IMDB: tt11304726
+11. Abandoned (2022) - Movie - IMDB: tt15473252
+12. ABBA: Against the Odds (1984) - Movie - IMDB: tt0173972
+13. Act Your Age (2023) - TV Series - IMDB: tt27938582
+14. Adam: His Song Continues (1986) - Movie - IMDB: tt0090611
+15. Adhugo (2018) - Movie - IMDB: tt9239772
+[QUERY] Pregunta: Que peliculas tiene Netflix en US que no en MX.
+[TIME] Tiempo: 61.64s
+[TOOLS] Tools: 2
+[RESPONSE] Respuesta:
+{'role': 'assistant', 'content': [{'text': 'T├¡tulos disponibles en Netflix US pero no en MX:\n\n1. 17 Again (2009) - Movie - IMDB: tt0974661\n2. 1917 (2019) - Movie - IMDB: tt8579674\n3. 23 Blast (2014) - Movie - IMDB: tt2950864\n4. 2 Hearts (2020) - Movie - IMDB: tt9551110\n5. 47 Meters Down (2017) - Movie - IMDB: tt2932536\n6. 47 Meters Down: Uncaged (2019) - Movie - IMDB: tt7329656\n7. 4 Kings 2 (2021) - Movie - IMDB: tt14262522\n8. 5 Centimeters per Second (2007) - Movie - IMDB: tt0983213\n9. 60 Days In (2016) - TV Series - IMDB: tt5564124\n10. Aaviri (2019) - Movie - IMDB: tt11304726\n11. Abandoned (2022) - Movie - IMDB: tt15473252\n12. ABBA: Against the Odds (1984) - Movie - IMDB: tt0173972\n13. Act Your Age (2023) - TV Series - IMDB: tt27938582\n14. Adam: His Song Continues (1986) - Movie - IMDB: tt0090611\n15. Adhugo (2018) - Movie - IMDB: tt9239772'}]}
+

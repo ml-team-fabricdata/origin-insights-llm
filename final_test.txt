@@ -1,0 +1,135 @@
+Loading validation data from platform_name_iso
+
+============================================================
+GRAFO CON NODOS INDIVIDUALES POR TOOL
+============================================================
+DIAGRAMA MERMAID DEL GRAFO:
+============================================================
+---
+config:
+  flowchart:
+    curve: linear
+---
+graph TD;
+	__start__([<p>__start__</p>]):::first
+	prices_latest(prices_latest)
+	prices_history(prices_history)
+	prices_changes(prices_changes)
+	prices_stats(prices_stats)
+	hits_quality(hits_quality)
+	platform_exclusivity(platform_exclusivity)
+	catalog_similarity(catalog_similarity)
+	titles_diff(titles_diff)
+	router_pricing(router_pricing)
+	router_intelligence(router_intelligence)
+	main_supervisor(main_supervisor)
+	format_response(format_response)
+	__end__([<p>__end__</p>]):::last
+	__start__ --> main_supervisor;
+	catalog_similarity --> main_supervisor;
+	hits_quality --> main_supervisor;
+	main_supervisor -.-> format_response;
+	main_supervisor -.-> router_intelligence;
+	main_supervisor -.-> router_pricing;
+	platform_exclusivity --> main_supervisor;
+	prices_changes --> main_supervisor;
+	prices_history --> main_supervisor;
+	prices_latest --> main_supervisor;
+	prices_stats --> main_supervisor;
+	router_intelligence -.-> catalog_similarity;
+	router_intelligence -.-> platform_exclusivity;
+	router_intelligence -.-> titles_diff;
+	router_pricing -.-> hits_quality;
+	router_pricing -.-> prices_changes;
+	router_pricing -.-> prices_history;
+	router_pricing -.-> prices_latest;
+	router_pricing -.-> prices_stats;
+	titles_diff --> main_supervisor;
+	format_response --> __end__;
+	classDef default fill:#f2f0ff,line-height:1.2
+	classDef first fill-opacity:0
+	classDef last fill:#bfb6fc
+
+============================================================
+
+Copia el c├│digo Mermaid en https://mermaid.live para visualizarlo
+
+RESUMEN DEL GRAFO:
+============================================================
+Nodos (14): ['__start__', 'prices_latest', 'prices_history', 'prices_changes', 'prices_stats', 'hits_quality', 'platform_exclusivity', 'catalog_similarity', 'titles_diff', 'router_pricing', 'router_intelligence', 'main_supervisor', 'format_response', '__end__']
+
+Edges: 21
+  - __start__ ÔåÆ main_supervisor
+  - catalog_similarity ÔåÆ main_supervisor
+  - hits_quality ÔåÆ main_supervisor
+  - main_supervisor ÔåÆ format_response
+  - main_supervisor ÔåÆ router_intelligence
+  - main_supervisor ÔåÆ router_pricing
+  - platform_exclusivity ÔåÆ main_supervisor
+  - prices_changes ÔåÆ main_supervisor
+  - prices_history ÔåÆ main_supervisor
+  - prices_latest ÔåÆ main_supervisor
+  - prices_stats ÔåÆ main_supervisor
+  - router_intelligence ÔåÆ catalog_similarity
+  - router_intelligence ÔåÆ platform_exclusivity
+  - router_intelligence ÔåÆ titles_diff
+  - router_pricing ÔåÆ hits_quality
+============================================================
+
+[SUPERVISOR] Main supervisor analizando... task=None, tools=0
+[INFO] Primera clasificaci├│n de la pregunta
+[DECISION] Main supervisor decidi├│: 'NECESITA_INTELLIGENCE'
+[ROUTING] Main supervisor routing: decision='NECESITA_INTELLIGENCE', tools=0/3
+[ROUTE] Ruta: router_intelligence
+[ROUTER] Intelligence router: seleccionando tool...
+[SELECT] Seleccion├│: titles_diff
+[TOOL] Ejecutando: titles_diff
+
+Tool #1: titles_in_A_not_in_B
+Loading validation data from platform_name
+Peliculas de Netflix en US no disponibles en MX:
+1. 17 Again (Pel├¡cula)
+2. 1917 (Pel├¡cula)
+3. 23 Blast (Pel├¡cula)
+4. 2 Hearts (Pel├¡cula)
+5. 47 Meters Down (Pel├¡cula)
+6. 47 Meters Down: Uncaged (Pel├¡cula)
+7. 4 Kings 2 (Pel├¡cula)
+8. 5 Centimeters per Second (Pel├¡cula)
+9. Aaviri (Pel├¡cula)
+10. Abandoned (Pel├¡cula)
+11. ABBA: Against the Odds (Pel├¡cula)
+12. Adam: His Song Continues (Pel├¡cula)
+13. Adhugo (Pel├¡cula)
+14. A Dog's Way Home (Pel├¡cula)
+15. Afraid (Pel├¡cula)
+... (lista contin├║a)
+
+Total: 50 t├¡tulos diferentes (m├íximo mostrado por l├¡mite de la consulta). ┬┐Desea ver m├ís detalles sobre alguno en espec├¡fico?[OK] titles_diff completada (tool #1)
+[SUPERVISOR] Main supervisor analizando... task=intelligence, tools=1
+[INFO] Evaluando si necesita m├ís informaci├│n
+[DECISION] Main supervisor decidi├│: 'COMPLETO'
+[ROUTING] Main supervisor routing: decision='COMPLETO', tools=1/3
+[ROUTE] Ruta: format_response (completo)
+Netflix US Exclusive Movies (Not in MX):
+1. 17 Again (2009) - Movie
+2. 1917 (2019) - Movie
+3. 23 Blast (2014) - Movie
+4. 2 Hearts (2020) - Movie
+5. 47 Meters Down (2017) - Movie
+6. 47 Meters Down: Uncaged (2019) - Movie
+7. 4 Kings 2 (2021) - Movie
+8. 5 Centimeters per Second (2007) - Movie
+9. Aaviri (2019) - Movie
+10. Abandoned (2022) - Movie
+11. ABBA: Against the Odds (1997) - Movie
+12. Adam: His Song Continues (1986) - Movie
+13. Adhugo (2018) - Movie
+14. A Dog's Way Home (2019) - Movie
+15. Afraid (2018) - Movie
+[QUERY] Pregunta: Que peliculas tiene Netflix en US que no en MX.
+[TIME] Tiempo: 28.32s
+[TOOLS] Tools: 1
+[RESPONSE] Respuesta:
+{'role': 'assistant', 'content': [{'text': "Netflix US Exclusive Movies (Not in MX):\n1. 17 Again (2009) - Movie\n2. 1917 (2019) - Movie\n3. 23 Blast (2014) - Movie\n4. 2 Hearts (2020) - Movie\n5. 47 Meters Down (2017) - Movie\n6. 47 Meters Down: Uncaged (2019) - Movie\n7. 4 Kings 2 (2021) - Movie\n8. 5 Centimeters per Second (2007) - Movie\n9. Aaviri (2019) - Movie\n10. Abandoned (2022) - Movie\n11. ABBA: Against the Odds (1997) - Movie\n12. Adam: His Song Continues (1986) - Movie\n13. Adhugo (2018) - Movie\n14. A Dog's Way Home (2019) - Movie\n15. Afraid (2018) - Movie"}]}
+

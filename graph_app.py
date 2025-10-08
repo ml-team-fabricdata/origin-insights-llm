@@ -170,6 +170,21 @@ async def node_platform_exclusivity(state: State) -> State:
     """Ejecuta solo la tool get_platform_exclusivity_by_country."""
     print("[TOOL] Ejecutando: platform_exclusivity")
     q = state["question"]
+    
+    # Verificar si la pregunta pide comparación entre múltiples plataformas
+    q_lower = q.lower()
+    if any(word in q_lower for word in ["compara", "todas", "cual plataforma", "que plataforma", "mas contenido"]):
+        answer = "Esta pregunta requiere comparar el contenido total entre múltiples plataformas. La tool actual solo puede consultar contenido exclusivo de una plataforma específica. No hay una tool apropiada para responder esta pregunta con los datos disponibles."
+        count = state.get("tool_calls_count", 0) + 1
+        print(f"[WARNING] Pregunta no soportada por tools disponibles (tool #{count})")
+        return {
+            **state,
+            "answer": answer,
+            "task": "intelligence",
+            "tool_calls_count": count,
+            "accumulated_data": answer
+        }
+    
     agent = Agent(
         model="us.anthropic.claude-3-5-haiku-20241022-v1:0",
         tools=[get_platform_exclusivity_by_country],
@@ -666,7 +681,7 @@ if __name__ == "__main__":
         return result
 
     async def main():
-        await ask("Que plataforma tiene mas contenido disponible en US.")
+      
         await ask("Que peliculas tiene Netflix en US que no en MX.")
 
     asyncio.run(main())

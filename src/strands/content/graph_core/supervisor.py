@@ -1,9 +1,8 @@
-# parent_supervisor.py
+# graph_core/supervisor.py
 from strands import Agent
-from src.strands.platform.prompt_platform import PLATFORM_PROMPT
-from src.strands.utils import MODEL_AGENT
-from src.strands.platform.graph.state import State
-from src.prompt_templates.prompt import response_prompt
+from src.strands.platform.prompts import PLATFORM_PROMPT, RESPONSE_PROMPT, get_supervisor_prompt
+from src.strands.platform.config import MODEL_CLASSIFIER, MODEL_SUPERVISOR, MODEL_FORMATTER
+from .state import State
 from typing import Literal, Optional
 
 async def platform_classifier(state: State) -> State:
@@ -16,13 +15,18 @@ async def platform_classifier(state: State) -> State:
         return state
     
     agent = Agent(
-        model=MODEL_AGENT,
+        model=MODEL_CLASSIFIER,
         system_prompt=PLATFORM_PROMPT
     )
 
     # Pasar la pregunta del usuario al agent
     response = await agent.invoke_async(state['question'])
-    decision = getattr(response, "message", str(response)).strip().upper()
+    
+    # Extraer mensaje correctamente (puede ser dict u objeto)
+    if isinstance(response, dict):
+        decision = str(response.get('message', response)).strip().upper()
+    else:
+        decision = str(getattr(response, "message", response)).strip().upper()
     
     print(f"[CLASSIFIER] Decision: {decision}")
     
@@ -82,43 +86,39 @@ async def main_supervisor(state: State) -> State:
         }
     
     # Evaluar con LLM si los datos son suficientes
-    supervisor_agent = Agent(
-        model=MODEL_AGENT,
-        system_prompt=f"""Eres un supervisor. Evalúa si los datos obtenidos responden completamente la pregunta del usuario.
-        
-PREGUNTA DEL USUARIO: {state['question']}
-INTENTOS: {tool_calls}/{max_iter}
-
-DATOS OBTENIDOS:
-{accumulated[:800]}
-
-Responde EXACTAMENTE una palabra: COMPLETO (si los datos responden la pregunta) o CONTINUAR (si necesita más información)"""
+    supervisor_prompt = get_supervisor_prompt(
+        question=state['question'],
+        tool_calls=tool_calls,
+        max_iter=max_iter,
+        accumulated=accumulated
     )
     
-    try:
-        response = await supervisor_agent.invoke_async("¿Los datos responden la pregunta?")
-        decision = getattr(response, "message", str(response)).strip().upper()
-        print(f"[SUPERVISOR] Decision del LLM: {decision}")
-        
-        if "COMPLETO" in decision or "COMPLETE" in decision:
-            print("[SUPERVISOR] ✓ Pregunta respondida, ir a format")
-            supervisor_decision = "COMPLETO"
-        else:
-            print("[SUPERVISOR] ✗ Necesita mas informacion, continuar loop")
-            supervisor_decision = "NECESITA_CLASIFICACION"
-        
-        return {
-            **state,
-            "supervisor_decision": supervisor_decision
-        }
-    except Exception as e:
-        print(f"[SUPERVISOR ERROR] {e}")
-        # En caso de error, marcar como completo para no quedarse en loop
-        return {
-            **state,
-            "supervisor_decision": "COMPLETO",
-            "supervisor_error": str(e)
-        }
+    supervisor_agent = Agent(
+        model=MODEL_SUPERVISOR,
+        system_prompt=supervisor_prompt
+    )
+    
+    response = await supervisor_agent.invoke_async("¿Los datos responden la pregunta?")
+    
+    # Extraer mensaje correctamente (puede ser dict u objeto)
+    if isinstance(response, dict):
+        decision = str(response.get('message', response)).strip().upper()
+    else:
+        decision = str(getattr(response, "message", response)).strip().upper()
+    
+    print(f"[SUPERVISOR] Decision del LLM: {decision}")
+    
+    if "COMPLETO" in decision or "COMPLETE" in decision:
+        print("[SUPERVISOR] ✓ Pregunta respondida, ir a format")
+        supervisor_decision = "COMPLETO"
+    else:
+        print("[SUPERVISOR] ✗ Necesita mas informacion, continuar loop")
+        supervisor_decision = "NECESITA_CLASIFICACION"
+    
+    return {
+        **state,
+        "supervisor_decision": supervisor_decision
+    }
 
 
 def route_from_main_supervisor(state: State) -> Literal["platform_node", "format_response"]:
@@ -148,9 +148,9 @@ async def format_response(state: State) -> State:
     """Formatea la respuesta final al usuario"""
     
     formatter = Agent(
-        model="us.anthropic.claude-sonnet-4-20250514-v1:0",
+        model=MODEL_FORMATTER,
         tools=[],
-        system_prompt=response_prompt
+        system_prompt=RESPONSE_PROMPT
     )
     
     accumulated = state.get('accumulated_data', state.get('answer', ''))
@@ -167,27 +167,23 @@ async def format_response(state: State) -> State:
     
     payload = f"""Question: {state['question']}
 
-Raw data:
-{accumulated}
+        Raw data:
+        {accumulated}
 
-Format a clear, concise response for the user."""
+        Format a clear, concise response for the user."""
     
-    try:
-        out = await formatter.invoke_async(payload)
-        answer = getattr(out, "message", str(out))
-        
-        return {
-            "question": state["question"],
-            "answer": answer,
-            "task": state.get("task"),
-            "tool_calls_count": state.get("tool_calls_count", 0),
-            "status": "success"
-        }
-    except Exception as e:
-        return {
-            "question": state["question"],
-            "answer": f"Error al formatear la respuesta: {str(e)}",
-            "task": state.get("task"),
-            "tool_calls_count": state.get("tool_calls_count", 0),
-            "status": "format_error"
-        }
+    out = await formatter.invoke_async(payload)
+    
+    # Extraer mensaje correctamente (puede ser dict u objeto)
+    if isinstance(out, dict):
+        answer = str(out.get('message', out))
+    else:
+        answer = str(getattr(out, "message", out))
+    
+    return {
+        "question": state["question"],
+        "answer": answer,
+        "task": state.get("task"),
+        "tool_calls_count": state.get("tool_calls_count", 0),
+        "status": "success"
+    }

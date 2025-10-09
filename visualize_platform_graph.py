@@ -7,7 +7,7 @@ from pathlib import Path
 root_dir = Path(__file__).parent
 sys.path.insert(0, str(root_dir))
 
-from src.strands.platform.graph.graph import create_streaming_graph
+from src.strands.platform import create_streaming_graph
 
 def main():
     print("\n" + "="*70)

@@ -9,7 +9,7 @@ sys.path.insert(0, str(root_dir))
 
 import asyncio
 import time
-from src.strands.platform.graph.graph import process_question
+from src.strands.platform import process_question
 
 async def main():
     print("\n" + "="*60)
@@ -19,7 +19,7 @@ async def main():
     # Test 1: Pregunta de INTELLIGENCE
     print("[TEST 1] Pregunta de INTELLIGENCE")
     print("-" * 60)
-    question1 = "¿Cuántas plataformas hay en Argentina?"
+    question1 = "donde puedo ver stranger things?"
     
     start = time.time()
     result1 = await process_question(question1, max_iterations=1)
@@ -42,7 +42,7 @@ async def main():
     # Test 2: Pregunta de PRICING
     print("[TEST 2] Pregunta de PRICING")
     print("-" * 60)
-    question2 = "¿Cuánto cuesta Netflix en Argentina?"
+    question2 = "donde esta disponible avatar??"
     
     start = time.time()
     result2 = await process_question(question2, max_iterations=1)

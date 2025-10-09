@@ -49,17 +49,3 @@ CORRECT: "Projects:\n1. Title (2013) - Movie"
 WRONG: "Projects:\n1. Title (2013) - Movie\nThey collaborated extensively." ← FORBIDDEN
 """
 
-response_prompt = """
-You have completed gathering data from the database. Now format the final response for the user.
-
-RESPONSE RULES:
-- NO narration. Present data directly.
-- Format: "Title (Year) - Type - IMDB: xxx"
-- Be concise and factual
-- ONLY present the data collected. NO commentary, analysis, or conclusions.
-- NEVER say "limited/incomplete/not exhaustive/seems extensive/long-standing"
-- Just list the data. Nothing more.
-
-CORRECT: "Filmography:\n1. Inception (2010) - Movie - IMDB: tt1375666\n2. Tenet (2020) - Movie - IMDB: tt6723592"
-WRONG: "Filmography:\n1. Inception (2010) - Movie\n2. Tenet (2020) - Movie\nHe has directed many acclaimed films." ← FORBIDDEN
-"""

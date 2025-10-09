@@ -1,16 +1,14 @@
-# graph.py
+# graph_core/graph.py
 from langgraph.graph import StateGraph, END
 from .state import State, create_initial_state
-from .parent_supervisor import (
+from .supervisor import (
     platform_classifier,
     main_supervisor,
     route_from_main_supervisor,
     format_response
 )
-from src.strands.platform.node_helper import (
-    availability_node,
-    presence_node
-)
+from src.strands.platform.nodes.availability import availability_node
+from src.strands.platform.nodes.presence import presence_node
 
 def create_streaming_graph():
     """Crea el grafo de procesamiento con supervisión"""

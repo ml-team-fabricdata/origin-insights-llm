@@ -1,159 +1,82 @@
-from src.sql.utils.default_import import *
-from src.sql.utils.constants_sql import *
-from src.sql.queries.content.queries_discovery import *
-from src.sql.utils.sql_db import db
-from src.sql.utils.validators_shared import *
+# content/nodes/discovery.py
+from strands import Agent
+from src.strands.content.graph_core.state import State, increment_tool_calls, append_to_accumulated_data, add_error
+from src.strands.content.nodes.routers import route_discovery_tool
+from src.strands.utils.config import MODEL_NODE_EXECUTOR
+from src.strands.content.nodes.prompt_content import DISCOVERY_PROMPT
 
-@tool
-def get_filmography_by_uid(uid: str) -> List[Dict[str, Any]]:
-    """Get complete filmography and profile information for a specific title using its UID.
-    
-    Returns detailed metadata including title, type, year, duration, and countries.
-    ONLY use after UID has been confirmed or validated.
-    
-    Args:
-        uid: Unique identifier for the title
-       
-    Returns:
-        List with title information, empty if not found or invalid UID
-        
-    Raises:
-        ValueError: If UID has invalid format
-    """
-    uid = validate_uid(uid)
-    if not uid:
-        logger.warning("Invalid or empty UID for filmography query")
-        return []
-   
-    logger.debug(f"Getting filmography for UID: {uid}")
-    
-    results = db.execute_query(FILMOGRAPHY_SQL, (uid,))
-    
-    if results is None:
-        logger.error(f"Database query failed for filmography UID: {uid}")
-        return []
-    
-    return handle_query_result(results, "filmography", uid)
 
-@tool
-def get_title_rating(uid: str, country: Optional[str] = None) -> List[Dict[str, Any]]:
-    """Get rating and popularity metrics for a title by UID.
-    
-    Supports global ratings or country/region-specific ratings (provide ISO-2 country code OR region name like 'LATAM', 'EU').
-    Supports regions: LATAM/latin_america, EU, north_america, south_america, europe, asia, africa, oceania.
-    Returns total hits, average hits, and hit count from popularity data.
+# Importar tools
+from src.sql.modules.content.discovery import (
+    get_filmography_by_uid, 
+    get_title_rating, 
+    get_multiple_titles_info
+)
 
-    Args:
-        uid: Unique identifier for the title
-        country: Optional country code (ISO-2) or region (e.g., 'US', 'LATAM', 'EU') for specific rating
 
-    Returns:
-        Lista de diccionarios con información de rating.
-        Retorna lista vacía si no se encuentra el título.
-        
-    Raises:
-        ValueError: Si el UID tiene formato inválido
-    """
-    uid = validate_uid(uid)
-    if not uid:
-        logger.warning("Invalid or empty UID for rating query")
-        return [{"error": "UID required and must be a valid string"}]
+DISCOVERY_TOOLS_MAP = {
+    "filmography_by_uid": get_filmography_by_uid,
+    "title_rating": get_title_rating,
+    "multiple_titles_info": get_multiple_titles_info
+}
+ 
 
-    logger.debug(f"Querying rating for UID: {uid}, country: {country or 'global'}")
-
-    if not country:
-        results = db.execute_query(RATING_QUERY_GLOBAL, (uid,))
-        
-        if results is None:
-            logger.error(f"Database query failed for global rating UID: {uid}")
-            return [{"error": "Database query failed"}]
-
-        logger.info(f"Global rating queried for {uid}, results: {len(results)}")
-        return handle_query_result(results, "title rating global", uid)
+async def discovery_node(state: State) -> State:
+    """Nodo que ejecuta tools de discovery dinámicamente"""
     
-    country = country.strip() if isinstance(country, str) else str(country).strip()
+    print("\n" + "="*80)
+    print("🔹 DISCOVERY NODE")
+    print("="*80)
+    print(f"📝 Pregunta: {state['question']}")
+    print(f"📊 Estado actual:")
+    print(f"   • Task: {state.get('task', 'N/A')}")
+    print(f"   • Tool calls previos: {state.get('tool_calls_count', 0)}")
+    print(f"   • Datos acumulados: {len(state.get('accumulated_data', ''))} caracteres")
     
-    # Try to resolve as region first
-    region_isos = get_region_iso_list(country)
-    if region_isos:
-        # Handle region with multiple countries
-        if len(region_isos) == 1:
-            results = db.execute_query(RATING_QUERY_COUNTRY, (uid, region_isos[0]))
-            if results is None:
-                logger.error(f"Database query failed for country rating UID: {uid}, country: {region_isos[0]}")
-                return [{"error": "Database query failed"}]
-            logger.info(f"Country rating queried for {uid}:{region_isos[0]}, results: {len(results)}")
-            return handle_query_result(results, "title rating by country", uid)
-        else:
-            # Multiple countries - aggregate results
-            all_results = []
-            for iso in region_isos:
-                results = db.execute_query(RATING_QUERY_COUNTRY, (uid, iso))
-                if results:
-                    # Add country info to each result
-                    for r in results:
-                        r['queried_country'] = iso
-                    all_results.extend(results)
-            
-            if not all_results:
-                logger.info(f"No rating found for {uid} in region {country}")
-                return [{"message": f"No rating found for UID {uid} in region {country}"}]
-            
-            logger.info(f"Region rating queried for {uid}:{country}, results: {len(all_results)}")
-            return all_results
+    # 1. Usar el router para seleccionar la tool
+    print(f"\n🔀 Routing a tool específica...")
+    tool_name = await route_discovery_tool(state)
+    print(f"✅ Tool seleccionada: {tool_name}")
     
-    # Try as individual country
-    resolved_country_iso = resolve_country_iso(country)
+    # 2. Obtener la tool del mapeo
+    tool_fn = DISCOVERY_TOOLS_MAP.get(tool_name)
     
-    if not resolved_country_iso:
-        logger.warning(f"Invalid country code or region provided: {country}")
-        return [{"error": f"Invalid country code or region: {country}"}]
+    if not tool_fn:
+        error_msg = f"Tool no encontrada: {tool_name}"
+        print(f"❌ ERROR: {error_msg}")
+        state = add_error(state, error_msg, "discovery_node")
+        state = increment_tool_calls(state, worker_name="discovery_node")
+        return state
     
-    results = db.execute_query(RATING_QUERY_COUNTRY, (uid, resolved_country_iso))
+    # 3. Ejecutar la tool con Agent
+    print(f"🤖 Ejecutando tool con Agent (modelo: {MODEL_NODE_EXECUTOR})...")
+    agent = Agent(
+        model=MODEL_NODE_EXECUTOR,
+        tools=[tool_fn],
+        system_prompt=DISCOVERY_PROMPT
+    )
     
-    if results is None:
-        logger.error(f"Database query failed for country rating UID: {uid}, country: {resolved_country_iso}")
-        return [{"error": "Database query failed"}]
-
-    logger.info(f"Country rating queried for {uid}:{resolved_country_iso}, results: {len(results)}")
-    return handle_query_result(results, "title rating by country", uid)
-
-@tool
-def get_multiple_titles_info(uids: List[str]) -> List[Dict[str, Any]]:
-    """
-    Obtiene información básica para múltiples UIDs de una vez.
+    result = await agent.invoke_async(state['question'])
     
-    Args:
-        uids: Lista de identificadores únicos
-        
-    Returns:
-        Lista con información de los títulos encontrados
-    """
-    if not uids or not isinstance(uids, list):
-        logger.warning("Invalid or missing UIDs list")
-        return []
+    # 4. Extraer datos del resultado
+    new_data = getattr(result, "message", str(result))
     
-    valid_uids = [validated for uid in uids if (validated := validate_uid(uid))]
+    print(f"📦 Datos obtenidos: {len(new_data)} caracteres")
+    print(f"📄 Preview: {new_data[:200]}..." if len(new_data) > 200 else f"📄 Datos: {new_data}")
     
-    if not valid_uids:
-        logger.warning("No valid UIDs provided")
-        return []
+    # 5. Actualizar estado usando helpers
+    state = append_to_accumulated_data(
+        state, 
+        new_data, 
+        source=f"discovery_node/{tool_name}"
+    )
     
-    logger.debug(f"Getting info for {len(valid_uids)} UIDs")
+    state = increment_tool_calls(state, worker_name="discovery_node")
     
-    in_clause, params = build_in_clause("uid", valid_uids)
-    sql = f"""
-        SELECT uid, title, type, year, duration, countries_iso
-        FROM {META_TBL}
-        WHERE {in_clause}
-        ORDER BY title
-    """
+    print(f"\n✅ Discovery node completado")
+    print(f"   • Total tool calls: {state.get('tool_calls_count')}")
+    print(f"   • Total datos acumulados: {len(state.get('accumulated_data', ''))} caracteres")
+    print(f"   • Último nodo: {state.get('last_node', 'N/A')}")
+    print("="*80 + "\n")
     
-    results = db.execute_query(sql, params)
-    
-    if results is None:
-        logger.error("Database query failed for multiple UIDs")
-        return []
-    
-    logger.info(f"Retrieved info for {len(results)} out of {len(valid_uids)} requested UIDs")
-    return results
+    return state

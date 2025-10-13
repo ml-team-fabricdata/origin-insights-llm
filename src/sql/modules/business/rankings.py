@@ -2,6 +2,7 @@ from src.sql.utils.db_utils_sql import *
 from src.sql.utils.default_import import *
 from src.sql.utils.validators_shared import *
 from src.sql.queries.business.rankings_queries import *
+from strands import tool
 
 def compute_window_anchored_to_table(days_back: int) -> Optional[Tuple[str, str]]:
     """Compute date window anchored to MAX(date_hits) when no current data exists."""

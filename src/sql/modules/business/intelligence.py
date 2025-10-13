@@ -3,6 +3,7 @@ from src.sql.utils.db_utils_sql import *
 from src.sql.utils.constants_sql import *
 from src.sql.utils.validators_shared import *
 from src.sql.queries.business.intelligence_queries import *
+from strands import tool
 
 
 @tool
@@ -46,7 +47,7 @@ def catalog_similarity_for_platform(
     platform: Any,
     iso_a: Any = None,
     iso_b: Any = None,
-    __arg1: Any = None
+    arg1: Any = None
 ) -> Dict[str, Any]:
     """Similarity of a platform's catalog between two countries (ISO-2).
     
@@ -58,13 +59,13 @@ def catalog_similarity_for_platform(
         platform: Platform name
         iso_a: First country ISO-2 code
         iso_b: Second country ISO-2 code
-        __arg1: Alternative combined format (optional)
+        arg1: Alternative combined format (optional)
     
     Returns:
         Dict with similarity metrics and counts
     """
-    if not all([platform, iso_a, iso_b]) and __arg1:
-        s = str(__arg1).strip()
+    if not all([platform, iso_a, iso_b]) and arg1:
+        s = str(arg1).strip()
         parts = [p.strip() for p in s.replace(
             '|', ':').replace(',', ':').split(':') if p.strip()]
         if len(parts) == 3:

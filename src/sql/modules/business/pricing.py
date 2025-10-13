@@ -3,6 +3,7 @@ from src.sql.utils.default_import import *
 from src.sql.queries.business.pricing_queries import *
 from src.sql.utils.validators_shared import *
 from src.sql.modules.content.metadata import _validate_select
+from strands import tool
 
 def _resolve_definition(values: Optional[List[str]]) -> Optional[List[str]]:
     """Normaliza/valida definiciones (e.g., "sd hd" -> "SD/HD")."""
@@ -332,7 +333,7 @@ def query_presence_with_price(**kwargs) -> List[Dict[str, Any]]:
 def tool_prices_latest(*args, **kwargs):
     """Últimos precios con filtros flexibles (hash/uid/país/plataforma, etc.)."""
     kwargs = normalize_args_kwargs(args, kwargs)
-    arg1 = kwargs.get("__arg1")
+    arg1 = kwargs.get("arg1")
     hash_unique = kwargs.get("hash_unique")
     uid = kwargs.get("uid")
     country = kwargs.get("country")
@@ -448,7 +449,7 @@ def tool_prices_latest(*args, **kwargs):
 def tool_prices_history(*args, **kwargs):
     """Histórico de precios con filtros flexibles."""
     kwargs = normalize_args_kwargs(args, kwargs)
-    arg1 = kwargs.get("__arg1")
+    arg1 = kwargs.get("arg1")
     hash_unique = kwargs.get("hash_unique")
     uid = kwargs.get("uid")
     title_like = kwargs.get("title_like")
@@ -559,7 +560,7 @@ def tool_prices_history(*args, **kwargs):
 def tool_prices_changes_last_n_days(*args, **kwargs):
     """Cambios de precio en los últimos N días (up/down/all)."""
     kwargs = normalize_args_kwargs(args, kwargs)
-    arg1 = kwargs.get("__arg1")
+    arg1 = kwargs.get("arg1")
     hash_unique = kwargs.get("hash_unique")
     uid = kwargs.get("uid")
     n_days = validate_days_back(kwargs.get("n_days", 7), DEFAULT_DAYS_BACK)
@@ -648,7 +649,7 @@ def tool_prices_changes_last_n_days(*args, **kwargs):
 def tool_prices_stats(*args, **kwargs):
     """Estadísticas de precio (min/max/avg/medianas/pXX) con filtros comunes."""
     kwargs = normalize_args_kwargs(args, kwargs)
-    country = kwargs.get("country") or kwargs.get("__arg1")
+    country = kwargs.get("country") or kwargs.get("arg1")
     platform_code = kwargs.get("platform_code")
     platform_name = kwargs.get("platform_name")
     price_type = kwargs.get("price_type")

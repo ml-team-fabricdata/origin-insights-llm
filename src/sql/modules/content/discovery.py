@@ -3,6 +3,7 @@ from src.sql.utils.constants_sql import *
 from src.sql.queries.content.queries_discovery import *
 from src.sql.utils.sql_db import db
 from src.sql.utils.validators_shared import *
+from strands import tool
 
 @tool
 def get_filmography_by_uid(uid: str) -> List[Dict[str, Any]]:

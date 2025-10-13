@@ -1,4 +1,4 @@
-# state.py
+# platform/graph_core/state.py
 from typing import TypedDict, Literal, Optional, List, Dict, Any
 
 class State(TypedDict, total=False):
@@ -43,7 +43,7 @@ def create_initial_state(question: str, max_iterations: int = 3) -> State:
         "classification_done": False,
         "status": None,
         "iteration_history": [],
-        "worker_errors": [],
+        "node_errors": [],
         "should_continue": True
     }
 

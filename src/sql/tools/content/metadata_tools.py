@@ -13,7 +13,7 @@ METADATA_COUNT_TOOL = Tool.from_function(
         "Supports regions: LATAM/latin_america, EU, north_america, south_america, europe, asia, africa, oceania. "
         "Returns only total count. Use for quick counts. For detailed statistics (year ranges, durations), use metadata_simple_all_stats instead."
     ),
-    func=tool_metadata_count,
+    func=metadata_simple_all_count,
 )
 
 METADATA_LIST_TOOL = Tool.from_function(
@@ -21,7 +21,7 @@ METADATA_LIST_TOOL = Tool.from_function(
     description=(
         "Get distinct/unique values from specific metadata columns. Specify 'column' parameter to retrieve unique values from fields like: type, countries_iso, primary_genre, primary_language, year, etc. Supports aliases (genre→primary_genre, country→countries_iso, lang→primary_language). Useful for discovering available filter options."
     ),
-    func=tool_metadata_list,
+    func=metadata_simple_all_list,
 )
 
 
@@ -34,7 +34,7 @@ METADATA_STATS_TOOL = Tool.from_function(
         "Supports regions: LATAM/latin_america, EU, north_america, south_america, europe, asia, africa, oceania. "
         "Use for catalog overview. For simple count only, use metadata_simple_all_count instead."
     ),
-    func=tool_metadata_stats,
+    func=metadata_simple_all_stats,
 )
 
 METADATA_QUERY_TOOL = Tool.from_function(

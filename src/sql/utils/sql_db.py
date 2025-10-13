@@ -155,21 +155,41 @@ class SQLConnectionManager:
             params: Optional parameters for the query
             operation_name: Optional name for the operation (for compatibility with tools)
         """
+        import time
+        
+        # 🔍 LOG: Imprimir query ejecutada
+        print("\n" + "="*80)
+        print("🔍 SQL QUERY EJECUTADA")
+        print("="*80)
+        if operation_name:
+            print(f"📝 Operación: {operation_name}")
+        print(f"📄 Query:")
+        print(query)
+        if params:
+            print(f"🔧 Parámetros: {params}")
+        print("="*80 + "\n")
+        
         conn = self.get_connection()
         try:
             with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                start_time = time.time()
                 cur.execute(query, params)
+                elapsed_time = time.time() - start_time
 
                 # Para DDL y DML hacer commit explícito
                 query_upper = query.strip().upper()
                 if query_upper.startswith(('CREATE', 'DROP', 'ALTER', 'INSERT', 'UPDATE', 'DELETE')):
                     conn.commit()
                 if cur.description:  # SELECT query
-                    return cur.fetchall()
+                    results = cur.fetchall()
+                    print(f"✅ Query retornó {len(results)} filas en {elapsed_time:.3f}s\n")
+                    return results
                 else:  # INSERT/UPDATE/DELETE
+                    print(f"✅ Query afectó {cur.rowcount} filas en {elapsed_time:.3f}s\n")
                     return cur.rowcount
         except psycopg2.Error as e:
             logger.error(f"❌ Query execution failed: {e}")
+            print(f"❌ ERROR: {e}\n")
             try:
                 conn.rollback()
             except Exception:

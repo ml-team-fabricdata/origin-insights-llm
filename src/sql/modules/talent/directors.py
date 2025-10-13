@@ -3,6 +3,7 @@ from src.sql.utils.db_utils_sql import *
 from src.sql.utils.constants_sql import *
 from src.sql.utils.default_import import *
 from src.sql.modules.common.validation import *
+from strands import tool
 
 @tool
 def get_director_filmography(director_id: str, limit: int = DEFAULT_LIMIT) -> Dict[str, Any]:
@@ -49,35 +50,3 @@ def get_director_collaborators(director_id: str, limit: int = MAX_LIMIT) -> Dict
         f"director_collaborators_{director_id}"
     )
     return handle_query_result(results, "director_collaborators", director_id)
-
-@tool
-def get_director_filmography_by_name(
-    director_name: Union[str, List[str], Any],
-    limit: int = DEFAULT_LIMIT
-    ) -> str:
-    """Get complete filmography for a director by name.
-    
-    Validates the director name and returns their complete list of directed films/series with title, type, year, and IMDb ID.
-    If the name is ambiguous, returns options to choose from. If name not found, returns error message.
-    Use this when you only have the director's name.
-    
-    Args:
-        director_name: Director name to search for
-        limit: Maximum number of films to return (default 10)
-    
-    Returns:
-        JSON string with filmography data, options, or error message
-    """
-    validation = validate_director(director_name)
-   
-    if validation["status"] == "ok":
-        filmography = get_director_filmography(validation["id"], limit)
-        return json.dumps(filmography, indent=2, ensure_ascii=False)
-   
-    query_text = normalize_input(director_name)
-   
-    if validation["status"] == "ambiguous":
-        options_text = format_validation_options(validation["options"], "director")
-        return f"Encontré varios posibles para '{query_text}'. Elige uno:\n{options_text}"
-   
-    return f"No encontré coincidencias para '{query_text}'."

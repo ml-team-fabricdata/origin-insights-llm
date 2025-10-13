@@ -1,61 +1,62 @@
-# graph_core/graph.py
+# content/graph_core/graph.py
 from langgraph.graph import StateGraph, END
 from .state import State, create_initial_state
 from .supervisor import (
-    platform_classifier,
+    content_classifier,
     main_supervisor,
     route_from_main_supervisor,
     format_response
 )
-from src.strands.platform.nodes.availability import availability_node
-from src.strands.platform.nodes.presence import presence_node
+from src.strands.content.nodes.metadata import metadata_node
+from src.strands.content.nodes.discovery import discovery_node
 
 def create_streaming_graph():
-    """Crea el grafo de procesamiento con supervisión"""
+    """Crea el grafo de procesamiento con supervisión para CONTENT"""
     
     # Inicializar grafo
     graph = StateGraph(State)
     
     # Agregar nodos
     graph.add_node("main_supervisor", main_supervisor)
-    graph.add_node("platform_node", platform_classifier)
-    graph.add_node("availability_node", availability_node)
-    graph.add_node("presence_node", presence_node)
+    graph.add_node("content_classifier", content_classifier)
+    graph.add_node("metadata_node", metadata_node)
+    graph.add_node("discovery_node", discovery_node)
     graph.add_node("format_response", format_response)
     
-    # Flujo: START → main_supervisor → platform_classifier → nodes → format → END
+    # Flujo: START → main_supervisor → content_classifier → nodes → format → END
     graph.set_entry_point("main_supervisor")
     
-    # Supervisor decide si necesita clasificar o formatear
+    # Supervisor decide si necesita clasificar, formatear, o volver al main router
     graph.add_conditional_edges(
         "main_supervisor",
         route_from_main_supervisor,
         {
-            "platform_node": "platform_node",
-            "format_response": "format_response"
+            "content_classifier": "content_classifier",
+            "format_response": "format_response",
+            "return_to_main_router": END  # Termina para volver al main router
         }
     )
     
     def route_from_classifier(state: State) -> str:
-        """Ruta desde classifier a pricing o intelligence"""
+        """Ruta desde classifier a metadata o discovery"""
         task = state.get("task", "").lower()
-        if task == "pricing":
-            return "availability_node"
+        if task == "metadata":
+            return "metadata_node"
         else:
-            return "presence_node"
+            return "discovery_node"
     
     graph.add_conditional_edges(
-        "platform_node",
+        "content_classifier",
         route_from_classifier,
         {
-            "availability_node": "availability_node",
-            "presence_node": "presence_node"
+            "metadata_node": "metadata_node",
+            "discovery_node": "discovery_node"
         }
     )
     
     # Después de cada node, VOLVER al supervisor para evaluar
-    graph.add_edge("availability_node", "main_supervisor")
-    graph.add_edge("presence_node", "main_supervisor")
+    graph.add_edge("metadata_node", "main_supervisor")
+    graph.add_edge("discovery_node", "main_supervisor")
     
     # Formatear respuesta es el paso final
     graph.add_edge("format_response", END)
@@ -98,24 +99,3 @@ async def process_question_streaming(question: str, max_iterations: int = 3):
         print("---")
     
     return state_output
-
-
-# Testing
-if __name__ == "__main__":
-    import asyncio
-    
-    async def test():
-        question = "¿Dónde puedo ver Stranger Things?"
-        result = await process_question(question, max_iterations=2)
-        
-        print("\n=== RESULTADO FINAL ===")
-        print(f"Pregunta: {result['question']}")
-        print(f"Respuesta: {result['answer']}")
-        print(f"Task: {result['task']}")
-        print(f"Iteraciones: {result['tool_calls_count']}")
-        print(f"Status: {result.get('status', 'N/A')}")
-        
-        if result.get('node_errors'):
-            print(f"\nErrores: {result['node_errors']}")
-    
-    asyncio.run(test())

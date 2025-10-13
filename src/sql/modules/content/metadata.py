@@ -3,7 +3,7 @@ from src.sql.utils.db_utils_sql import *
 from src.sql.utils.constants_sql import *
 from src.sql.utils.validators_shared import *
 from src.sql.queries.content.queries_metadata import *
-
+from strands import tool
 
 def _normalize_args_kwargs(args, kwargs, parse_arg1=False):
     kwargs = normalize_args_kwargs(args, kwargs)
@@ -98,7 +98,7 @@ def _build_filters_common(kwargs):
 
 
 @tool
-def tool_metadata_count(*args, **kwargs):
+def metadata_simple_all_count(*args, **kwargs):
     kwargs = _normalize_args_kwargs(args, kwargs)
 
     primary_arg = str(kwargs.get("__arg1", "")).strip().lower()
@@ -123,7 +123,7 @@ def tool_metadata_count(*args, **kwargs):
 
 
 @tool
-def tool_metadata_list(*args, **kwargs):
+def metadata_simple_all_list(*args, **kwargs):
     kwargs = _normalize_args_kwargs(args, kwargs)
 
     primary_arg = kwargs.get("__arg1")
@@ -160,7 +160,7 @@ def tool_metadata_list(*args, **kwargs):
 
 
 @tool
-def tool_metadata_stats(*args, **kwargs):
+def metadata_simple_all_stats(*args, **kwargs):
     kwargs = _normalize_args_kwargs(args, kwargs)
 
     primary_arg = str(kwargs.get("__arg1", "")).strip().lower()
@@ -381,7 +381,7 @@ def query_metadata_simple_all(*args, **kwargs) -> List[Dict[str, Any]]:
 
 
 @tool
-def query_metadata_simple_all_tool(*args, **kwargs) -> List[Dict]:
+def metadata_simple_all_query(*args, **kwargs) -> List[Dict]:
     kwargs = _normalize_args_kwargs(args, kwargs, parse_arg1=True)
     rows = query_metadata_simple_all(**kwargs) or []
 

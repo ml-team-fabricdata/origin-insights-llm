@@ -26,13 +26,14 @@ def create_streaming_graph():
     # Flujo: START → main_supervisor → platform_classifier → nodes → format → END
     graph.set_entry_point("main_supervisor")
     
-    # Supervisor decide si necesita clasificar o formatear
+    # Supervisor decide si necesita clasificar, formatear, o volver al main router
     graph.add_conditional_edges(
         "main_supervisor",
         route_from_main_supervisor,
         {
             "platform_node": "platform_node",
-            "format_response": "format_response"
+            "format_response": "format_response",
+            "return_to_main_router": END  # Termina para volver al main router
         }
     )
     
@@ -98,24 +99,3 @@ async def process_question_streaming(question: str, max_iterations: int = 3):
         print("---")
     
     return state_output
-
-
-# Testing
-if __name__ == "__main__":
-    import asyncio
-    
-    async def test():
-        question = "¿Dónde puedo ver Stranger Things?"
-        result = await process_question(question, max_iterations=2)
-        
-        print("\n=== RESULTADO FINAL ===")
-        print(f"Pregunta: {result['question']}")
-        print(f"Respuesta: {result['answer']}")
-        print(f"Task: {result['task']}")
-        print(f"Iteraciones: {result['tool_calls_count']}")
-        print(f"Status: {result.get('status', 'N/A')}")
-        
-        if result.get('node_errors'):
-            print(f"\nErrores: {result['node_errors']}")
-    
-    asyncio.run(test())

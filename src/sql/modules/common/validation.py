@@ -2,6 +2,7 @@ from __future__ import annotations
 from src.sql.utils.default_import import *
 from src.sql.utils.db_utils_sql import *
 from src.sql.queries.common.queries_validation import *
+from strands import tool
 
 MAX_OPTIONS_DISPLAY = 8
 MAX_VALIDATION_OPTIONS = 5

@@ -1,8 +1,8 @@
-# nodes/availability.py - Nodo de disponibilidad
+# platform/nodes/availability.py - Nodo de disponibilidad
 from strands import Agent
 from src.strands.platform.graph_core.state import State, increment_tool_calls, append_to_accumulated_data, add_error
 from src.strands.platform.nodes.routers import route_availability_tool
-from src.strands.platform.config import MODEL_NODE_EXECUTOR
+from src.strands.utils.config import MODEL_NODE_EXECUTOR
 
 # Importar tools
 from src.sql.modules.platform.availability import (
@@ -13,7 +13,7 @@ from src.sql.modules.platform.availability import (
 )
 
 # Importar prompts
-from src.strands.platform.prompts import AVAILABILITY_PROMPT
+from src.strands.platform.prompt_platform import AVAILABILITY_PROMPT
 
 # Mapeo de tools
 AVAILABILITY_TOOLS_MAP = {
@@ -27,23 +27,32 @@ AVAILABILITY_TOOLS_MAP = {
 async def availability_node(state: State) -> State:
     """Nodo que ejecuta tools de disponibilidad dinámicamente"""
     
-    print("[NODE] Availability node ejecutando...")
+    print("\n" + "="*80)
+    print("🔹 AVAILABILITY NODE")
+    print("="*80)
+    print(f"📝 Pregunta: {state['question']}")
+    print(f"📊 Estado actual:")
+    print(f"   • Task: {state.get('task', 'N/A')}")
+    print(f"   • Tool calls previos: {state.get('tool_calls_count', 0)}")
+    print(f"   • Datos acumulados: {len(state.get('accumulated_data', ''))} caracteres")
     
     # 1. Usar el router para seleccionar la tool
+    print(f"\n🔀 Routing a tool específica...")
     tool_name = await route_availability_tool(state)
-    print(f"[NODE] Tool seleccionada: {tool_name}")
+    print(f"✅ Tool seleccionada: {tool_name}")
     
     # 2. Obtener la tool del mapeo
     tool_fn = AVAILABILITY_TOOLS_MAP.get(tool_name)
     
     if not tool_fn:
         error_msg = f"Tool no encontrada: {tool_name}"
-        print(f"[ERROR] {error_msg}")
+        print(f"❌ ERROR: {error_msg}")
         state = add_error(state, error_msg, "availability_node")
         state = increment_tool_calls(state, worker_name="availability_node")
         return state
     
     # 3. Ejecutar la tool con Agent
+    print(f"🤖 Ejecutando tool con Agent (modelo: {MODEL_NODE_EXECUTOR})...")
     agent = Agent(
         model=MODEL_NODE_EXECUTOR,
         tools=[tool_fn],
@@ -57,7 +66,9 @@ async def availability_node(state: State) -> State:
         new_data = str(result.get('message', result))
     else:
         new_data = str(getattr(result, "message", result))
-    print(f"[NODE] Datos obtenidos: {len(new_data)} caracteres")
+    
+    print(f"📦 Datos obtenidos: {len(new_data)} caracteres")
+    print(f"📄 Preview: {new_data[:200]}..." if len(new_data) > 200 else f"📄 Datos: {new_data}")
     
     # 5. Actualizar estado usando helpers
     state = append_to_accumulated_data(
@@ -68,5 +79,10 @@ async def availability_node(state: State) -> State:
     
     state = increment_tool_calls(state, worker_name="availability_node")
     
-    print(f"[NODE] Availability node completado (tool #{state.get('tool_calls_count')})")
+    print(f"\n✅ Availability node completado")
+    print(f"   • Total tool calls: {state.get('tool_calls_count')}")
+    print(f"   • Total datos acumulados: {len(state.get('accumulated_data', ''))} caracteres")
+    print(f"   • Último nodo: {state.get('last_node', 'N/A')}")
+    print("="*80 + "\n")
+    
     return state

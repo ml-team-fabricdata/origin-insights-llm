@@ -5,30 +5,29 @@ from src.sql.utils.validators_shared import *
 from strands import tool
 
 
-
 @tool
 def get_availability_by_uid(uid: str, country: Optional[str] = None, with_prices: bool = False, limit: int = 100) -> List[Dict]:
     """Get platform availability for a title by UID with optional price information.
-    
+
     Parameters: uid (required), country (optional - accepts ISO-2 code like 'US' OR region name like 'LATAM', 'EU', 'latin_america'),
     with_prices (boolean, default False), limit (int, default 100 - max platforms to return).
     Supports regions: LATAM/latin_america, EU, north_america, south_america, europe, asia, africa, oceania, and more.
     Returns platform availability data including platform names, countries, and optionally pricing information.
-    
+
     Args:
         uid: Unique identifier for the title
         country: Country ISO-2 code or region name (e.g., 'US', 'LATAM', 'EU') (optional)
         with_prices: Include price information (default False)
         limit: Maximum number of platforms to return (default 100)
-        
+
     Returns:
         List containing availability data or error message
     """
     uid, country = parse_uid_with_country(uid, country)
-    
+
     if not uid:
         return [{"message": "UID parameter is required"}]
-    
+
     country_isos = None
     if country:
         # Try to resolve as region first
@@ -56,13 +55,17 @@ def get_availability_by_uid(uid: str, country: Optional[str] = None, with_prices
             country_condition = f"AND p.iso_alpha2 IN ({placeholders})"
 
     if with_prices:
-        sql = QUERY_AVAILABILITY_WITH_PRICES.format(country_condition=country_condition)
+        sql = QUERY_AVAILABILITY_WITH_PRICES.format(
+            country_condition=country_condition)
     else:
-        sql = QUERY_AVAILABILITY_WITHOUT_PRICES.format(country_condition=country_condition)
+        sql = QUERY_AVAILABILITY_WITHOUT_PRICES.format(
+            country_condition=country_condition)
 
     result = db.execute_query(sql, query_params)
-    country_filter_display = country_isos[0] if country_isos and len(country_isos) == 1 else (f"region:{country}" if country_isos and len(country_isos) > 1 else None)
-    logger.info(f"Availability queried for {uid} (country={country_filter_display}, with_prices={with_prices}), results: {len(result) if result else 0}")
+    country_filter_display = country_isos[0] if country_isos and len(country_isos) == 1 else (
+        f"region:{country}" if country_isos and len(country_isos) > 1 else None)
+    logger.info(
+        f"Availability queried for {uid} (country={country_filter_display}, with_prices={with_prices}), results: {len(result) if result else 0}")
 
     if not result:
         error_context = {"uid": uid, "message": "No availability found"}
@@ -78,7 +81,7 @@ def get_availability_by_uid(uid: str, country: Optional[str] = None, with_prices
     total_platforms = len(result)
     if limit and len(result) > limit:
         result = result[:limit]
-    
+
     response_data = {
         "uid": uid,
         "country_filter": country_isos[0] if country_isos and len(country_isos) == 1 else None,
@@ -99,7 +102,7 @@ def get_availability_by_uid(uid: str, country: Optional[str] = None, with_prices
 
         if prices_found:
             all_prices = [
-                float(r['price']) for r in prices_found 
+                float(r['price']) for r in prices_found
                 if r.get('price') and str(r['price']).replace('.', '').isdigit()
             ]
             if all_prices:
@@ -108,13 +111,14 @@ def get_availability_by_uid(uid: str, country: Optional[str] = None, with_prices
                         "min": min(all_prices),
                         "max": max(all_prices),
                         "currencies": list(set(
-                            r['currency'] for r in prices_found 
+                            r['currency'] for r in prices_found
                             if r.get('currency')
                         ))
                     }
                 })
 
     return [response_data]
+
 
 @tool
 def query_platforms_for_title(uid: str, limit: int = 50) -> List[Dict]:
@@ -128,14 +132,17 @@ def query_platforms_for_title(uid: str, limit: int = 50) -> List[Dict]:
     Returns:
         List of platform information for the title
     """
-    logger.info(f"query_platforms_for_title called with uid={uid}, limit={limit}")
+    logger.info(
+        f"query_platforms_for_title called with uid={uid}, limit={limit}")
 
     if not uid:
         return [{"message": "uid required"}]
     result = db.execute_query(QUERY_PLATFORMS_FOR_TITLE, (uid, limit))
-    
-    logger.info(f"Platforms queried for {uid}, results: {len(result) if result else 0}")
+
+    logger.info(
+        f"Platforms queried for {uid}, results: {len(result) if result else 0}")
     return handle_query_result(result, "platforms for title (uid)", uid)
+
 
 @tool
 def query_platforms_for_uid_by_country(uid: str, country: str = None) -> List[Dict]:
@@ -149,13 +156,15 @@ def query_platforms_for_uid_by_country(uid: str, country: str = None) -> List[Di
     Returns:
         List of platform information filtered by country/region
     """
-    logger.info(f"query_platforms_for_uid_by_country called with uid={uid}, country={country}")
+    logger.info(
+        f"query_platforms_for_uid_by_country called with uid={uid}, country={country}")
 
     if not uid:
         return [{"message": "uid required"}]
 
     if not country:
-        logger.info("No country provided, falling back to generic platforms query")
+        logger.info(
+            "No country provided, falling back to generic platforms query")
         return query_platforms_for_title(uid)
 
     # Try to resolve as region first
@@ -163,7 +172,8 @@ def query_platforms_for_uid_by_country(uid: str, country: str = None) -> List[Di
     if region_isos:
         # Handle region with multiple countries
         if len(region_isos) == 1:
-            result = db.execute_query(QUERY_PLATFORMS_FOR_UID_BY_COUNTRY, (uid, region_isos[0]))
+            result = db.execute_query(
+                QUERY_PLATFORMS_FOR_UID_BY_COUNTRY, (uid, region_isos[0]))
             return handle_query_result(result, "platforms for title by country", f"{uid} @ {region_isos[0]}")
         else:
             # Multiple countries - need different query approach
@@ -174,20 +184,22 @@ def query_platforms_for_uid_by_country(uid: str, country: str = None) -> List[Di
             )
             result = db.execute_query(query, (uid,))
             return handle_query_result(result, "platforms for title by region", f"{uid} @ {country}")
-    
+
     # Try as individual country
     resolved_country = resolve_country_iso(country)
     if not resolved_country:
         return [{"message": f"Invalid country code or region: {country}"}]
-    
-    result = db.execute_query(QUERY_PLATFORMS_FOR_UID_BY_COUNTRY, (uid, resolved_country))
-    
+
+    result = db.execute_query(
+        QUERY_PLATFORMS_FOR_UID_BY_COUNTRY, (uid, resolved_country))
+
     return handle_query_result(result, "platforms for title by country", f"{uid} @ {resolved_country}")
+
 
 @tool
 def get_platform_exclusives(platform_name: str, country: str = "US", limit: int = 50) -> List[Dict]:
     """Get exclusive titles available on a specific platform within a country or region.
-    
+
     Requires platform_name and country (ISO-2 code OR region name like 'LATAM', 'EU', defaults to US).
     Supports regions: LATAM/latin_america, EU, north_america, south_america, europe, asia, africa, oceania.
     Returns list of titles that are exclusively available on the specified platform in the given country/region,
@@ -201,25 +213,28 @@ def get_platform_exclusives(platform_name: str, country: str = "US", limit: int 
     Returns:
         List of exclusive titles for the platform
     """
-    logger.info(f"get_platform_exclusives called with platform_name={platform_name}, country={country}, limit={limit}")
+    logger.info(
+        f"get_platform_exclusives called with platform_name={platform_name}, country={country}, limit={limit}")
 
     if not platform_name:
         return [{"message": "Platform name required"}]
 
     resolved_platform = resolve_platform_name(platform_name)
-    
+
     # Try to resolve as region first
     region_isos = get_region_iso_list(country)
     if region_isos:
         # Handle region with multiple countries
         if len(region_isos) == 1:
-            result = db.execute_query(QUERY_PLATFORM_EXCLUSIVES, (resolved_platform, region_isos[0], limit))
+            result = db.execute_query(
+                QUERY_PLATFORM_EXCLUSIVES, (resolved_platform, region_isos[0], limit))
             return handle_query_result(result, "platform exclusives", f"exclusives {resolved_platform} @ {region_isos[0]}")
         else:
             # Multiple countries - aggregate results
             all_results = []
             for iso in region_isos:
-                result = db.execute_query(QUERY_PLATFORM_EXCLUSIVES, (resolved_platform, iso, limit))
+                result = db.execute_query(
+                    QUERY_PLATFORM_EXCLUSIVES, (resolved_platform, iso, limit))
                 if result:
                     all_results.extend(result)
             # Remove duplicates by uid and limit
@@ -232,20 +247,22 @@ def get_platform_exclusives(platform_name: str, country: str = "US", limit: int 
                     if len(unique_results) >= limit:
                         break
             return handle_query_result(unique_results, "platform exclusives", f"exclusives {resolved_platform} @ {country}")
-    
+
     # Try as individual country
     resolved_country = resolve_country_iso(country)
     if not resolved_country:
         return [{"message": f"Invalid country code or region: {country}"}]
-    
-    result = db.execute_query(QUERY_PLATFORM_EXCLUSIVES, (resolved_platform, resolved_country, limit))
-    
+
+    result = db.execute_query(
+        QUERY_PLATFORM_EXCLUSIVES, (resolved_platform, resolved_country, limit))
+
     return handle_query_result(result, "platform exclusives", f"exclusives {resolved_platform} @ {resolved_country}")
+
 
 @tool
 def compare_platforms_for_title(title_: str) -> List[Dict]:
     """Compare which streaming platforms carry a specific title (exact title match).
-    
+
     Returns distinct list of platform names and countries where the title is available.
     Useful for finding where to watch a specific movie or series across different platforms and regions.
 
@@ -261,9 +278,10 @@ def compare_platforms_for_title(title_: str) -> List[Dict]:
         return [{"message": "Title required"}]
 
     result = db.execute_query(QUERY_COMPARE_PLATFORM_TITLE, (title_,))
-    
+
     logger.info(f"Platforms queried for {title_}, results: {result}")
     return handle_query_result(result, "compare platforms for title", title_)
+
 
 @tool
 def get_recent_premieres_by_country(country: str, days_back: int = 7, limit: int = 30) -> List[Dict]:
@@ -291,7 +309,7 @@ def get_recent_premieres_by_country(country: str, days_back: int = 7, limit: int
     date_from, date_to = get_date_range(days_back)
 
     logger.debug(f"Date range: {date_from} → {date_to}")
-    
+
     # Try to resolve as region first
     region_isos = get_region_iso_list(country)
     if region_isos:
@@ -303,7 +321,8 @@ def get_recent_premieres_by_country(country: str, days_back: int = 7, limit: int
                 "date_to": date_to,
                 "limit": limit,
             }
-            logger.debug(f"[recent_premieres] country={region_isos[0]}, days_back={days_back}, range=({date_from},{date_to}), limit={limit}")
+            logger.debug(
+                f"[recent_premieres] country={region_isos[0]}, days_back={days_back}, range=({date_from},{date_to}), limit={limit}")
             rows = db.execute_query(QUERY_RECENT_PREMIERES_BY_COUNTRY, params)
             return handle_query_result(rows, "recent premieres by country", f"{region_isos[0]} last {days_back}d")
         else:
@@ -316,7 +335,8 @@ def get_recent_premieres_by_country(country: str, days_back: int = 7, limit: int
                     "date_to": date_to,
                     "limit": limit,
                 }
-                rows = db.execute_query(QUERY_RECENT_PREMIERES_BY_COUNTRY, params)
+                rows = db.execute_query(
+                    QUERY_RECENT_PREMIERES_BY_COUNTRY, params)
                 if rows:
                     all_results.extend(rows)
             # Remove duplicates by uid and limit
@@ -328,9 +348,10 @@ def get_recent_premieres_by_country(country: str, days_back: int = 7, limit: int
                     unique_results.append(r)
                     if len(unique_results) >= limit:
                         break
-            logger.debug(f"[recent_premieres] region={country}, days_back={days_back}, range=({date_from},{date_to}), total_results={len(unique_results)}")
+            logger.debug(
+                f"[recent_premieres] region={country}, days_back={days_back}, range=({date_from},{date_to}), total_results={len(unique_results)}")
             return handle_query_result(unique_results, "recent premieres by region", f"{country} last {days_back}d")
-    
+
     # Try as individual country
     resolved_country = resolve_country_iso(country)
     if not resolved_country:
@@ -343,7 +364,8 @@ def get_recent_premieres_by_country(country: str, days_back: int = 7, limit: int
         "limit": limit,
     }
 
-    logger.debug(f"[recent_premieres] country={resolved_country}, days_back={days_back}, range=({date_from},{date_to}), limit={limit}")
+    logger.debug(
+        f"[recent_premieres] country={resolved_country}, days_back={days_back}, range=({date_from},{date_to}), limit={limit}")
     rows = db.execute_query(QUERY_RECENT_PREMIERES_BY_COUNTRY, params)
-    
+
     return handle_query_result(rows, "recent premieres by country", f"{resolved_country} last {days_back}d")

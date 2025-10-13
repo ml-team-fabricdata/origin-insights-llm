@@ -1,11 +1,11 @@
-# state.py
+# content/graph_core/state.py
 from typing import TypedDict, Literal, Optional, List, Dict, Any
 
 class State(TypedDict, total=False):
     # Campos originales
     question: str
     answer: str
-    task: Literal["availability", "presence"]
+    task: Literal["metadata", "discovery"]
     tool_calls_count: int
     max_iterations: int
     accumulated_data: str
@@ -23,7 +23,7 @@ class State(TypedDict, total=False):
     
     # Metadata útil para debugging
     iteration_history: Optional[List[Dict[str, Any]]]  # Historial de decisiones
-    last_node: Optional[Literal["availability_node", "presence_node"]]
+    last_node: Optional[Literal["metadata_node", "discovery_node"]]
     
     # Control de flujo
     should_continue: bool  # Flag explícito para continuar o no

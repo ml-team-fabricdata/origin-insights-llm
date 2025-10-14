@@ -61,11 +61,24 @@ def parse_plan(plan_text: str):
 
 def substitute_placeholders(args, results):
     """
-    Reemplaza placeholders tipo {{step_1}} por el valor real.
+    Reemplaza placeholders tipo:
+      {{step_1}} -> resultado completo del paso 1
+      {{step_1.uid}} -> valor de la clave 'uid' dentro del resultado del paso 1
     """
+    def resolve_placeholder(path):
+        parts = path.split(".")
+        value = results.get(parts[0])
+        for key in parts[1:]:  # recorrer las claves anidadas
+            if isinstance(value, dict):
+                value = value.get(key)
+            else:
+                return f"{{{{{path}}}}}"  # fallback si no existe
+        return value
+
     def replace(match):
-        key = match.group(1)
-        return str(results.get(key, f"{{{{{key}}}}}"))
+        path = match.group(1)
+        value = resolve_placeholder(path)
+        return str(value) if value is not None else f"{{{{{path}}}}}"
 
     if isinstance(args, str):
         return re.sub(r"\{\{(.*?)\}\}", replace, args)

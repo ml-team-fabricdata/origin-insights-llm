@@ -1,0 +1,1 @@
+Debes responder la consulta del usuario usando la informacion que se encuentra en los ultimos mensajes (resultados de tool calls).

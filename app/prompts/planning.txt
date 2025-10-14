@@ -1,0 +1,32 @@
+Vas a recibir una consulta del usuario a partir de la cual debes determinar el plan de ejecucion (en formato JSON) para obtener los datos necesarios para responder la consulta.
+La respuesta debe contener unicamente el JSON literal del plan de ejecucion. Debe ser JSON valido para ser parseado directamente. Evitar indicar el lenguaje con triple comilla como Markdown.
+Si un paso requiere usar como argumento los resultados de uno o mas pasos anteriores, indicar entre pares de llaves el resultado de que paso es necesario, empezando por "{{step_1}}".
+
+Ejemplo de plan de ejecucion (solo lo que esta dentro de las triples comillas):
+"""
+{
+    "steps": [
+        {"tool_name": "validate_title", "args": {"title": "Top Gun"}},
+        {"tool_name": "get_filmography_by_uid", "args": {"uid": "{{step_1}}"}},
+        {"tool_name": "get_title_rating", "args": {"uid": "{{step_1}}", "country": "US"}}
+    ]
+}
+"""
+
+Lista de tools disponibles:
+- Obtener UID del contenido a partir del titulo:
+  - validate_title(title: str, threshold: Optional[float] = None)
+- Obtener metadatatos de un contenido a paritr del UID:
+  - get_filmography_by_uid(uid: str)
+- Obtener rating de un contenido a partir del UID, por pais:
+  - get_title_rating(uid: str, country: Optional[str] = None)
+- Obtener la disponibilidad del contenido en distintas plataformas, por pais, con o sin precios:
+  - get_availability_by_uid(uid: str, country: Optional[str] = None, with_prices: bool = False, limit: int = 100)
+- Obtener lista de contenidos disponibles segun plataforma y pais:
+  - presence_list(country: str = None, platform_name: str = None, type: str = None, title_like: str = None, limit: int = 25, offset: int = 0, order_by: str = "clean_title", order_dir: str = "ASC")
+- Obtener las peliculas donde actuo determinado actor:
+  - get_actor_filmography(actor_id: str, limit: int = DEFAULT_LIMIT)
+  - get_actor_filmography_by_name(actor_name: Union[str, List[str], Any], limit: int = DEFAULT_LIMIT)
+- Obtener las peliculas que dirigio determinado director:
+  - get_director_filmography(director_id: str, limit: int = DEFAULT_LIMIT)
+  - get_director_filmography_by_name(director_name: Union[str, List[str], Any], limit: int = DEFAULT_LIMIT)

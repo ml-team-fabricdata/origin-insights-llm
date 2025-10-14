@@ -2,6 +2,7 @@ from __future__ import annotations
 from src.sql.utils.default_import import *
 from src.sql.utils.db_utils_sql import *
 from src.sql.queries.common.queries_validation import *
+from src.sql.utils.validation_cache import get_cached_validation, cache_validation
 from strands import tool
 
 MAX_OPTIONS_DISPLAY = 8
@@ -293,6 +294,12 @@ def validate_title(title: str, threshold: Optional[float] = None) -> Dict[str, A
     Returns:
         Dict with validation result (status, uid, title, options, etc.)
     """
+    # Check cache first
+    cached = get_cached_validation("title", title)
+    if cached is not None:
+        logger.debug(f"✅ Cache hit for title: '{title}'")
+        return cached
+    
     normalized_query = _normalize_and_validate_input(title)
     if not normalized_query:
         return ValidationResponseBuilder.not_found()
@@ -302,9 +309,14 @@ def validate_title(title: str, threshold: Optional[float] = None) -> Dict[str, A
 
     exact_result = _try_exact_title_search(normalized_query)
     if exact_result:
+        # Cache the result
+        cache_validation("title", title, exact_result)
         return exact_result
 
-    return _try_fuzzy_title_search(normalized_query, threshold)
+    result = _try_fuzzy_title_search(normalized_query, threshold)
+    # Cache the result
+    cache_validation("title", title, result)
+    return result
 
 @tool
 def validate_actor(name: Union[str, List[str], Any], threshold: Optional[float] = None) -> Dict[str, Any]:
@@ -321,7 +333,13 @@ def validate_actor(name: Union[str, List[str], Any], threshold: Optional[float] 
     Returns:
         Dict with validation result (status, id, name, options, etc.)
     """
-    return _validate_person_entity(
+    # Check cache first
+    cached = get_cached_validation("actor", str(name))
+    if cached is not None:
+        logger.debug(f"✅ Cache hit for actor: '{name}'")
+        return cached
+    
+    result = _validate_person_entity(
         query_text=name,
         exact_sql=ACTOR_EXACT_SQL,
         fuzzy_sql=ACTOR_FUZZY_SQL_ILIKE,
@@ -329,6 +347,10 @@ def validate_actor(name: Union[str, List[str], Any], threshold: Optional[float] 
         threshold=threshold,
         sort_by_titles=False
     )
+    
+    # Cache the result
+    cache_validation("actor", str(name), result)
+    return result
 
 @tool
 def validate_director(name: Union[str, List[str], Any], threshold: Optional[float] = None) -> Dict[str, Any]:
@@ -345,10 +367,21 @@ def validate_director(name: Union[str, List[str], Any], threshold: Optional[floa
     Returns:
         Dict with validation result (status, id, name, options, etc.)
     """
-    return _validate_person_entity(
+    # Check cache first
+    cached = get_cached_validation("director", str(name))
+    if cached is not None:
+        logger.debug(f"✅ Cache hit for director: '{name}'")
+        return cached
+    
+    result = _validate_person_entity(
         query_text=name,
         exact_sql=DIRECTOR_EXACT_SQL,
         fuzzy_sql=DIRECTOR_FUZZY_SQL_ILIKE,
         entity_type="director",
+        threshold=threshold,
         sort_by_titles=True
     )
+    
+    # Cache the result
+    cache_validation("director", str(name), result)
+    return result

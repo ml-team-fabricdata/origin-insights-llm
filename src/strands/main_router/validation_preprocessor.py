@@ -4,6 +4,7 @@ Nodo de validación que se ejecuta ANTES de los grafos específicos.
 Valida títulos, actores y directores mencionados en la pregunta.
 """
 
+import asyncio
 from strands import Agent
 from src.strands.utils.config import MODEL_NODE_EXECUTOR
 from .state import MainRouterState
@@ -16,54 +17,6 @@ from src.sql.modules.common.validation import (
 )
 
 from src.strands.main_router.prompts import VALIDATION_PREPROCESSOR_PROMPT
-
-
-async def detect_entities_in_question(question: str) -> dict:
-    """
-    Detecta qué tipo de entidades están presentes en la pregunta.
-    
-    Returns:
-        dict con keys: has_title, has_actor, has_director, entities
-    """
-    question_lower = question.lower()
-    
-    result = {
-        "has_title": False,
-        "has_actor": False,
-        "has_director": False,
-        "entities": []
-    }
-    
-    # Patrones para detectar menciones
-    title_keywords = ["película", "serie", "film", "movie", "show", "título"]
-    actor_keywords = ["actor", "actriz", "protagonista", "actuó", "actúa"]
-    director_keywords = ["director", "dirigió", "dirige", "dirigida por"]
-    
-    # Detectar si menciona título
-    if any(kw in question_lower for kw in title_keywords):
-        result["has_title"] = True
-    
-    # Detectar si menciona actor
-    if any(kw in question_lower for kw in actor_keywords):
-        result["has_actor"] = True
-    
-    # Detectar si menciona director
-    if any(kw in question_lower for kw in director_keywords):
-        result["has_director"] = True
-    
-    # Detectar nombres propios (capitalización)
-    # Buscar palabras que empiecen con mayúscula (posibles nombres)
-    words = question.split()
-    potential_names = [w for w in words if w and w[0].isupper() and len(w) > 2]
-    
-    if potential_names:
-        # Si hay nombres propios, probablemente hay entidades
-        if not result["has_title"] and not result["has_actor"] and not result["has_director"]:
-            # Asumir que podría ser título o persona
-            result["has_title"] = True
-        result["entities"] = potential_names
-    
-    return result
 
 
 async def validation_preprocessor_node(state: MainRouterState) -> MainRouterState:
@@ -140,10 +93,27 @@ async def validation_preprocessor_node(state: MainRouterState) -> MainRouterStat
             }
         
         # Parsear resultado para extraer entidades validadas
+        import re
+        
         validated_entities = {
             "raw_validation": validation_str,
             "has_valid_entities": "NO_VALIDATION_NEEDED" not in validation_str.upper()
         }
+        
+        # Extraer IDs estructurados usando regex
+        # Formato esperado: "validado (ID: 123456)" o "ID: 123456"
+        id_patterns = [
+            (r'director.*?ID:\s*(\d+)', 'director_id'),
+            (r'actor.*?ID:\s*(\d+)', 'actor_id'),
+            (r'título.*?UID:\s*(\d+)', 'title_uid'),
+            (r'title.*?UID:\s*(\d+)', 'title_uid'),
+        ]
+        
+        for pattern, key in id_patterns:
+            match = re.search(pattern, validation_str, re.IGNORECASE)
+            if match:
+                validated_entities[key] = int(match.group(1))
+                print(f"[VALIDATION] 📌 Extraído {key}: {match.group(1)}")
         
         print(f"[VALIDATION] ✅ Validación completada")
         print("="*80 + "\n")

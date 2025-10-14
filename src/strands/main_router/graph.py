@@ -11,7 +11,7 @@ Flujo:
 
 from langgraph.graph import StateGraph, END
 from .state import MainRouterState
-from .router import main_graph_router, route_to_graph
+from .router import main_graph_router, route_to_graph, parallel_routing_and_validation_node
 from .validation_preprocessor import validation_preprocessor_node, should_validate
 
 # Importar los process_question de cada grafo
@@ -134,12 +134,18 @@ async def common_graph_node(state: MainRouterState) -> MainRouterState:
     }
 
 
-def create_main_graph():
+def create_main_graph(use_parallel: bool = False):
     """
     Crea el grafo principal que orquesta todos los sub-grafos.
     
-    Estructura:
+    Estructura (con paralelización):
+    START → parallel_routing_validation → [business|talent|content|platform|common]_graph → END o main_router
+    
+    Estructura (sin paralelización - legacy):
     START → main_router → validation_preprocessor → [business|talent|content|platform|common]_graph → END o main_router
+    
+    Args:
+        use_parallel: Si True, usa nodo paralelo (más rápido). Si False, usa flujo secuencial (legacy).
     
     El validation_preprocessor valida entidades (títulos, actores, directores) antes de ejecutar los grafos.
     Si un sub-grafo no completa, vuelve al main_router para reclasificar.
@@ -147,45 +153,107 @@ def create_main_graph():
     
     graph = StateGraph(MainRouterState)
     
-    # Agregar nodos
-    graph.add_node("main_router", main_graph_router)
-    graph.add_node("validation_preprocessor", validation_preprocessor_node)
-    graph.add_node("business_graph", business_graph_node)
-    graph.add_node("talent_graph", talent_graph_node)
-    graph.add_node("content_graph", content_graph_node)
-    graph.add_node("platform_graph", platform_graph_node)
-    graph.add_node("common_graph", common_graph_node)
-    
-    # Punto de entrada
-    graph.set_entry_point("main_router")
-    
-    # Router condicional desde main_router → puede ir a validación o directo al grafo
-    graph.add_conditional_edges(
-        "main_router",
-        should_validate,
-        {
-            "validation_preprocessor": "validation_preprocessor",
-            "business_graph": "business_graph",
-            "talent_graph": "talent_graph",
-            "content_graph": "content_graph",
-            "platform_graph": "platform_graph",
-            "common_graph": "common_graph"
-        }
-    )
-    
-    # Desde validation_preprocessor → ir al grafo correspondiente o END si hay ambigüedad
-    graph.add_conditional_edges(
-        "validation_preprocessor",
-        route_to_graph,
-        {
-            "business_graph": "business_graph",
-            "talent_graph": "talent_graph",
-            "content_graph": "content_graph",
-            "platform_graph": "platform_graph",
-            "common_graph": "common_graph",
-            "END": END  # Si necesita input del usuario
-        }
-    )
+    if use_parallel:
+        # ⚡ MODO PARALELO (OPTIMIZADO)
+        print("🚀 Creando grafo con PARALELIZACIÓN activada")
+        
+        # Agregar nodos (incluir main_router para re-routing)
+        graph.add_node("parallel_routing_validation", parallel_routing_and_validation_node)
+        graph.add_node("main_router", main_graph_router)  # Necesario para re-routing
+        graph.add_node("validation_preprocessor", validation_preprocessor_node)  # Necesario para re-routing
+        graph.add_node("business_graph", business_graph_node)
+        graph.add_node("talent_graph", talent_graph_node)
+        graph.add_node("content_graph", content_graph_node)
+        graph.add_node("platform_graph", platform_graph_node)
+        graph.add_node("common_graph", common_graph_node)
+        
+        # Punto de entrada: nodo paralelo
+        graph.set_entry_point("parallel_routing_validation")
+        
+        # Desde nodo paralelo → ir al grafo correspondiente o END si hay ambigüedad
+        graph.add_conditional_edges(
+            "parallel_routing_validation",
+            route_to_graph,
+            {
+                "business_graph": "business_graph",
+                "talent_graph": "talent_graph",
+                "content_graph": "content_graph",
+                "platform_graph": "platform_graph",
+                "common_graph": "common_graph",
+                "END": END  # Si necesita input del usuario
+            }
+        )
+        
+        # Desde main_router (para re-routing) → validation_preprocessor
+        graph.add_conditional_edges(
+            "main_router",
+            should_validate,
+            {
+                "validation_preprocessor": "validation_preprocessor",
+                "business_graph": "business_graph",
+                "talent_graph": "talent_graph",
+                "content_graph": "content_graph",
+                "platform_graph": "platform_graph",
+                "common_graph": "common_graph"
+            }
+        )
+        
+        # Desde validation_preprocessor (para re-routing) → grafo correspondiente
+        graph.add_conditional_edges(
+            "validation_preprocessor",
+            route_to_graph,
+            {
+                "business_graph": "business_graph",
+                "talent_graph": "talent_graph",
+                "content_graph": "content_graph",
+                "platform_graph": "platform_graph",
+                "common_graph": "common_graph",
+                "END": END
+            }
+        )
+    else:
+        # 🐢 MODO SECUENCIAL (LEGACY)
+        print("⚠️  Creando grafo con flujo SECUENCIAL (legacy)")
+        
+        # Agregar nodos
+        graph.add_node("main_router", main_graph_router)
+        graph.add_node("validation_preprocessor", validation_preprocessor_node)
+        graph.add_node("business_graph", business_graph_node)
+        graph.add_node("talent_graph", talent_graph_node)
+        graph.add_node("content_graph", content_graph_node)
+        graph.add_node("platform_graph", platform_graph_node)
+        graph.add_node("common_graph", common_graph_node)
+        
+        # Punto de entrada
+        graph.set_entry_point("main_router")
+        
+        # Router condicional desde main_router → puede ir a validación o directo al grafo
+        graph.add_conditional_edges(
+            "main_router",
+            should_validate,
+            {
+                "validation_preprocessor": "validation_preprocessor",
+                "business_graph": "business_graph",
+                "talent_graph": "talent_graph",
+                "content_graph": "content_graph",
+                "platform_graph": "platform_graph",
+                "common_graph": "common_graph"
+            }
+        )
+        
+        # Desde validation_preprocessor → ir al grafo correspondiente o END si hay ambigüedad
+        graph.add_conditional_edges(
+            "validation_preprocessor",
+            route_to_graph,
+            {
+                "business_graph": "business_graph",
+                "talent_graph": "talent_graph",
+                "content_graph": "content_graph",
+                "platform_graph": "platform_graph",
+                "common_graph": "common_graph",
+                "END": END  # Si necesita input del usuario
+            }
+        )
     
     # Función para decidir si volver al main_router o terminar
     def should_reroute(state: MainRouterState) -> str:

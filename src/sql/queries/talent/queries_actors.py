@@ -2,6 +2,7 @@ from src.sql.utils.constants_sql import *
 
 FILMOGRAPHY_SQL_ACTOR = f"""
     SELECT
+        m.uid,
         m.title,
         m.type,
         m.year,

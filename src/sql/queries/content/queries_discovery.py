@@ -18,7 +18,7 @@ RATING_QUERY_COUNTRY = f"""
     FROM {META_TBL} m
     LEFT JOIN {HITS_PRESENCE_TBL} h ON m.uid = h.uid
     WHERE m.uid = %s
-    AND m.country ILIKE %s
+    AND h.country ILIKE %s
     GROUP BY m.uid, m.title, m.year, m.type
 """
 

@@ -1,5 +1,3 @@
-# content/nodes/routers.py - Routers usando helpers genéricos
-
 from src.strands.content.graph_core.state import State
 from src.strands.utils.router_helpers import route_with_llm
 from src.strands.utils.config import MODEL_CLASSIFIER
@@ -9,7 +7,6 @@ from src.strands.content.nodes.prompt_content import (
 )
 
 
-# Configuración de tools válidas por categoría
 METADATA_TOOLS = {
     "simple_all_count",
     "simple_all_list",
@@ -25,10 +22,6 @@ DISCOVERY_TOOLS = {
 
 
 async def route_metadata_tool(state: State) -> str:
-    """
-    Router para herramientas de metadata.
-    Usa el helper genérico route_with_llm.
-    """
     return await route_with_llm(
         state=state,
         model=MODEL_CLASSIFIER,
@@ -38,10 +31,6 @@ async def route_metadata_tool(state: State) -> str:
 
 
 async def route_discovery_tool(state: State) -> str:
-    """
-    Router para herramientas de discovery.
-    Usa el helper genérico route_with_llm.
-    """
     return await route_with_llm(
         state=state,
         model=MODEL_CLASSIFIER,

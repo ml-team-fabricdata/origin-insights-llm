@@ -1,8 +1,7 @@
-# content/graph_core/state.py
 from typing import TypedDict, Literal, Optional, List, Dict, Any
 
+
 class State(TypedDict, total=False):
-    # Campos originales
     question: str
     answer: str
     task: Literal["validation", "admin"]
@@ -11,26 +10,17 @@ class State(TypedDict, total=False):
     accumulated_data: str
     supervisor_decision: str
     needs_more: bool
-    
-    # Campos adicionales para mejor control
-    classification_done: bool  # Evita reclasificación
+    classification_done: bool
     status: Literal["success", "insufficient_data", "format_error", "max_iterations"]
-    
-    # Tracking de errores
     classification_error: Optional[str]
     supervisor_error: Optional[str]
     node_errors: Optional[List[str]]
-    
-    # Metadata útil para debugging
-    iteration_history: Optional[List[Dict[str, Any]]]  # Historial de decisiones
+    iteration_history: Optional[List[Dict[str, Any]]]
     last_node: Optional[Literal["validation_node", "admin_node"]]
-    
-    # Control de flujo
-    should_continue: bool  # Flag explícito para continuar o no
+    should_continue: bool
 
 
 def create_initial_state(question: str, max_iterations: int = 3) -> State:
-    """Factory function para crear estado inicial consistente"""
     return {
         "question": question,
         "answer": "",
@@ -49,7 +39,6 @@ def create_initial_state(question: str, max_iterations: int = 3) -> State:
 
 
 def append_to_accumulated_data(state: State, new_data: str, source: str = "") -> State:
-    """Helper para agregar datos de forma consistente"""
     current = state.get("accumulated_data", "")
     separator = "\n\n---\n\n" if current else ""
     source_label = f"[{source}]\n" if source else ""
@@ -61,7 +50,6 @@ def append_to_accumulated_data(state: State, new_data: str, source: str = "") ->
 
 
 def increment_tool_calls(state: State, worker_name: str = "") -> State:
-    """Helper para incrementar contador de forma segura"""
     count = state.get("tool_calls_count", 0) + 1
     history = state.get("iteration_history", [])
     
@@ -78,8 +66,8 @@ def increment_tool_calls(state: State, worker_name: str = "") -> State:
         "iteration_history": history
     }
 
+
 def add_error(state: State, error: str, error_type: str = "node") -> State:
-    """Helper para registrar errores"""
     errors = state.get("node_errors", [])
     if errors is None:
         errors = []

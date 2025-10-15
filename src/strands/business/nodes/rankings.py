@@ -1,6 +1,3 @@
-# src/strands/business/nodes/rankings.py
-"""Rankings node - handles top content and genre momentum queries."""
-
 from src.strands.business.graph_core.state import State
 from src.strands.business.nodes.routers import route_rankings_tool
 from src.strands.business.nodes.prompt_business import RANKINGS_PROMPT
@@ -29,7 +26,6 @@ RANKINGS_TOOLS_MAP = {
 }
 
 
-# Configure executor
 _rankings_executor = BaseExecutorNode(
     node_name="rankings",
     tools_map=RANKINGS_TOOLS_MAP,
@@ -40,20 +36,4 @@ _rankings_executor = BaseExecutorNode(
 
 
 async def rankings_node(state: State) -> State:
-    """
-    Execute rankings tools dynamically.
-    
-    Handles:
-    - Genre momentum queries
-    - Top content by various filters
-    - Global rankings
-    - Country-specific rankings
-    - Rankings by UID
-    
-    Args:
-        state: Current state with question and validated entities
-        
-    Returns:
-        Updated state with results
-    """
     return await _rankings_executor.execute(state)

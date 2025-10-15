@@ -2,45 +2,11 @@ from __future__ import annotations
 from src.sql.utils.default_import import *
 from src.sql.utils.db_utils_sql import *
 from src.sql.queries.common.queries_validation import *
-from src.sql.utils.validation_cache import get_cached_validation, cache_validation
 from strands import tool
 
 MAX_OPTIONS_DISPLAY = 8
 MAX_VALIDATION_OPTIONS = 5
 DEFAULT_FALLBACK_THRESHOLDS = [0.3, 0.2]
-HIGH_SIMILARITY_THRESHOLD = 0.8
-MEDIUM_SIMILARITY_THRESHOLD = 0.5
-LOW_SIMILARITY_THRESHOLD = 0.3
-
-@dataclass
-class ValidationResult:
-    """Represents a validation result with consistent structure."""
-    status: str
-    result: Optional[Dict[str, Any]] = None
-    options: Optional[List[Dict[str, Any]]] = None
-
-class ValidationResponseBuilder:
-    """Builder for standardized validation responses."""
-
-    @staticmethod
-    def not_found() -> Dict[str, Any]:
-        """Returns a not found response."""
-        return {"status": "not_found"}
-
-    @staticmethod
-    def resolved(result: Dict[str, Any]) -> Dict[str, Any]:
-        """Returns a resolved response with a single result."""
-        return {"status": "resolved", "result": result}
-
-    @staticmethod
-    def ambiguous(options: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Returns an ambiguous response with multiple options."""
-        return {"status": "ambiguous", "options": options}
-
-    @staticmethod
-    def ok(entity_id: str, name: str, aka_name: Optional[str] = None) -> Dict[str, Any]:
-        """Returns an OK response for person validation."""
-        return {"status": "ok", "id": entity_id, "name": name, "aka_name": aka_name}
 
 def _build_title_result(row: Dict, is_fuzzy: bool = False) -> Dict[str, Any]:
     """Builds a standardized title result dictionary."""
@@ -85,11 +51,11 @@ def _calculate_name_similarity(query_text: str, name: str) -> float:
     if normalized_name == normalized_query:
         return 1.0
     elif normalized_name.startswith(normalized_query):
-        return HIGH_SIMILARITY_THRESHOLD
+        return 0.8
     elif normalized_query in normalized_name:
-        return MEDIUM_SIMILARITY_THRESHOLD
+        return 0.5
     else:
-        return LOW_SIMILARITY_THRESHOLD
+        return 0.3
 
 def _normalize_and_validate_input(input_data: Union[str, List[str], Any]) -> Optional[str]:
     """Normalizes and validates input data using shared utilities."""
@@ -117,9 +83,9 @@ def _try_exact_title_search(normalized_title: str) -> Optional[Dict[str, Any]]:
         return None
 
     if len(exact_results) == 1:
-        return ValidationResponseBuilder.resolved(_build_title_result(exact_results[0]))
+        return {"status": "resolved", "result": _build_title_result(exact_results[0])}
 
-    return ValidationResponseBuilder.ambiguous(_build_title_options(exact_results))
+    return {"status": "ambiguous", "options": _build_title_options(exact_results)}
 
 def _try_fuzzy_title_search(normalized_title: str, threshold: Optional[float]) -> Dict[str, Any]:
     """Attempts fuzzy title search with fallback thresholds."""
@@ -137,7 +103,7 @@ def _try_fuzzy_title_search(normalized_title: str, threshold: Optional[float]) -
         if fuzzy_results:
             return _process_fuzzy_title_results(fuzzy_results, normalized_title, current_threshold)
 
-    return ValidationResponseBuilder.not_found()
+    return {"status": "not_found"}
 
 def _process_fuzzy_title_results(results: List[Dict], query_text: str, threshold: float) -> Dict[str, Any]:
     """Processes fuzzy title search results."""
@@ -148,9 +114,9 @@ def _process_fuzzy_title_results(results: List[Dict], query_text: str, threshold
         similarity = safe_cast_float(result.get('title_similarity'))
 
         if similarity >= threshold:
-            return ValidationResponseBuilder.resolved(_build_title_result(result, is_fuzzy=True))
+            return {"status": "resolved", "result": _build_title_result(result, is_fuzzy=True)}
 
-    return ValidationResponseBuilder.ambiguous(_build_title_options(results, is_fuzzy=True))
+    return {"status": "ambiguous", "options": _build_title_options(results, is_fuzzy=True)}
 
 def _filter_results_by_similarity(results: List[Dict], query_text: str, threshold: float) -> List[Dict]:
     """Filters fuzzy search results by similarity threshold."""
@@ -200,33 +166,30 @@ def _validate_person_entity(
     """Generic validation function for person entities (actors/directors)."""
     normalized_query = _normalize_and_validate_input(query_text)
     if not normalized_query:
-        return ValidationResponseBuilder.not_found()
+        return {"status": "not_found"}
 
     threshold = normalize_threshold(threshold)
     logger.debug(
         f"Validating {entity_type}: '{normalized_query}' with threshold {threshold}")
-
     exact_results = _perform_exact_search(
         exact_sql, (normalized_query,), entity_type)
     if exact_results:
         if len(exact_results) == 1:
             result = exact_results[0]
-            return ValidationResponseBuilder.ok(result.get('id'), result.get('name'))
+            return {"status": "ok", "id": result.get('id'), "name": result.get('name')}
 
         exact_options = []
         for result in exact_results[:MAX_VALIDATION_OPTIONS]:
-            option = {"id": result.get(
-                'id'), "name": result.get('name'), "score": 1.0}
-            if sort_by_titles:
+            option = {"id": result.get('id'), "name": result.get('name')}
+            if 'n_titles' in result:
                 option["n_titles"] = safe_cast_int(result.get('n_titles'))
             exact_options.append(option)
 
-        return ValidationResponseBuilder.ambiguous(exact_options)
+        return {"status": "ambiguous", "options": exact_options}
 
     for current_threshold in [threshold] + DEFAULT_FALLBACK_THRESHOLDS:
         logger.debug(
             f"Trying {entity_type} fuzzy search with threshold {current_threshold}")
-
         fuzzy_results = _perform_fuzzy_search(
             fuzzy_sql, (normalized_query,), entity_type, current_threshold)
         if not fuzzy_results:
@@ -241,12 +204,12 @@ def _validate_person_entity(
 
         if len(sorted_results) == 1 and not is_single_token(normalized_query):
             result = sorted_results[0]
-            return ValidationResponseBuilder.ok(result.get('id'), result.get('name'))
+            return {"status": "ok", "id": result.get('id'), "name": result.get('name')}
 
         options = _build_person_options(sorted_results, sort_by_titles)
-        return ValidationResponseBuilder.ambiguous(options)
+        return {"status": "ambiguous", "options": options}
 
-    return ValidationResponseBuilder.not_found()
+    return {"status": "not_found"}
 
 def search_title_exact(title: str) -> List[Dict[str, Any]]:
     """Performs exact title search."""
@@ -294,28 +257,18 @@ def validate_title(title: str, threshold: Optional[float] = None) -> Dict[str, A
     Returns:
         Dict with validation result (status, uid, title, options, etc.)
     """
-    # Check cache first
-    cached = get_cached_validation("title", title)
-    if cached is not None:
-        logger.debug(f"✅ Cache hit for title: '{title}'")
-        return cached
-    
     normalized_query = _normalize_and_validate_input(title)
     if not normalized_query:
-        return ValidationResponseBuilder.not_found()
+        return {"status": "not_found"}
 
     logger.debug(
         f"Validating title: '{title}' (normalized: '{normalized_query}')")
 
     exact_result = _try_exact_title_search(normalized_query)
     if exact_result:
-        # Cache the result
-        cache_validation("title", title, exact_result)
         return exact_result
 
     result = _try_fuzzy_title_search(normalized_query, threshold)
-    # Cache the result
-    cache_validation("title", title, result)
     return result
 
 @tool
@@ -333,12 +286,6 @@ def validate_actor(name: Union[str, List[str], Any], threshold: Optional[float] 
     Returns:
         Dict with validation result (status, id, name, options, etc.)
     """
-    # Check cache first
-    cached = get_cached_validation("actor", str(name))
-    if cached is not None:
-        logger.debug(f"✅ Cache hit for actor: '{name}'")
-        return cached
-    
     result = _validate_person_entity(
         query_text=name,
         exact_sql=ACTOR_EXACT_SQL,
@@ -347,9 +294,6 @@ def validate_actor(name: Union[str, List[str], Any], threshold: Optional[float] 
         threshold=threshold,
         sort_by_titles=False
     )
-    
-    # Cache the result
-    cache_validation("actor", str(name), result)
     return result
 
 @tool
@@ -367,12 +311,6 @@ def validate_director(name: Union[str, List[str], Any], threshold: Optional[floa
     Returns:
         Dict with validation result (status, id, name, options, etc.)
     """
-    # Check cache first
-    cached = get_cached_validation("director", str(name))
-    if cached is not None:
-        logger.debug(f"✅ Cache hit for director: '{name}'")
-        return cached
-    
     result = _validate_person_entity(
         query_text=name,
         exact_sql=DIRECTOR_EXACT_SQL,
@@ -381,7 +319,4 @@ def validate_director(name: Union[str, List[str], Any], threshold: Optional[floa
         threshold=threshold,
         sort_by_titles=True
     )
-    
-    # Cache the result
-    cache_validation("director", str(name), result)
     return result

@@ -38,21 +38,4 @@ _pricing_executor = BaseExecutorNode(
 
 
 async def pricing_node(state: State) -> State:
-    """
-    Execute pricing tools dynamically.
-    
-    Handles:
-    - Presence with price queries
-    - Latest prices
-    - Price history
-    - Price changes
-    - Price statistics
-    - Quality hits
-    
-    Args:
-        state: Current state with question and validated entities
-        
-    Returns:
-        Updated state with results
-    """
     return await _pricing_executor.execute(state)

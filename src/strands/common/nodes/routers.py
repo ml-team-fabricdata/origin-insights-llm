@@ -1,5 +1,3 @@
-# content/nodes/routers.py - Routers usando helpers genéricos
-
 from src.strands.common.graph_core.state import State
 from src.strands.utils.router_helpers import route_with_llm
 from src.strands.utils.config import MODEL_CLASSIFIER
@@ -8,8 +6,6 @@ from src.strands.common.nodes.prompt_common import (
     VALIDATION_ROUTER_PROMPT
 )
 
-
-# Configuración de tools válidas por categoría
 
 VALIDATION_TOOLS = {
     "validate_title",
@@ -25,10 +21,6 @@ ADMIN_TOOLS = {
 
 
 async def route_validation_tool(state: State) -> str:
-    """
-    Router para herramientas de validation.
-    Usa el helper genérico route_with_llm.
-    """
     return await route_with_llm(
         state=state,
         model=MODEL_CLASSIFIER,
@@ -38,10 +30,6 @@ async def route_validation_tool(state: State) -> str:
 
 
 async def route_admin_tool(state: State) -> str:
-    """
-    Router para herramientas de admin.
-    Usa el helper genérico route_with_llm.
-    """
     return await route_with_llm(
         state=state,
         model=MODEL_CLASSIFIER,

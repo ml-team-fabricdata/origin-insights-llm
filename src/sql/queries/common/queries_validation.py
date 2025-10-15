@@ -14,7 +14,8 @@ SELECT DISTINCT ON (m.uid)
 FROM {AKAS_TABLE} m
 LEFT JOIN {META_TBL} md ON md.uid = m.uid
 WHERE m.title = LOWER(%s)
-ORDER BY m.uid, m.year NULLS LAST
+ORDER BY m.uid, m.year DESC NULLS LAST
+LIMIT {MAX_CANDIDATES}
 """
 
 FUZZY_SEARCH_SQL = f"""

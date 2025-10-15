@@ -1,6 +1,3 @@
-# src/strands/talent/nodes/actors.py
-"""Actors node - handles actor filmography and coactors queries."""
-
 from src.strands.talent.graph_core.state import State
 from src.strands.talent.nodes.prompt_talent import ACTORS_PROMPT
 from src.strands.talent.nodes.routers import route_actors_tool
@@ -21,7 +18,6 @@ ACTORS_TOOLS_MAP = {
 }
 
 
-# Configure executor
 _actors_executor = BaseExecutorNode(
     node_name="actors",
     tools_map=ACTORS_TOOLS_MAP,
@@ -32,17 +28,4 @@ _actors_executor = BaseExecutorNode(
 
 
 async def actors_node(state: State) -> State:
-    """
-    Execute actors tools dynamically.
-    
-    Handles:
-    - Actor filmography queries
-    - Actor coactors (frequent collaborators) queries
-    
-    Args:
-        state: Current state with question and validated entities
-        
-    Returns:
-        Updated state with results
-    """
     return await _actors_executor.execute(state)

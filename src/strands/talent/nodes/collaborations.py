@@ -1,6 +1,3 @@
-# src/strands/talent/nodes/collaborations.py
-"""Collaborations node - handles actor-director collaboration queries."""
-
 from src.strands.talent.graph_core.state import State
 from src.strands.talent.nodes.routers import route_collaborations_tool
 from src.strands.talent.nodes.prompt_talent import COLLABORATIONS_PROMPT
@@ -19,7 +16,6 @@ COLLABORATIONS_TOOLS_MAP = {
 }
 
 
-# Configure executor
 _collaborations_executor = BaseExecutorNode(
     node_name="collaborations",
     tools_map=COLLABORATIONS_TOOLS_MAP,
@@ -30,17 +26,4 @@ _collaborations_executor = BaseExecutorNode(
 
 
 async def collaborations_node(state: State) -> State:
-    """
-    Execute actor-director collaboration tools dynamically.
-    
-    Handles:
-    - Finding common titles between actors and directors
-    - Getting common projects by name
-    
-    Args:
-        state: Current state with question and validated entities
-        
-    Returns:
-        Updated state with results
-    """
     return await _collaborations_executor.execute(state)

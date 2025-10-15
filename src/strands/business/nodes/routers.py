@@ -1,5 +1,3 @@
-# content/nodes/routers.py - Routers usando helpers genéricos
-
 from src.strands.business.graph_core.state import State
 from src.strands.utils.router_helpers import route_with_llm
 from src.strands.utils.config import MODEL_CLASSIFIER
@@ -9,8 +7,6 @@ from src.strands.business.nodes.prompt_business import (
     RANKINGS_ROUTER_PROMPT
 )
 
-
-# Configuración de tools válidas por categoría
 PRICING_TOOLS = {
     "tool_prices_latest",
     "tool_prices_history",
@@ -39,10 +35,6 @@ INTELLIGENCE_TOOLS = {
 
 
 async def route_pricing_tool(state: State) -> str:
-    """
-    Router para herramientas de pricing.
-    Usa el helper genérico route_with_llm.
-    """
     return await route_with_llm(
         state=state,
         model=MODEL_CLASSIFIER,
@@ -52,10 +44,6 @@ async def route_pricing_tool(state: State) -> str:
 
 
 async def route_rankings_tool(state: State) -> str:
-    """
-    Router para herramientas de admin.
-    Usa el helper genérico route_with_llm.
-    """
     return await route_with_llm(
         state=state,
         model=MODEL_CLASSIFIER,
@@ -65,10 +53,6 @@ async def route_rankings_tool(state: State) -> str:
 
 
 async def route_intelligence_tool(state: State) -> str:
-    """
-    Router para herramientas de intelligence.
-    Usa el helper genérico route_with_llm.
-    """
     return await route_with_llm(
         state=state,
         model=MODEL_CLASSIFIER,

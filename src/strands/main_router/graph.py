@@ -1,20 +1,22 @@
-# main_router/graph.py
-"""
-Grafo principal que orquesta todos los sub-grafos.
-
-Flujo:
-1. Usuario hace pregunta
-2. Main Router clasifica → business/talent/content/platform/common
-3. Se ejecuta el sub-grafo correspondiente
-4. Se retorna la respuesta al usuario
-"""
-
 from langgraph.graph import StateGraph, END
 from .state import MainRouterState
-from .router import main_graph_router, route_to_graph, parallel_routing_and_validation_node
-from .validation_preprocessor import validation_preprocessor_node, should_validate
+from .advanced_router import advanced_router_node
+from .clarifier import clarifier_node
+from .parallel_executor import parallel_executor_node, aggregator_node
+from .validation_preprocessor import validation_preprocessor_node
+from .specialized_nodes import (
+    disambiguation_node,
+    not_found_responder_node,
+    error_handler_node,
+    responder_formatter_node
+)
+from .routing_gates import (
+    route_from_router,
+    route_from_validation,
+    route_from_domain_graph,
+    route_from_aggregator
+)
 
-# Importar los process_question de cada grafo
 from src.strands.business.graph_core.graph import process_question as business_process
 from src.strands.talent.graph_core.graph import process_question as talent_process
 from src.strands.content.graph_core.graph import process_question as content_process
@@ -22,331 +24,165 @@ from src.strands.platform.graph_core.graph import process_question as platform_p
 from src.strands.common.graph_core.graph import process_question as common_process
 
 
-async def business_graph_node(state: MainRouterState) -> MainRouterState:
-    """Ejecuta el grafo de business"""
-    print("\n🏢 Ejecutando BUSINESS GRAPH...")
-    result = await business_process(state['question'], max_iterations=3)
+GRAPH_PROCESSORS = {
+    "business": business_process,
+    "talent": talent_process,
+    "content": content_process,
+    "platform": platform_process,
+    "common": common_process
+}
+
+
+async def domain_graph_node(state: MainRouterState) -> MainRouterState:
+    print("\n" + "="*80)
+    print("🎬 DOMAIN GRAPH EXECUTOR")
+    print("="*80)
     
-    # Verificar si necesita volver al main router
-    if result.get('supervisor_decision') == 'VOLVER_MAIN_ROUTER':
-        print("⚠️ Business graph no completó, volviendo al main router...")
+    selected_graph = state.get("selected_graph", "common")
+    print(f"[DOMAIN] Ejecutando: {selected_graph}")
+    
+    processor = GRAPH_PROCESSORS.get(selected_graph)
+    if not processor:
+        print(f"[DOMAIN] ❌ Grafo no encontrado: {selected_graph}")
         return {
             **state,
-            "answer": result.get('accumulated_data', ''),
-            "needs_rerouting": True,
-            "previous_graph": "business_graph"
+            "error": f"Graph processor not found: {selected_graph}",
+            "domain_graph_status": "error"
         }
     
-    return {
-        **state,
-        "answer": result.get('answer', 'No se pudo obtener respuesta')
-    }
-
-
-async def talent_graph_node(state: MainRouterState) -> MainRouterState:
-    """Ejecuta el grafo de talent"""
-    print("\n🎬 Ejecutando TALENT GRAPH...")
-    
-    # Pasar entidades validadas al grafo de talent
     validated_entities = state.get('validated_entities', {})
-    result = await talent_process(
-        state['question'], 
-        max_iterations=3,
-        validated_entities=validated_entities
-    )
     
-    # Verificar si necesita volver al main router
-    if result.get('supervisor_decision') == 'VOLVER_MAIN_ROUTER':
-        print("⚠️ Talent graph no completó, volviendo al main router...")
+    try:
+        if selected_graph in ["talent", "content"]:
+            result = await processor(
+                state['question'],
+                max_iterations=3,
+                validated_entities=validated_entities
+            )
+        else:
+            result = await processor(
+                state['question'],
+                max_iterations=3
+            )
+        
+        supervisor_decision = result.get('supervisor_decision', '')
+        
+        if 'VOLVER_MAIN_ROUTER' in supervisor_decision or 'return_to_main_router' in supervisor_decision.lower():
+            print(f"[DOMAIN] 🔄 {selected_graph} solicita re-routing")
+            return {
+                **state,
+                "answer": result.get('accumulated_data', ''),
+                "needs_rerouting": True,
+                "domain_graph_status": "not_my_scope"
+            }
+        
+        answer = result.get('answer', result.get('accumulated_data', ''))
+        
+        if not answer or len(answer) < 50:
+            print(f"[DOMAIN] ⚠️ Respuesta insuficiente ({len(answer)} chars)")
+            return {
+                **state,
+                "answer": answer,
+                "needs_rerouting": True,
+                "domain_graph_status": "not_my_scope"
+            }
+        
+        print(f"[DOMAIN] ✅ Completado exitosamente ({len(answer)} chars)")
+        print("="*80 + "\n")
+        
         return {
             **state,
-            "answer": result.get('accumulated_data', ''),
-            "needs_rerouting": True,
-            "previous_graph": "talent_graph"
+            "answer": answer,
+            "domain_graph_status": "success"
         }
-    
-    return {
-        **state,
-        "answer": result.get('answer', 'No se pudo obtener respuesta')
-    }
-
-
-async def content_graph_node(state: MainRouterState) -> MainRouterState:
-    """Ejecuta el grafo de content"""
-    print("\n📺 Ejecutando CONTENT GRAPH...")
-    result = await content_process(state['question'], max_iterations=3)
-    
-    # Verificar si necesita volver al main router
-    if result.get('supervisor_decision') == 'VOLVER_MAIN_ROUTER':
-        print("⚠️ Content graph no completó, volviendo al main router...")
+        
+    except Exception as e:
+        print(f"[DOMAIN] ❌ Error: {e}")
+        print("="*80 + "\n")
         return {
             **state,
-            "answer": result.get('accumulated_data', ''),
-            "needs_rerouting": True,
-            "previous_graph": "content_graph"
+            "error": str(e),
+            "domain_graph_status": "error"
         }
-    
-    return {
-        **state,
-        "answer": result.get('answer', 'No se pudo obtener respuesta')
-    }
 
 
-async def platform_graph_node(state: MainRouterState) -> MainRouterState:
-    """Ejecuta el grafo de platform"""
-    print("\n🌐 Ejecutando PLATFORM GRAPH...")
-    result = await platform_process(state['question'], max_iterations=3)
-    
-    # Verificar si necesita volver al main router
-    if result.get('supervisor_decision') == 'VOLVER_MAIN_ROUTER':
-        print("⚠️ Platform graph no completó, volviendo al main router...")
-        return {
-            **state,
-            "answer": result.get('accumulated_data', ''),
-            "needs_rerouting": True,
-            "previous_graph": "platform_graph"
-        }
-    
-    return {
-        **state,
-        "answer": result.get('answer', 'No se pudo obtener respuesta')
-    }
-
-
-async def common_graph_node(state: MainRouterState) -> MainRouterState:
-    """Ejecuta el grafo de common"""
-    print("\n⚙️ Ejecutando COMMON GRAPH...")
-    result = await common_process(state['question'], max_iterations=3)
-    
-    # Verificar si necesita volver al main router
-    if result.get('supervisor_decision') == 'VOLVER_MAIN_ROUTER':
-        print("⚠️ Common graph no completó, volviendo al main router...")
-        return {
-            **state,
-            "answer": result.get('accumulated_data', ''),
-            "needs_rerouting": True,
-            "previous_graph": "common_graph"
-        }
-    
-    return {
-        **state,
-        "answer": result.get('answer', 'No se pudo obtener respuesta')
-    }
-
-
-def create_main_graph(use_parallel: bool = False):
-    """
-    Crea el grafo principal que orquesta todos los sub-grafos.
-    
-    Estructura (con paralelización):
-    START → parallel_routing_validation → [business|talent|content|platform|common]_graph → END o main_router
-    
-    Estructura (sin paralelización - legacy):
-    START → main_router → validation_preprocessor → [business|talent|content|platform|common]_graph → END o main_router
-    
-    Args:
-        use_parallel: Si True, usa nodo paralelo (más rápido). Si False, usa flujo secuencial (legacy).
-    
-    El validation_preprocessor valida entidades (títulos, actores, directores) antes de ejecutar los grafos.
-    Si un sub-grafo no completa, vuelve al main_router para reclasificar.
-    """
-    
+def create_advanced_graph():
     graph = StateGraph(MainRouterState)
     
-    if use_parallel:
-        # ⚡ MODO PARALELO (OPTIMIZADO)
-        print("🚀 Creando grafo con PARALELIZACIÓN activada")
-        
-        # Agregar nodos (incluir main_router para re-routing)
-        graph.add_node("parallel_routing_validation", parallel_routing_and_validation_node)
-        graph.add_node("main_router", main_graph_router)  # Necesario para re-routing
-        graph.add_node("validation_preprocessor", validation_preprocessor_node)  # Necesario para re-routing
-        graph.add_node("business_graph", business_graph_node)
-        graph.add_node("talent_graph", talent_graph_node)
-        graph.add_node("content_graph", content_graph_node)
-        graph.add_node("platform_graph", platform_graph_node)
-        graph.add_node("common_graph", common_graph_node)
-        
-        # Punto de entrada: nodo paralelo
-        graph.set_entry_point("parallel_routing_validation")
-        
-        # Desde nodo paralelo → ir al grafo correspondiente o END si hay ambigüedad
-        graph.add_conditional_edges(
-            "parallel_routing_validation",
-            route_to_graph,
-            {
-                "business_graph": "business_graph",
-                "talent_graph": "talent_graph",
-                "content_graph": "content_graph",
-                "platform_graph": "platform_graph",
-                "common_graph": "common_graph",
-                "END": END  # Si necesita input del usuario
-            }
-        )
-        
-        # Desde main_router (para re-routing) → validation_preprocessor
-        graph.add_conditional_edges(
-            "main_router",
-            should_validate,
-            {
-                "validation_preprocessor": "validation_preprocessor",
-                "business_graph": "business_graph",
-                "talent_graph": "talent_graph",
-                "content_graph": "content_graph",
-                "platform_graph": "platform_graph",
-                "common_graph": "common_graph"
-            }
-        )
-        
-        # Desde validation_preprocessor (para re-routing) → grafo correspondiente
-        graph.add_conditional_edges(
-            "validation_preprocessor",
-            route_to_graph,
-            {
-                "business_graph": "business_graph",
-                "talent_graph": "talent_graph",
-                "content_graph": "content_graph",
-                "platform_graph": "platform_graph",
-                "common_graph": "common_graph",
-                "END": END
-            }
-        )
-    else:
-        # 🐢 MODO SECUENCIAL (LEGACY)
-        print("⚠️  Creando grafo con flujo SECUENCIAL (legacy)")
-        
-        # Agregar nodos
-        graph.add_node("main_router", main_graph_router)
-        graph.add_node("validation_preprocessor", validation_preprocessor_node)
-        graph.add_node("business_graph", business_graph_node)
-        graph.add_node("talent_graph", talent_graph_node)
-        graph.add_node("content_graph", content_graph_node)
-        graph.add_node("platform_graph", platform_graph_node)
-        graph.add_node("common_graph", common_graph_node)
-        
-        # Punto de entrada
-        graph.set_entry_point("main_router")
-        
-        # Router condicional desde main_router → puede ir a validación o directo al grafo
-        graph.add_conditional_edges(
-            "main_router",
-            should_validate,
-            {
-                "validation_preprocessor": "validation_preprocessor",
-                "business_graph": "business_graph",
-                "talent_graph": "talent_graph",
-                "content_graph": "content_graph",
-                "platform_graph": "platform_graph",
-                "common_graph": "common_graph"
-            }
-        )
-        
-        # Desde validation_preprocessor → ir al grafo correspondiente o END si hay ambigüedad
-        graph.add_conditional_edges(
-            "validation_preprocessor",
-            route_to_graph,
-            {
-                "business_graph": "business_graph",
-                "talent_graph": "talent_graph",
-                "content_graph": "content_graph",
-                "platform_graph": "platform_graph",
-                "common_graph": "common_graph",
-                "END": END  # Si necesita input del usuario
-            }
-        )
+    graph.add_node("advanced_router", advanced_router_node)
+    graph.add_node("clarifier", clarifier_node)
+    graph.add_node("parallel_executor", parallel_executor_node)
+    graph.add_node("aggregator", aggregator_node)
+    graph.add_node("validation_preprocessor", validation_preprocessor_node)
+    graph.add_node("domain_graph", domain_graph_node)
+    graph.add_node("disambiguation", disambiguation_node)
+    graph.add_node("not_found_responder", not_found_responder_node)
+    graph.add_node("error_handler", error_handler_node)
+    graph.add_node("responder_formatter", responder_formatter_node)
     
-    # Función para decidir si volver al main_router o terminar
-    def should_reroute(state: MainRouterState) -> str:
-        """Decide si el sub-grafo debe volver al main_router o terminar"""
-        if state.get("needs_rerouting", False):
-            # Verificar límite de re-routings para evitar loops infinitos
-            rerouting_count = state.get("rerouting_count", 0)
-            if rerouting_count >= 2:  # Máximo 2 re-routings
-                print("⚠️ Límite de re-routings alcanzado, terminando...")
-                return "END"
-            print(f"🔄 Re-routing #{rerouting_count + 1} al main_router...")
-            return "main_router"
-        return "END"
+    graph.set_entry_point("advanced_router")
     
-    # Los sub-grafos pueden volver al main_router o terminar
+    # Router → Clarifier o Validation
     graph.add_conditional_edges(
-        "business_graph",
-        should_reroute,
+        "advanced_router",
+        route_from_router,
         {
-            "main_router": "main_router",
-            "END": END
+            "clarifier": "clarifier",
+            "validation_preprocessor": "validation_preprocessor"
         }
     )
     
+    graph.add_edge("clarifier", END)
+    
+    # Validation → Parallel/Domain/Disambiguation/NotFound
     graph.add_conditional_edges(
-        "talent_graph",
-        should_reroute,
+        "validation_preprocessor",
+        route_from_validation,
         {
-            "main_router": "main_router",
-            "END": END
+            "parallel_executor": "parallel_executor",
+            "domain_graph": "domain_graph",
+            "disambiguation": "disambiguation",
+            "not_found_responder": "not_found_responder"
         }
     )
     
+    # Parallel → Aggregator → Domain
+    graph.add_edge("parallel_executor", "aggregator")
+    
     graph.add_conditional_edges(
-        "content_graph",
-        should_reroute,
+        "aggregator",
+        route_from_aggregator,
         {
-            "main_router": "main_router",
-            "END": END
+            "domain_graph": "domain_graph",
+            "error_handler": "error_handler"
         }
     )
     
+    graph.add_edge("disambiguation", END)
+    graph.add_edge("not_found_responder", END)
+    
     graph.add_conditional_edges(
-        "platform_graph",
-        should_reroute,
+        "domain_graph",
+        route_from_domain_graph,
         {
-            "main_router": "main_router",
-            "END": END
+            "responder_formatter": "responder_formatter",
+            "advanced_router": "advanced_router",
+            "clarifier": "clarifier",
+            "error_handler": "error_handler"
         }
     )
     
-    graph.add_conditional_edges(
-        "common_graph",
-        should_reroute,
-        {
-            "main_router": "main_router",
-            "END": END
-        }
-    )
+    graph.add_edge("responder_formatter", END)
+    graph.add_edge("error_handler", END)
     
     return graph.compile()
 
 
-async def process_question_main(
-    question: str, 
+async def process_question_advanced(
+    question: str,
     max_iterations: int = 3,
-    resolved_entity: dict = None
+    max_hops: int = 2
 ) -> MainRouterState:
-    """
-    Función principal para procesar preguntas.
-    
-    Esta es la función que debes usar desde el exterior.
-    
-    Args:
-        question: Pregunta del usuario
-        max_iterations: Máximo de iteraciones para cada sub-grafo
-        resolved_entity: Entidad resuelta por el usuario (cuando hubo ambigüedad)
-                        Formato: {"type": "title/actor/director", "id": "...", "name": "..."}
-        
-    Returns:
-        MainRouterState con la respuesta final
-        
-    Example:
-        >>> # Primera llamada
-        >>> result = await process_question_main("¿De qué año es The Matrix?")
-        >>> if result.get('needs_user_input'):
-        >>>     # Usuario elige opción 1
-        >>>     result = await process_question_main(
-        >>>         "¿De qué año es The Matrix?",
-        >>>         resolved_entity={"type": "title", "uid": "123", "title": "The Matrix (1999)"}
-        >>>     )
-    """
-    
     initial_state: MainRouterState = {
         "question": question,
         "answer": "",
@@ -360,35 +196,32 @@ async def process_question_main(
         "validated_entities": None,
         "needs_validation": False,
         "needs_user_input": False,
-        "validation_message": None
+        "validation_message": None,
+        "validation_status": None,
+        "skip_validation": False,
+        "routing_confidence": 0.0,
+        "routing_candidates": [],
+        "visited_graphs": [],
+        "max_hops": max_hops,
+        "parallel_execution": False,
+        "parallel_results": [],
+        "aggregated_result": None,
+        "needs_clarification": False,
+        "clarification_message": None,
+        "domain_graph_status": None
     }
     
-    # Si el usuario ya resolvió la ambigüedad, marcar como validado
-    if resolved_entity:
-        initial_state["validation_done"] = True
-        initial_state["needs_validation"] = True
-        initial_state["validated_entities"] = {
-            "status": "resolved",
-            "result": resolved_entity
-        }
-    
-    graph = create_main_graph()
+    graph = create_advanced_graph()
     result = await graph.ainvoke(initial_state)
-    
-    # Si necesita input del usuario (ambigüedad), retornar el mensaje de validación
-    if result.get("needs_user_input"):
-        result["answer"] = result.get("validation_message", "Multiple options found. Please clarify.")
     
     return result
 
 
-async def process_question_main_streaming(question: str, max_iterations: int = 3):
-    """
-    Versión con streaming de eventos.
-    
-    Útil para ver el progreso en tiempo real.
-    """
-    
+async def process_question_advanced_streaming(
+    question: str,
+    max_iterations: int = 3,
+    max_hops: int = 2
+):
     initial_state: MainRouterState = {
         "question": question,
         "answer": "",
@@ -400,20 +233,35 @@ async def process_question_main_streaming(question: str, max_iterations: int = 3
         "rerouting_count": 0,
         "validation_done": False,
         "validated_entities": None,
-        "needs_validation": False
+        "needs_validation": False,
+        "needs_user_input": False,
+        "validation_message": None,
+        "validation_status": None,
+        "skip_validation": False,
+        "routing_confidence": 0.0,
+        "routing_candidates": [],
+        "visited_graphs": [],
+        "max_hops": max_hops,
+        "parallel_execution": False,
+        "parallel_results": [],
+        "aggregated_result": None,
+        "needs_clarification": False,
+        "clarification_message": None,
+        "domain_graph_status": None
     }
     
-    graph = create_main_graph()
+    graph = create_advanced_graph()
     
     async for event in graph.astream(initial_state):
         node_name = list(event.keys())[0]
         state_output = event[node_name]
         
-        print(f"\n📍 Node: {node_name}")
-        if node_name == "main_router":
+        print(f"\n🔹 Node: {node_name}")
+        if node_name == "advanced_router":
             print(f"   Selected: {state_output.get('selected_graph', 'N/A')}")
-        elif "graph" in node_name:
-            print(f"   Answer preview: {state_output.get('answer', 'N/A')[:100]}...")
+            print(f"   Confidence: {state_output.get('routing_confidence', 0.0):.2f}")
+        elif node_name == "domain_graph":
+            print(f"   Status: {state_output.get('domain_graph_status', 'N/A')}")
         print("---")
     
     return state_output

@@ -1,6 +1,3 @@
-# src/strands/talent/nodes/directors.py
-"""Directors node - handles director filmography and collaborators queries."""
-
 from src.strands.talent.graph_core.state import State
 from src.strands.talent.nodes.routers import route_directors_tool
 from src.strands.talent.nodes.prompt_talent import DIRECTORS_PROMPT
@@ -19,7 +16,6 @@ DIRECTORS_TOOLS_MAP = {
 }
 
 
-# Configure executor
 _directors_executor = BaseExecutorNode(
     node_name="directors",
     tools_map=DIRECTORS_TOOLS_MAP,
@@ -30,17 +26,4 @@ _directors_executor = BaseExecutorNode(
 
 
 async def directors_node(state: State) -> State:
-    """
-    Execute directors tools dynamically.
-    
-    Handles:
-    - Director filmography queries
-    - Director collaborators (co-directors) queries
-    
-    Args:
-        state: Current state with question and validated entities
-        
-    Returns:
-        Updated state with results
-    """
     return await _directors_executor.execute(state)

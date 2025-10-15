@@ -36,6 +36,16 @@ async def validation_preprocessor_node(state: MainRouterState) -> MainRouterStat
         print("[VALIDATION] Ya validado, saltando...")
         return state
     
+    # Si el grafo no requiere validación, saltar
+    if state.get("skip_validation", False):
+        print("[VALIDATION] ⏭️  Validación no requerida para este grafo, saltando...")
+        return {
+            **state,
+            "validation_done": True,
+            "needs_validation": False,
+            "validation_status": "resolved"
+        }
+    
     # En lugar de detectar heurísticamente, SIEMPRE dar todas las tools al LLM
     # y dejar que el prompt decida si necesita validar o no
     print(f"[VALIDATION] 🤖 Ejecutando validación con LLM...")
@@ -82,12 +92,33 @@ async def validation_preprocessor_node(state: MainRouterState) -> MainRouterStat
             # Retornar con flag especial para que el sistema pida clarificación
             return {
                 **state,
-                "validation_done": False,  # No completada, necesita clarificación
+                "validation_done": True,
                 "needs_user_input": True,
                 "needs_validation": True,
+                "validation_status": "ambiguous",
                 "validation_message": validation_str,
+                "answer": f"🔍 Disambiguation Required:\n\n{validation_str}",
                 "validated_entities": {
                     "status": "ambiguous",
+                    "message": validation_str
+                }
+            }
+        
+        # Detectar si no se encontró la entidad
+        if "not_found" in validation_str.lower() or "no se encontró" in validation_str.lower() or "no se encontro" in validation_str.lower():
+            print(f"[VALIDATION] ❌ Entidad no encontrada")
+            print("="*80 + "\n")
+            
+            return {
+                **state,
+                "validation_done": True,
+                "needs_user_input": True,
+                "needs_validation": True,
+                "validation_status": "not_found",
+                "validation_message": validation_str,
+                "answer": f"❌ Entity Not Found:\n\n{validation_str}",
+                "validated_entities": {
+                    "status": "not_found",
                     "message": validation_str
                 }
             }
@@ -122,6 +153,7 @@ async def validation_preprocessor_node(state: MainRouterState) -> MainRouterStat
             **state,
             "validation_done": True,
             "needs_validation": True,
+            "validation_status": "resolved",
             "validated_entities": validated_entities
         }
         

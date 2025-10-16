@@ -12,9 +12,9 @@ from functools import lru_cache
 # THIRD PARTY IMPORTS
 # =============================================================================
 import boto3
-import psycopg2
-import psycopg2.extras
+import psycopg
 from botocore.exceptions import ClientError
+from psycopg.rows import dict_row
 
 # =============================================================================
 # LOGGER
@@ -80,32 +80,28 @@ class SQLConnectionManager:
     """PostgreSQL con reintentos."""
 
     def __init__(self):
-        cfg = get_secret()
-        self.conn_params = {
-            "host": cfg["host"],
-            "port": cfg["port"],
-            "dbname": cfg["db"],         # psycopg2 acepta 'dbname'
-            "user": cfg["user"],
-            "password": cfg["password"],
-            "connect_timeout": 30,
-            "application_name": "chatbot_app",
-            "sslmode": "require",        # recomendado en Aurora Postgres
-        }
+        self._cfg = get_secret()
+        self._connection_uri = f"postgresql://{self._cfg['user']}:{self._cfg['password']}@{self._cfg['host']}:{self._cfg['port']}/{self._cfg['db']}"
+        self.conn_options = "-c search_path=public,ms"
         self._connection = None
         self._initialized = False
         self._initialize_connection()
 
     def _initialize_connection(self):
         try:
-            self._connection = psycopg2.connect(**self.conn_params)
+            self._connection = psycopg.connect(self._connection_uri, options=self.conn_options)
             if not self._initialized:
-                logger.info(
-                    f"✅ Connected to PostgreSQL: {self.conn_params['dbname']}@"
-                    f"{self.conn_params['host']}:{self.conn_params['port']}"
+                print(
+                    f"✅ Connected to PostgreSQL: {self._cfg['db']}@"
+                    f"{self._cfg['host']}:{self._cfg['port']}"
                 )
                 self._initialized = True
+
+        except psycopg.Error as e:
+            print(f"❌ Initial connection failed: {e}")
+            self._connection = None
                 
-        except psycopg2.Error as e:
+        except psycopg.Error as e:
             logger.error(f"❌ Initial connection failed: {e}")
             self._connection = None
 
@@ -117,26 +113,26 @@ class SQLConnectionManager:
                         with self._connection.cursor() as c:
                             c.execute("SELECT 1")
                         return self._connection
-                    except (psycopg2.Error, psycopg2.OperationalError):
+                    except (psycopg.Error, psycopg.OperationalError):
                         self.close()
 
                 if attempt == 0:
-                    logger.info("🔄 Creating new PostgreSQL connection")
-                self._connection = psycopg2.connect(**self.conn_params)
+                    print("🔄 Creating new PostgreSQL connection")
+                self._connection = psycopg.connect(self._connection_uri, options=self.conn_options)
                 self._connection.autocommit = True
                 return self._connection
 
-            except psycopg2.Error as e:
+            except psycopg.Error as e:
                 if attempt < retry_count - 1:
-                    logger.warning(f"⚠️ Connection attempt {attempt+1} failed: {e}")
+                    print(f"⚠️ Connection attempt {attempt+1} failed: {e}")
                     time.sleep(2 ** attempt)
                 else:
-                    logger.error(f"❌ All connection attempts failed: {e}")
+                    print(f"❌ All connection attempts failed: {e}")
                     raise
 
     def cursor(self, dictionary=True):
         conn = self.get_connection()
-        return conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) if dictionary else conn.cursor()
+        return conn.cursor(row_factory=dict_row) if dictionary else conn.cursor()
 
     def close(self):
         if self._connection and not self._connection.closed:
@@ -149,7 +145,7 @@ class SQLConnectionManager:
     def execute_query(self, query, params=None, operation_name=None):
         """
         Execute a query and return results.
-        
+
         Args:
             query: SQL query string
             params: Optional parameters for the query
@@ -157,7 +153,7 @@ class SQLConnectionManager:
         """
         conn = self.get_connection()
         try:
-            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            with conn.cursor(row_factory=dict_row) as cur:
                 cur.execute(query, params)
 
                 # Para DDL y DML hacer commit explícito
@@ -168,8 +164,8 @@ class SQLConnectionManager:
                     return cur.fetchall()
                 else:  # INSERT/UPDATE/DELETE
                     return cur.rowcount
-        except psycopg2.Error as e:
-            logger.error(f"❌ Query execution failed: {e}")
+        except psycopg.Error as e:
+            print(f"❌ Query execution failed: {e}")
             try:
                 conn.rollback()
             except Exception:

@@ -47,7 +47,7 @@ def get_availability_by_uid(uid: str, country: Optional[str] = None, with_prices
             country_condition = "AND p.iso_alpha2 = %(country_iso)s"
             query_params["country_iso"] = country_isos[0]
         else:
-            # Multiple countries (region) - need to use tuple for psycopg2
+            # Multiple countries (region) - need to use tuple for psycopg
             placeholders = ", ".join([f"'{iso}'" for iso in country_isos])
             country_condition = f"AND p.iso_alpha2 IN ({placeholders})"
 

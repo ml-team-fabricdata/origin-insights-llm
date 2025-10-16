@@ -11,6 +11,8 @@ langdetect
 langgraph
 opensearch-dsl
 opensearch-py
+psycopg
+psycopg[binary,pool]
 psycopg2-binary
 pydantic
 python-dotenv

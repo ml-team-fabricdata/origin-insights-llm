@@ -102,9 +102,9 @@ def _perform_exact_search(sql_query: str, params: tuple, search_type: str) -> Li
     """Performs exact search with given SQL and parameters."""
     return db.execute_query(sql_query, params, f"{search_type} exact search")
 
-def _perform_fuzzy_search(sql_query: str, params: tuple, search_type: str, threshold: float) -> List[Dict]:
+def _perform_fuzzy_search(sql_query: str, params: tuple, search_type: str) -> List[Dict]:
     """Performs fuzzy search with given SQL and parameters."""
-    return db.execute_query(sql_query, params, f"{search_type} fuzzy search (threshold {threshold})")
+    return db.execute_query(sql_query, params, f"{search_type} fuzzy search")
 
 def _try_exact_title_search(normalized_title: str) -> Optional[Dict[str, Any]]:
     """Attempts exact title search and returns appropriate response."""
@@ -127,10 +127,8 @@ def _try_fuzzy_title_search(normalized_title: str, threshold: Optional[float]) -
         logger.debug(
             f"Trying title fuzzy search with threshold {current_threshold}")
 
-        params = (normalized_title, current_threshold,
-                  current_threshold, current_threshold, DEFAULT_FUZZY_LIMIT)
-        fuzzy_results = _perform_fuzzy_search(
-            FUZZY_SEARCH_SQL, params, "title", current_threshold)
+        params = (normalized_title, normalized_title, DEFAULT_FUZZY_LIMIT)
+        fuzzy_results = _perform_fuzzy_search(FUZZY_SEARCH_SQL, params, "title")
 
         if fuzzy_results:
             return _process_fuzzy_title_results(fuzzy_results, normalized_title, current_threshold)
@@ -225,8 +223,7 @@ def _validate_person_entity(
         logger.debug(
             f"Trying {entity_type} fuzzy search with threshold {current_threshold}")
 
-        fuzzy_results = _perform_fuzzy_search(
-            fuzzy_sql, (normalized_query,), entity_type, current_threshold)
+        fuzzy_results = _perform_fuzzy_search(fuzzy_sql, (normalized_query,), entity_type)
         if not fuzzy_results:
             continue
 
@@ -259,7 +256,6 @@ def search_title_exact(title: str) -> List[Dict[str, Any]]:
 
 def search_title_fuzzy(
     title: str,
-    threshold: float = DEFAULT_FUZZY_THRESHOLD,
     limit: int = DEFAULT_FUZZY_LIMIT
 ) -> List[Dict[str, Any]]:
     """Performs fuzzy title search."""
@@ -270,7 +266,7 @@ def search_title_fuzzy(
     if not normalized_title:
         return []
 
-    params = (normalized_title, threshold, threshold, threshold, limit)
+    params = (normalized_title, normalized_title, limit)
     return db.execute_query(FUZZY_SEARCH_SQL, params, "fuzzy search")
 def search_title(title: str, *, threshold: float = DEFAULT_FUZZY_THRESHOLD) -> Dict[str, Any]:
     """Searches for a title with validation."""

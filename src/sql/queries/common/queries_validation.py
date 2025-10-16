@@ -18,32 +18,12 @@ ORDER BY m.uid, m.year NULLS LAST
 """
 
 FUZZY_SEARCH_SQL = f"""
-WITH normalized_query AS (
-  SELECT %s::text AS query_lower
-),
-candidates AS (
-  SELECT
-    a.uid,
-    a.title AS aka_title,
-    a.year,
-    {PG_TRGM_SCHEMA}.similarity(LOWER(a.title), nq.query_lower) AS title_similarity
-  FROM {AKAS_TABLE} a
-  CROSS JOIN normalized_query nq
-  WHERE (
-    {PG_TRGM_SCHEMA}.similarity(LOWER(a.title), nq.query_lower) >= %s
-    OR {PG_TRGM_SCHEMA}.similarity(LOWER(a.title), nq.query_lower) >= %s
-  )
-),
-ranked AS (
-  SELECT c.*, md.type, md.imdb_id
-  FROM candidates c
-  LEFT JOIN {META_TBL} md ON md.uid = c.uid
-  WHERE c.title_similarity >= %s
-)
-SELECT *
-FROM ranked
-ORDER BY title_similarity DESC, year DESC NULLS LAST
-LIMIT %s
+SELECT {SCHEMA}.similarity(clean_title, %s::text) as title_similarity, a.uid, a.title AS aka_title, s."year", s.directors
+FROM {AKAS_TABLE} a
+JOIN {META_TBL} s ON a.uid = s.uid
+WHERE clean_title %% %s::text
+ORDER BY title_similarity DESC
+LIMIT %s;
 """
 
 # =============================================================================

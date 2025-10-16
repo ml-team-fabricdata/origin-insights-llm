@@ -6,7 +6,6 @@ Ejemplo de plan de ejecucion (solo lo que esta dentro de las triples comillas):
 """
 {
     "steps": [
-        {"tool_name": "validate_title", "args": {"title": "Top Gun"}},
         {"tool_name": "get_filmography_by_uid", "args": {"uid": "{{step_1.uid}}"}},
         {"tool_name": "get_title_rating", "args": {"uid": "{{step_1.uid}}", "country": "US"}}
     ]
@@ -14,8 +13,6 @@ Ejemplo de plan de ejecucion (solo lo que esta dentro de las triples comillas):
 """
 
 Lista de tools disponibles:
-- Obtener UID del contenido a partir del titulo:
-  - validate_title(title: str, threshold: Optional[float] = None)
 - Obtener metadatatos de un contenido a paritr del UID:
   - get_filmography_by_uid(uid: str)
 - Obtener rating de un contenido a partir del UID, por pais:

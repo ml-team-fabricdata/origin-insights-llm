@@ -16,8 +16,13 @@ def _route_from_classifier(state: State) -> str:
 
 
 def create_streaming_graph():
+    """Create business graph without validation node."""
+    print("\n" + "="*80)
+    print("🔧 CREATING BUSINESS GRAPH - NO VALIDATION NODE")
+    print("="*80)
     graph = StateGraph(State)
 
+    # Business queries don't need entity validation (no actors/directors/specific titles)
     graph.add_node("main_supervisor", main_supervisor)
     graph.add_node("business_classifier", business_classifier)
     graph.add_node("intelligence_node", intelligence_node)
@@ -25,7 +30,11 @@ def create_streaming_graph():
     graph.add_node("pricing_node", pricing_node)
     graph.add_node("format_response", format_response)
 
+    # Start with supervisor (no validation needed)
     graph.set_entry_point("main_supervisor")
+    
+    print("[BUSINESS GRAPH] Compiled with nodes: main_supervisor, business_classifier, intelligence_node, rankings_node, pricing_node, format_response")
+    print("[BUSINESS GRAPH] Entry point: main_supervisor (NO validation node)")
 
     graph.add_conditional_edges(
         "main_supervisor",
@@ -55,9 +64,17 @@ def create_streaming_graph():
     return graph.compile()
 
 
-async def process_question(question: str, max_iterations: int = 3) -> State:
+async def process_question(question: str, max_iterations: int = 3, validated_entities: dict = None) -> State:
+    print("\n" + "🚀"*40)
+    print("🚀 BUSINESS PROCESS_QUESTION CALLED")
+    print("🚀"*40)
+    
     initial_state = create_initial_state(question, max_iterations)
-    graph = create_streaming_graph()
+    
+    if validated_entities:
+        initial_state['validated_entities'] = validated_entities
+    
+    graph = create_streaming_graph()  # This should print the debug messages
     result = await graph.ainvoke(initial_state)
     return result
 

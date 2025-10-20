@@ -36,9 +36,9 @@ class BaseExecutorNode:
         print("=" * 80)
         print(f"Question: {state['question']}")
         print("Current state:")
-        print(f"   • Task: {state.get('task', 'N/A')}")
-        print(f"   • Previous tool calls: {state.get('tool_calls_count', 0)}")
-        print(f"   • Accumulated data: {len(state.get('accumulated_data', ''))} characters")
+        print(f"   Task: {state.get('task', 'N/A')}")
+        print(f"   Previous tool calls: {state.get('tool_calls_count', 0)}")
+        print(f"   Accumulated data: {len(state.get('accumulated_data', ''))} characters")
 
     async def _route_tool(self, state: T) -> str:
         print("\n[ROUTING] Selecting tool...")
@@ -61,8 +61,38 @@ class BaseExecutorNode:
     async def _execute_with_agent(self, state: T, tool_fn: Callable) -> str:
         print(f"[AGENT] Executing tool with model: {self.model}...")
         question_with_context = self._build_context(state)
+        
+        # Create agent with tools
+        # Note: If the Agent class supports tool_choice parameter, we should use it
+        # to force tool usage: Agent(..., tool_choice="required")
         agent = Agent(model=self.model, tools=[tool_fn], system_prompt=self.system_prompt)
-        result = await agent.invoke_async(question_with_context)
+        
+        # Add explicit instruction to use tools
+        enhanced_question = (
+            f"{question_with_context}\n\n"
+            f"IMPORTANT: You MUST use the available tool to answer this question. "
+            f"Do not provide a generic response or apologize for lack of data."
+        )
+        
+        result = await agent.invoke_async(enhanced_question)
+        
+        # Validate that tools were actually used
+        tool_used = False
+        if hasattr(result, 'tool_calls') and result.tool_calls:
+            tool_used = True
+            print(f"[SUCCESS] ✅ Tool was called: {len(result.tool_calls)} call(s)")
+        elif hasattr(result, 'content'):
+            # Check if the response contains tool output markers
+            content_str = str(result.content) if hasattr(result.content, '__str__') else str(result)
+            if 'tool_use' in content_str.lower() or 'function_call' in content_str.lower():
+                tool_used = True
+                print(f"[SUCCESS] ✅ Tool usage detected in content")
+        
+        if not tool_used:
+            print(f"[WARNING] ⚠️  Agent did NOT use any tools!")
+            print(f"[WARNING] This may indicate the agent is providing a generic response.")
+            print(f"[WARNING] The response may be incomplete or incorrect.")
+        
         return getattr(result, "message", str(result))
 
     def _build_context(self, state: T) -> str:
@@ -82,8 +112,8 @@ class BaseExecutorNode:
         state['tool_calls_count'] = state.get('tool_calls_count', 0) + 1
         state['last_node'] = f"{self.node_name}_node"
         print(f"\n[SUCCESS] {self.node_name.capitalize()} node completed")
-        print(f"   • Total tool calls: {state.get('tool_calls_count')}")
-        print(f"   • Total accumulated data: {len(state.get('accumulated_data', ''))} characters")
-        print(f"   • Last node: {state.get('last_node', 'N/A')}")
+        print(f"   Total tool calls: {state.get('tool_calls_count')}")
+        print(f"   Total accumulated data: {len(state.get('accumulated_data', ''))} characters")
+        print(f"   Last node: {state.get('last_node', 'N/A')}")
         print("=" * 80 + "\n")
         return state

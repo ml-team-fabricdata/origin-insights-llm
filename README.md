@@ -90,17 +90,57 @@ curl http://localhost:8080/version
 
 ---
 
-## 🧪 Test rápido LLM
+## 🧪 Testing
 
+### Test rápido LLM
 ```bash
 python test_llm.py
 ```
+
+### Test completo del grafo
+
+El proyecto incluye una suite completa de tests end-to-end para validar todo el grafo:
+
+```bash
+# Modo interactivo
+python run_tests.py
+
+# Smoke test (rápido - 4 tests)
+python run_tests.py smoke
+
+# Full test suite (completo - ~25 tests)
+python run_tests.py full
+
+# Stress test
+python run_tests.py stress 20
+```
+
+### Tests unitarios de validación
+```bash
+python test_validation_node.py
+```
+
+### Ejecutar todos los tests
+```bash
+# Windows
+run_all_tests.bat
+
+# Linux/Mac
+chmod +x run_all_tests.sh && ./run_all_tests.sh
+```
+
+**Documentación completa:** Ver [TESTING.md](TESTING.md)
+
+**Archivos de test:**
+- `test_complete_graph.py` - Suite completa end-to-end
+- `test_validation_node.py` - Tests unitarios de validación
+- `run_tests.py` - Script interactivo
+- `pytest.ini` - Configuración pytest
 
 ---
 
 ## 📌 Pendientes
 
 - Enriquecer logs y trazabilidad de nodos.
-- Casos de prueba unitarios.
 - Monitoreo básico en App Runner.
 - Staging / producción con entornos separados.

@@ -1,7 +1,7 @@
 def get_supervisor_prompt(question: str, tool_calls: int, max_iter: int, accumulated: str) -> str:
     """Genera el prompt del supervisor con los datos del estado"""
     return f"""
-Eres un supervisor inteligente que evalúa si los datos obtenidos responden completamente la pregunta del usuario.
+Eres un supervisor inteligente que evalúa si los datos obtenidos responden la pregunta del usuario.
 
 PREGUNTA DEL USUARIO: {question}
 INTENTOS: {tool_calls}/{max_iter}
@@ -9,17 +9,26 @@ INTENTOS: {tool_calls}/{max_iter}
 DATOS OBTENIDOS:
 {accumulated[:800]}
 
-CONTEXTO IMPORTANTE:
-- Las entidades (títulos, actores, directores) YA fueron validadas en un paso previo
-- Si los datos obtenidos NO responden la pregunta, el sistema puede redirigir a otro grafo especializado
-- Tu tarea es evaluar SOLO si los datos actuales son suficientes
+REGLAS DE EVALUACIÓN:
+1. Si los datos contienen información directa que responde la pregunta → COMPLETO
+2. Si los datos muestran listas, números, títulos, o cualquier información relevante → COMPLETO
+3. Solo di CONTINUAR si los datos están completamente vacíos o son errores técnicos
 
-DECISIONES POSIBLES:
-1. **COMPLETO**: Los datos responden completamente la pregunta con la información actual
-2. **CONTINUAR**: Los datos son insuficientes, pero este grafo puede obtener más información
+EJEMPLOS DE RESPUESTAS COMPLETAS:
+- "Aquí están los títulos..." (lista con datos) → COMPLETO
+- "El precio es X" (información específica) → COMPLETO
+- "Los rankings son: ..." (información estructurada) → COMPLETO
+- Cualquier lista con 1+ elementos → COMPLETO
 
-IMPORTANTE: Si los datos son insuficientes Y este grafo no puede ayudar más, el sistema automáticamente 
-redirigirá a otro grafo.
+EJEMPLOS DE RESPUESTAS INCOMPLETAS:
+- "" (vacío) → CONTINUAR
+- "Error: database connection" → CONTINUAR
+- "No data found" → CONTINUAR
+
+CONTEXTO:
+- Las entidades YA fueron validadas
+- Si dices CONTINUAR, el sistema puede redirigir a otro grafo
+- Sé generoso: si hay CUALQUIER dato útil → COMPLETO
 
 Responde EXACTAMENTE una palabra: COMPLETO o CONTINUAR
     """

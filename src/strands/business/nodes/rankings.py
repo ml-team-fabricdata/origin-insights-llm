@@ -1,10 +1,14 @@
 from src.strands.business.graph_core.state import State
-from src.strands.business.nodes.routers import route_rankings_tool
 from src.strands.business.nodes.prompt_business import RANKINGS_PROMPT
+from src.strands.business.nodes.router_configs import (
+    RANKINGS_TOOLS,
+    RANKINGS_ROUTER_PROMPT
+)
 from src.strands.utils.config import MODEL_NODE_EXECUTOR
 from src.strands.utils.base_node import BaseExecutorNode
+from src.strands.utils.router_config import create_router
 
-from src.sql.modules.business.rankings import (
+from src.strands.business.business_modules.rankings import (
     get_genre_momentum,
     get_top_generic,
     get_top_presence,
@@ -29,7 +33,10 @@ RANKINGS_TOOLS_MAP = {
 _rankings_executor = BaseExecutorNode(
     node_name="rankings",
     tools_map=RANKINGS_TOOLS_MAP,
-    router_fn=route_rankings_tool,
+    router_fn=create_router(
+        prompt=RANKINGS_ROUTER_PROMPT,
+        valid_tools=RANKINGS_TOOLS
+    ),
     system_prompt=RANKINGS_PROMPT,
     model=MODEL_NODE_EXECUTOR
 )

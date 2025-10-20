@@ -1,10 +1,14 @@
 from src.strands.platform.graph_core.state import State
-from src.strands.platform.nodes.routers import route_availability_tool
-from src.strands.platform.prompt_platform import AVAILABILITY_PROMPT
+from src.strands.platform.nodes.prompt_platform import AVAILABILITY_PROMPT
+from src.strands.platform.nodes.router_configs import (
+    AVAILABILITY_TOOLS,
+    AVAILABILITY_ROUTER_PROMPT
+)
 from src.strands.utils.config import MODEL_NODE_EXECUTOR
 from src.strands.utils.base_node import BaseExecutorNode
+from src.strands.utils.router_config import create_router
 
-from src.sql.modules.platform.availability import (
+from src.strands.platform.platform_modules.availability import (
     get_availability_by_uid, 
     get_platform_exclusives, 
     compare_platforms_for_title, 
@@ -23,7 +27,10 @@ AVAILABILITY_TOOLS_MAP = {
 _availability_executor = BaseExecutorNode(
     node_name="availability",
     tools_map=AVAILABILITY_TOOLS_MAP,
-    router_fn=route_availability_tool,
+    router_fn=create_router(
+        prompt=AVAILABILITY_ROUTER_PROMPT,
+        valid_tools=AVAILABILITY_TOOLS
+    ),
     system_prompt=AVAILABILITY_PROMPT,
     model=MODEL_NODE_EXECUTOR
 )

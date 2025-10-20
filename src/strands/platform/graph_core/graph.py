@@ -3,6 +3,7 @@ from .state import State, create_initial_state
 from .supervisor import platform_classifier, main_supervisor, route_from_main_supervisor, format_response
 from src.strands.platform.nodes.availability import availability_node
 from src.strands.platform.nodes.presence import presence_node
+from src.strands.utils.param_validation_node import validation_node, create_validation_edge
 
 
 def _route_from_classifier(state: State) -> str:
@@ -13,15 +14,29 @@ def _route_from_classifier(state: State) -> str:
 
 
 def create_streaming_graph():
+    """Create platform graph with validation node."""
     graph = StateGraph(State)
 
+    # Add validation node first
+    graph.add_node("validation", validation_node)
     graph.add_node("main_supervisor", main_supervisor)
     graph.add_node("platform_node", platform_classifier)
     graph.add_node("availability_node", availability_node)
     graph.add_node("presence_node", presence_node)
     graph.add_node("format_response", format_response)
 
-    graph.set_entry_point("main_supervisor")
+    # Start with validation
+    graph.set_entry_point("validation")
+    
+    # Route from validation: continue to supervisor or format error
+    graph.add_conditional_edges(
+        "validation",
+        create_validation_edge,
+        {
+            "continue": "main_supervisor",
+            "format_response": "format_response"
+        }
+    )
 
     graph.add_conditional_edges(
         "main_supervisor",
@@ -49,8 +64,12 @@ def create_streaming_graph():
     return graph.compile()
 
 
-async def process_question(question: str, max_iterations: int = 3) -> State:
+async def process_question(question: str, max_iterations: int = 3, validated_entities: dict = None) -> State:
     initial_state = create_initial_state(question, max_iterations)
+    
+    if validated_entities:
+        initial_state['validated_entities'] = validated_entities
+    
     graph = create_streaming_graph()
     result = await graph.ainvoke(initial_state)
     return result

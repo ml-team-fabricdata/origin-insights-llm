@@ -1,16 +1,20 @@
-from src.sql.utils.default_import import *
+from src.strands.utils.default_import import *
 from src.sql.modules.business.intelligence import *
 
 # =============================================================================
 # Intelligence Tools
 # =============================================================================
 PLATFORM_EXCLUSIVITY_COUNTRY_TOOL = Tool.from_function(
-    name="get_platform_exclusivity_by_country",
+    name="",
     description=(
-        "Count of exclusive titles for a platform in a given country (ISO-2). "
-        "Returns a JSON-serializable list of rows."
+        "Count of exclusive titles for a platform in a given country. "
+        "Parameters: platform_name (string, validated), country (ISO-2 code, validated), limit (int, default 100). "
+        "Platform name is validated against known platforms (e.g., 'netflix', 'disney+', 'prime'). "
+        "Country is validated and normalized to ISO-2 format (e.g., 'US', 'MX', 'AR'). "
+        "Returns JSON list of exclusive titles with metadata. "
+        "Returns error if platform or country cannot be validated."
     ),
-    func=get_platform_exclusivity_by_country,
+    func=,
 )
 
 CATALOG_SIMILARITY_TOOL = Tool.from_function(

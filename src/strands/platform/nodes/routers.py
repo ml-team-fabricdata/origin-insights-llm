@@ -3,7 +3,7 @@
 from src.strands.platform.graph_core.state import State
 from src.strands.utils.router_helpers import route_with_llm
 from src.strands.utils.config import MODEL_CLASSIFIER
-from src.strands.platform.prompt_platform import AVAILABILITY_ROUTER_PROMPT, PRESENCE_ROUTER_PROMPT
+from src.strands.platform.nodes.prompt_platform import AVAILABILITY_ROUTER_PROMPT, PRESENCE_ROUTER_PROMPT
 
 
 # Configuración de tools válidas

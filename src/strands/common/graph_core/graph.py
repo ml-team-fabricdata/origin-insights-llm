@@ -49,8 +49,12 @@ def create_streaming_graph():
     return graph.compile()
 
 
-async def process_question(question: str, max_iterations: int = 3) -> State:
+async def process_question(question: str, max_iterations: int = 3, validated_entities: dict = None) -> State:
     initial_state = create_initial_state(question, max_iterations)
+    
+    if validated_entities:
+        initial_state['validated_entities'] = validated_entities
+    
     graph = create_streaming_graph()
     result = await graph.ainvoke(initial_state)
     return result

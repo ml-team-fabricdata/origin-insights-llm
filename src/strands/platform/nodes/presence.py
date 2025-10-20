@@ -1,10 +1,14 @@
 from src.strands.platform.graph_core.state import State
-from src.strands.platform.nodes.routers import route_presence_tool
-from src.strands.platform.prompt_platform import PRESENCE_PROMPT
+from src.strands.platform.nodes.prompt_platform import PRESENCE_PROMPT
+from src.strands.platform.nodes.router_configs import (
+    PRESENCE_TOOLS,
+    PRESENCE_ROUTER_PROMPT
+)
 from src.strands.utils.config import MODEL_NODE_EXECUTOR
 from src.strands.utils.base_node import BaseExecutorNode
+from src.strands.utils.router_config import create_router
 
-from src.sql.modules.platform.presence import (
+from src.strands.platform.platform_modules.presence import (
     presence_count, 
     presence_list, 
     presence_statistics, 
@@ -25,7 +29,10 @@ PRESENCE_TOOLS_MAP = {
 _presence_executor = BaseExecutorNode(
     node_name="presence",
     tools_map=PRESENCE_TOOLS_MAP,
-    router_fn=route_presence_tool,
+    router_fn=create_router(
+        prompt=PRESENCE_ROUTER_PROMPT,
+        valid_tools=PRESENCE_TOOLS
+    ),
     system_prompt=PRESENCE_PROMPT,
     model=MODEL_NODE_EXECUTOR
 )

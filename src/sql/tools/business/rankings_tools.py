@@ -1,4 +1,4 @@
-from src.sql.utils.default_import import *
+from src.strands.utils.default_import import *
 from src.sql.modules.business.rankings import *
 
 # =============================================================================

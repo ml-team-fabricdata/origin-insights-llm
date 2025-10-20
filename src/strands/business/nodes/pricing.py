@@ -1,13 +1,16 @@
-# src/strands/business/nodes/pricing.py
 """Pricing node - handles pricing and quality queries."""
 
 from src.strands.business.graph_core.state import State
-from src.strands.business.nodes.routers import route_pricing_tool
 from src.strands.business.nodes.prompt_business import PRICING_PROMPT
+from src.strands.business.nodes.router_configs import (
+    PRICING_TOOLS,
+    PRICING_ROUTER_PROMPT
+)
 from src.strands.utils.config import MODEL_NODE_EXECUTOR
 from src.strands.utils.base_node import BaseExecutorNode
+from src.strands.utils.router_config import create_router
 
-from src.sql.modules.business.pricing import (
+from src.strands.business.business_modules.pricing import (
     query_presence_with_price,
     tool_hits_with_quality,
     tool_prices_latest,
@@ -26,12 +29,13 @@ PRICING_TOOLS_MAP = {
     "tool_hits_with_quality": tool_hits_with_quality
 }
 
-
-# Configure executor
 _pricing_executor = BaseExecutorNode(
     node_name="pricing",
     tools_map=PRICING_TOOLS_MAP,
-    router_fn=route_pricing_tool,
+    router_fn=create_router(
+        prompt=PRICING_ROUTER_PROMPT,
+        valid_tools=PRICING_TOOLS
+    ),
     system_prompt=PRICING_PROMPT,
     model=MODEL_NODE_EXECUTOR
 )

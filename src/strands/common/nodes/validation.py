@@ -1,10 +1,14 @@
 from src.strands.common.graph_core.state import State
-from src.strands.common.nodes.routers import route_validation_tool
 from src.strands.common.nodes.prompt_common import VALIDATION_PROMPT
+from src.strands.common.nodes.router_configs import (
+    VALIDATION_TOOLS,
+    VALIDATION_ROUTER_PROMPT
+)
 from src.strands.utils.config import MODEL_NODE_EXECUTOR
 from src.strands.utils.base_node import BaseExecutorNode
+from src.strands.utils.router_config import create_router
 
-from src.sql.modules.common.validation import (
+from src.strands.common.common_modules.validation import (
     validate_title,
     validate_actor,
     validate_director
@@ -21,7 +25,10 @@ VALIDATION_TOOLS_MAP = {
 _validation_executor = BaseExecutorNode(
     node_name="validation",
     tools_map=VALIDATION_TOOLS_MAP,
-    router_fn=route_validation_tool,
+    router_fn=create_router(
+        prompt=VALIDATION_ROUTER_PROMPT,
+        valid_tools=VALIDATION_TOOLS
+    ),
     system_prompt=VALIDATION_PROMPT,
     model=MODEL_NODE_EXECUTOR
 )

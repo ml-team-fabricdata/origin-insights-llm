@@ -1,79 +1,92 @@
-# main_router/prompts.py
 MAIN_ROUTER_PROMPT = """
-Clasifica preguntas sobre streaming en UNA categoría. Responde SOLO la categoría en MAYÚSCULAS.
+Classify into ONE category. Return ONLY the category name.
 
-CATEGORÍAS:
+BUSINESS - pricing, plans, rankings, market share
+TALENT - actors, directors, filmography
+CONTENT - title metadata (year, genre, duration, rating)
+PLATFORM - availability, where to watch, catalogs
+COMMON - system admin, technical queries
 
-BUSINESS - Precios, rankings, popularidad, exclusividad, análisis de mercado
-
-TALENT - Actores, directores, filmografía, colaboraciones
-
-CONTENT - Metadata de títulos: año, género, duración, rating, detalles
-
-PLATFORM - Disponibilidad, dónde ver, catálogos por país/plataforma
-
-COMMON - Administración, estadísticas del sistema, consultas técnicas generales
-
-REGLAS:
-- Responde SOLO: BUSINESS, TALENT, CONTENT, PLATFORM o COMMON
-- Sin explicaciones ni texto adicional
-- Si hay duda, elige la categoría más específica
-- La validación de entidades se hace automáticamente después
+Return ONLY: BUSINESS, TALENT, CONTENT, PLATFORM, or COMMON
 """
 
 ADVANCED_ROUTER_PROMPT = """
-Clasifica la pregunta en UNA categoría y retorna SOLO JSON válido.
+Classify and return ONLY valid JSON.
 
-CATEGORÍAS:
-- BUSINESS: Precios, rankings, popularidad, exclusividad
-- TALENT: Actores, directores, filmografía, colaboraciones
-- CONTENT: Metadata de títulos (año, género, duración, rating)
-- PLATFORM: Disponibilidad, dónde ver, catálogos
-- COMMON: Administración, consultas técnicas
-
-IMPORTANTE: Responde SOLO con JSON válido, sin texto adicional.
-
-FORMATO:
+Format:
 {
-  "primary": "TALENT",
-  "confidence": 0.90,
-  "candidates": [
-    {"category": "TALENT", "confidence": 0.90},
-    {"category": "CONTENT", "confidence": 0.60}
-  ]
+  "primary": "CATEGORY",
+  "confidence": 0.00,
+  "candidates": [{"category": "CATEGORY", "confidence": 0.00}]
 }
 
-REGLAS:
-1. primary: categoría principal (MAYÚSCULAS)
-2. confidence: 0.0-1.0 (tu nivel de certeza)
-3. candidates: lista ordenada (incluye primary primero)
-4. Si confidence < 0.5: incluye 2-3 candidatos
-5. Si confidence >= 0.8: solo primary en candidates
+Rules:
+- primary must be first in candidates
+- confidence: 0.0-1.0
+- If confidence >= 0.8: only primary in candidates
+- If confidence < 0.8: include 2-3 candidates
 
-EJEMPLOS:
-Pregunta: "películas de Coppola"
-{"primary": "TALENT", "confidence": 0.90, "candidates": [{"category": "TALENT", "confidence": 0.90}]}
+Categories:
 
-Pregunta: "cuánto cuesta Netflix"
-{"primary": "BUSINESS", "confidence": 0.95, "candidates": [{"category": "BUSINESS", "confidence": 0.95}]}
+BUSINESS - Business intelligence, analytics, comparisons:
+  • Platform exclusivity analysis ("exclusive titles", "only on Netflix")
+  • Catalog similarity/comparison between countries or platforms
+  • Titles in region A but not in region B
+  • Pricing, plans, price history, price changes
+  • Rankings, top titles, trending, momentum
+  • Market share, subscriber counts
 
-Pregunta: "dónde ver Inception"
-{"primary": "PLATFORM", "confidence": 0.85, "candidates": [{"category": "PLATFORM", "confidence": 0.85}, {"category": "CONTENT", "confidence": 0.60}]}
+TALENT - People in the industry:
+  • Actor filmography, actor collaborations
+  • Director filmography, director collaborations
+  • Cast information, crew information
+
+CONTENT - Title metadata and discovery:
+  • Search/discover titles by genre, year, rating, duration
+  • Title metadata (genre, year, duration, rating, synopsis)
+  • Filter titles by attributes
+
+PLATFORM - Simple availability queries:
+  • "Where can I watch [specific title]?" (single title availability)
+  • Platform catalog listing (simple list of titles on a platform)
+  • Title presence on platforms
+
+COMMON - System administration:
+  • Validate entities (titles, actors, directors)
+  • Custom SQL queries
+  • System status, technical queries
+
+IMPORTANT DISTINCTIONS:
+- "Exclusive titles on Netflix" → BUSINESS (exclusivity analysis)
+- "Where to watch Inception?" → PLATFORM (single title availability)
+- "Titles in Netflix US but not in Netflix MX" → BUSINESS (catalog comparison)
+- "What's on Netflix?" → PLATFORM (simple catalog listing)
+- "Compare Netflix and Disney+ catalogs" → BUSINESS (catalog comparison)
 """
 
 VALIDATION_PREPROCESSOR_PROMPT = """
-PASSTHROUGH estricto.
+Identify entities and call validation tool ONCE.
 
-Sin entidad → NO_VALIDATION_NEEDED.
-Con entidad → llama UNA vez: validate_title | validate_actor | validate_director.
+No entity -> return: NO_VALIDATION_NEEDED
 
-status=resolved / not_found → devuelve el JSON EXACTO de la herramienta.
-status=ambiguous → imprime SOLO:
-Múltiples resultados para "<entrada>":
-1. <opción 1>
-2. <opción 2>
-...
-¿Cuál es? (1..N)
+Has entity -> call ONE tool:
+- validate_title (movies/series)
+- validate_actor (actors)
+- validate_director (directors)
 
-PROHIBIDO: segunda llamada, adivinar, resumir/traducir, texto extra, elegir por el usuario.
+Then:
+- status=resolved/not_found -> return exact JSON from tool
+- status=ambiguous -> print ONLY:
+
+Multiple results for "<name>":
+1. <option 1>
+2. <option 2>
+
+Which one? (1, 2...)
+
+FORBIDDEN:
+- Calling tools twice
+- Modifying tool output
+- Choosing for user
+- Adding extra text
 """

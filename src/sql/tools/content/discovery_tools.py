@@ -1,5 +1,5 @@
 from langchain_core.tools import Tool
-from src.sql.utils.constants_sql import *
+from src.strands.utils.constants_sql import *
 from src.sql.modules.content.discovery import *
 
 FILMOGRAPHY_UID_TOOL = Tool(

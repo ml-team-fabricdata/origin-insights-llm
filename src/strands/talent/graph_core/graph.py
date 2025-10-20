@@ -4,20 +4,41 @@ from .supervisor import talent_classifier, main_supervisor, route_from_main_supe
 from src.strands.talent.nodes.actors import actors_node
 from src.strands.talent.nodes.directors import directors_node
 from src.strands.talent.nodes.collaborations import collaborations_node
+from src.strands.utils.param_validation_node import validation_node, create_validation_edge
 
 
 def _route_from_classifier(state: State) -> str:
+    """Route from classifier. Collaborations requires prior validation."""
     task = state.get("task", "").lower()
+    
+    # Collaborations can only execute after actor or director validation
+    if task == "collaborations":
+        validated_entities = state.get("validated_entities") or {}
+        # Check for truthy values (not None, not empty string, not False)
+        has_actor = bool(validated_entities.get("actor"))
+        has_director = bool(validated_entities.get("director"))
+        
+        # If no validated entities, route to actors first
+        if not has_actor and not has_director:
+            return "actors_node"
+        
+        return "collaborations_node"
+    
     if task == "actors":
         return "actors_node"
     elif task == "directors":
         return "directors_node"
-    return "collaborations_node"
+    
+    # Default to actors if task is unclear
+    return "actors_node"
 
 
 def create_streaming_graph():
+    """Create talent graph with validation node."""
     graph = StateGraph(State)
 
+    # Add validation node first
+    graph.add_node("validation", validation_node)
     graph.add_node("main_supervisor", main_supervisor)
     graph.add_node("talent_classifier", talent_classifier)
     graph.add_node("actors_node", actors_node)
@@ -25,7 +46,18 @@ def create_streaming_graph():
     graph.add_node("collaborations_node", collaborations_node)
     graph.add_node("format_response", format_response)
 
-    graph.set_entry_point("main_supervisor")
+    # Start with validation
+    graph.set_entry_point("validation")
+    
+    # Route from validation: continue to supervisor or format error
+    graph.add_conditional_edges(
+        "validation",
+        create_validation_edge,
+        {
+            "continue": "main_supervisor",
+            "format_response": "format_response"
+        }
+    )
 
     graph.add_conditional_edges(
         "main_supervisor",

@@ -1,5 +1,6 @@
 from typing import Literal
 from .state import MainRouterState
+from .config import MIN_CONFIDENCE_NO_CLARIFICATION
 
 
 def route_from_router(state: MainRouterState) -> Literal["clarifier", "validation_preprocessor"]:
@@ -9,7 +10,7 @@ def route_from_router(state: MainRouterState) -> Literal["clarifier", "validatio
     
     confidence = state.get("routing_confidence", 1.0)
     
-    if confidence < 0.5:
+    if confidence < MIN_CONFIDENCE_NO_CLARIFICATION:
         return "clarifier"
     
     return "validation_preprocessor"
@@ -26,20 +27,22 @@ def route_from_validation(state: MainRouterState) -> Literal["parallel_executor"
     if validation_status == "not_found":
         return "not_found_responder"
     
-    # Validación OK → decidir si paralelizar
-    candidates = state.get("routing_candidates", [])
+    # Validación OK → decidir si paralelizar basado en state
+    # El router ya decidió si usar parallel_execution basado en τ
+    use_parallel = state.get("parallel_execution", False)
     
-    if len(candidates) >= 2 and len(candidates) > 1 and candidates[1][1] > 0.6:
+    if use_parallel:
         return "parallel_executor"
     
     return "domain_graph"
 
 
-def route_from_domain_graph(state: MainRouterState) -> Literal["responder_formatter", "advanced_router", "clarifier", "error_handler"]:
+def route_from_domain_graph(state: MainRouterState) -> Literal["schema_checker", "advanced_router", "clarifier", "error_handler"]:
+    """Domain Graph → Schema Checker (si success) o Re-routing/Error"""
     domain_status = state.get("domain_graph_status")
     
     if domain_status == "success":
-        return "responder_formatter"
+        return "schema_checker"  # Validar esquema antes de formatear
     
     if domain_status == "not_my_scope":
         return "advanced_router"
@@ -50,7 +53,7 @@ def route_from_domain_graph(state: MainRouterState) -> Literal["responder_format
     if domain_status == "error":
         return "error_handler"
     
-    return "responder_formatter"
+    return "schema_checker"  # Default: validar esquema
 
 
 def route_from_aggregator(state: MainRouterState) -> Literal["domain_graph", "error_handler"]:
@@ -61,3 +64,13 @@ def route_from_aggregator(state: MainRouterState) -> Literal["domain_graph", "er
         return "error_handler"
     
     return "domain_graph"
+
+
+def route_from_schema_checker(state: MainRouterState) -> Literal["responder_formatter", "error_handler"]:
+    """Schema Checker → Formatter (si válido) o Error Handler (si inválido)"""
+    schema_valid = state.get("schema_valid", False)
+    
+    if schema_valid:
+        return "responder_formatter"
+    
+    return "error_handler"

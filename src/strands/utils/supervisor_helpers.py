@@ -10,14 +10,35 @@ async def main_supervisor(state: TypedDict) -> TypedDict:
     max_iter = state.get('max_iterations', 3)
     if tool_calls == 0:
         print("[SUPERVISOR] Primera iteracion, necesita clasificacion")
+        print("[SUPERVISOR] Retornando: supervisor_decision='NECESITA_CLASIFICACION'")
         return {**state, "supervisor_decision": "NECESITA_CLASIFICACION"}
     if tool_calls >= max_iter:
         print(f"[SUPERVISOR] Maximo de iteraciones alcanzado ({tool_calls}/{max_iter})")
-        print("[SUPERVISOR] ⚠️ No se completó, volviendo al main router")
+        print("[SUPERVISOR] No se completo, volviendo al main router")
         return {**state, "supervisor_decision": "VOLVER_MAIN_ROUTER"}
     accumulated = state.get('accumulated_data', '')
     if not accumulated or len(accumulated.strip()) < 50:
         print("[SUPERVISOR] No hay datos suficientes, volviendo al main router")
+        return {**state, "supervisor_decision": "VOLVER_MAIN_ROUTER"}
+    
+    # Check for generic/apologetic responses
+    accumulated_lower = accumulated.lower()
+    generic_phrases = [
+        "lo siento, no tengo",
+        "i'm sorry, i don't have",
+        "no tengo información",
+        "don't have access",
+        "no puedo proporcionar",
+        "cannot provide",
+        "lamentablemente, no tengo",
+        "unfortunately, i don't",
+        "no tengo acceso"
+    ]
+    
+    if any(phrase in accumulated_lower for phrase in generic_phrases):
+        print("[SUPERVISOR] ⚠️  Respuesta genérica detectada (frases de disculpa)")
+        print("[SUPERVISOR] Esto indica que las herramientas no se usaron correctamente")
+        print("[SUPERVISOR] Volviendo al main router para intentar otro enfoque")
         return {**state, "supervisor_decision": "VOLVER_MAIN_ROUTER"}
     supervisor_prompt = get_supervisor_prompt(
         question=state['question'],
@@ -33,10 +54,10 @@ async def main_supervisor(state: TypedDict) -> TypedDict:
         decision = str(getattr(response, "message", response)).strip().upper()
     print(f"[SUPERVISOR] Decision del LLM: {decision}")
     if "COMPLETO" in decision or "COMPLETE" in decision:
-        print("[SUPERVISOR] ✓ Pregunta respondida, ir a format")
+        print("[SUPERVISOR] Pregunta respondida, ir a format")
         supervisor_decision = "COMPLETO"
     else:
-        print("[SUPERVISOR] ✗ Necesita mas informacion, volviendo al main router")
+        print("[SUPERVISOR] Necesita mas informacion, volviendo al main router")
         supervisor_decision = "VOLVER_MAIN_ROUTER"
     return {**state, "supervisor_decision": supervisor_decision}
 
@@ -44,12 +65,21 @@ async def main_supervisor(state: TypedDict) -> TypedDict:
 def create_route_from_supervisor(classifier_node_name: str):
     def route_from_main_supervisor(state: TypedDict) -> Literal[str, str, str]:
         decision = state.get("supervisor_decision", "COMPLETO").upper()
+        print(f"\n[ROUTING] route_from_main_supervisor called")
+        print(f"[ROUTING] supervisor_decision: '{decision}'")
+        print(f"[ROUTING] classifier_node_name: '{classifier_node_name}'")
+        
         if decision == "COMPLETO":
+            print(f"[ROUTING] → format_response")
             return "format_response"
         if "VOLVER_MAIN_ROUTER" in decision:
+            print(f"[ROUTING] → return_to_main_router")
             return "return_to_main_router"
         if "CLASIFICACION" in decision:
+            print(f"[ROUTING] → {classifier_node_name}")
             return classifier_node_name
+        
+        print(f"[ROUTING] → return_to_main_router (default)")
         return "return_to_main_router"
     route_from_main_supervisor.__name__ = f"route_from_main_supervisor_to_{classifier_node_name}"
     return route_from_main_supervisor
@@ -61,7 +91,7 @@ async def format_response(state: TypedDict) -> TypedDict:
     if not accumulated or len(accumulated.strip()) < 20:
         return {
             "question": state["question"],
-            "answer": "Lo siento, no pude obtener información suficiente para responder tu pregunta.",
+            "answer": "Lo siento, no pude obtener informacion suficiente para responder tu pregunta.",
             "task": state.get("task"),
             "tool_calls_count": state.get("tool_calls_count", 0),
             "status": "insufficient_data"

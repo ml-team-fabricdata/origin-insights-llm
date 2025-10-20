@@ -1,5 +1,6 @@
 import asyncio
 from .state import MainRouterState
+from .config import MAX_PARALLEL_CANDIDATES
 from src.strands.business.graph_core.graph import process_question as business_process
 from src.strands.talent.graph_core.graph import process_question as talent_process
 from src.strands.content.graph_core.graph import process_question as content_process
@@ -22,17 +23,21 @@ async def parallel_executor_node(state: MainRouterState) -> MainRouterState:
     print("="*80)
     
     candidates = state.get("routing_candidates", [])
+    parallel_k = state.get("parallel_k", min(len(candidates), MAX_PARALLEL_CANDIDATES))
     
     if len(candidates) < 2:
         print("[PARALLEL] Menos de 2 candidatos, no se requiere ejecución paralela")
         return state
     
-    print(f"[PARALLEL] Ejecutando {len(candidates)} grafos en paralelo:")
-    for graph, conf in candidates:
+    # Limitar a K candidatos
+    candidates_to_execute = candidates[:parallel_k]
+    
+    print(f"[PARALLEL] Ejecutando K={len(candidates_to_execute)}/{len(candidates)} grafos en paralelo:")
+    for graph, conf in candidates_to_execute:
         print(f"  - {graph} (confidence: {conf:.2f})")
     
     tasks = []
-    for graph_name, confidence in candidates:
+    for graph_name, confidence in candidates_to_execute:
         processor = GRAPH_PROCESSORS.get(graph_name)
         if processor:
             task = processor(state['question'], max_iterations=3)

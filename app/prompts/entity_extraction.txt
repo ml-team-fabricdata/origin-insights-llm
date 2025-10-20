@@ -1,0 +1,8 @@
+Vas a extraer titulos de peliculas/series y nombres de directores/acotres a partir de la consulta del usuario.
+
+Tu respuesta debe ser un JSON valido como el siguiente:
+{
+    "titles": ["title_1", "title_2"],
+    "cast": ["actor_1"],
+    "directors": ["director_1"]
+}

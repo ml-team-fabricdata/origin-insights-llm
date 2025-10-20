@@ -44,9 +44,10 @@ tools = {
 
 class State(TypedDict):
     messages: list[BaseMessage]
-    plan: list[dict]
-    validation_plan: list[dict]
+    entities: list[dict]
+    search_results: dict[str, str]
     validation_results: dict[str, str]
+    plan: list[dict]
     tool_results: dict[str, str]
     output: str
 
@@ -88,52 +89,83 @@ def substitute_placeholders(args, results):
         return [substitute_placeholders(v, results) for v in args]
     return args
 
-# Nodo de validacion de nombres y titulos
-def validate_node(state: State):
-    with open("./prompts/validation.txt", encoding="utf-8") as file:
-        plan_prompt = file.read()
-    messages = [SystemMessage(content=plan_prompt)] + state['messages']
-    plan = validation_llm.invoke(messages).content
-    state['validation_plan'] = parse_plan(plan)
+
+def extract_entities_node(state: State):
+    print("## Extrayendo entidades de la consulta del usuario...")
+    with open("./prompts/entity_extraction.txt", encoding="utf-8") as file:
+        entity_prompt = file.read()
+    messages = [SystemMessage(content=entity_prompt)] + state['messages']
+    entities = planning_llm.invoke(messages).content
+    state['entities'] = json.loads(entities)
     print(state)
     return state
 
 
-# Ejecuta las validaciones consultando al usuario cuando hay ambigüedad
-def execute_validation_node(state: State):
+def search_entities_node(state: State):
+    print("## Buscando entidades extraídas...")
     results = {}
+    entities = state.get('entities', {})
+    for entity_type, names in entities.items():
+        for name in names:
+            if entity_type == "titles":
+                result = validate_title(name)
+            elif entity_type == "cast":
+                result = validate_actor(name)
+            elif entity_type == "directors":
+                result = validate_director(name)
+            else:
+                raise ValueError(f"Tipo de entidad desconocido: {entity_type}")
+            results[name] = result
+            print(result)
+    state['search_results'] = results
+    print(state)
+    return state
 
-    for i, step in enumerate(state['validation_plan'], 1):
-        step_key = f"step_{i}"
-        tool_name = step["tool_name"]
 
-        tool = validation_tools.get(tool_name)
-        if not tool:
-            results[step_key] = f"Unknown tool: {tool_name}"
+# Nodo de validacion de nombres y titulos
+def validate_node(state: State):
+    print("## Validando entidades encontradas...")
+    with open("./prompts/validation.txt", encoding="utf-8") as file:
+        plan_prompt = file.read()
+    messages = [SystemMessage(content=plan_prompt)] + state['messages']
+
+    for entity in state.get('search_results', {}).values():
+        print(entity)
+        if entity["status"] == "ok":
+            messages += [HumanMessage(content=str(entity))]
+
+    result = validation_llm.invoke(messages).content
+    state['validation_results'] = json.loads(result).get("validations", [])
+    print(state)
+    return state
+
+
+# Resuelve las ambigüedades consultando al usuario
+def execute_validation_node(state: State):
+    print("## Ejecutando validaciones con intervencion del usuario...")
+    for i, entity in enumerate(state['validation_results']):
+        if entity["entity_id"] != "ambiguous":
             continue
-
-        result = tool(**step["args"])
-        if result["status"] == "ambiguous":
-            selected_index = interrupt({"options": result["options"]})
-            result = result["options"][selected_index]
+        search_result = state['search_results'].get(entity['entity_name'])
+        selected_index = interrupt({"options": search_result["options"]})
+        if entity["entity_type"] == "title":
+            selected_id = search_result["options"][selected_index]["uid"]
         else:
-            result = result["result"]
+            selected_id = search_result["options"][selected_index]["id"]
+        state['validation_results'][i]['entity_id'] = selected_id
+        state['messages'] += [HumanMessage(content=str(entity))]
+        print(entity)
 
-        results[step_key] = result
-
-        step["result"] = result
-        state['messages'] += [HumanMessage(content=str(step))]
-        print(step)
-
-    state['validation_results'] = results
     return state
 
 
 # Nodo de planificación: llama al LLM para generar el plan (qué tools usar)
 def plan_node(state: State):
+    print("## Generando plan de ejecucion...")
     with open("./prompts/planning.txt", encoding="utf-8") as file:
         plan_prompt = file.read()
     messages = [SystemMessage(content=plan_prompt)] + state['messages']
+    print(messages)
     plan = planning_llm.invoke(messages).content
     state['plan'] = parse_plan(plan)
     print(state)
@@ -179,13 +211,17 @@ def answer_node(state: State):
 
 # Construcción del grafo
 graph = StateGraph(state_schema=State)
+graph.add_node("extract_entities", extract_entities_node)
+graph.add_node("search_entities", search_entities_node)
 graph.add_node("validate", validate_node)
 graph.add_node("execute_validation", execute_validation_node)
 graph.add_node("plan", plan_node)
 graph.add_node("execute", execute_node)
 graph.add_node("answer", answer_node)
 
-graph.add_edge(START, "validate")
+graph.add_edge(START, "extract_entities")
+graph.add_edge("extract_entities", "search_entities")
+graph.add_edge("search_entities", "validate")
 graph.add_edge("validate", "execute_validation")
 graph.add_edge("execute_validation", "plan")
 graph.add_edge("plan", "execute")

@@ -1,19 +1,19 @@
 Vas a recibir una consulta del usuario a partir de la cual debes determinar el plan de ejecucion (en formato JSON) para obtener los datos necesarios para responder la consulta.
 La respuesta debe contener unicamente el JSON literal del plan de ejecucion. Debe ser JSON valido para ser parseado directamente. Evitar indicar el lenguaje con triple comilla como Markdown.
-Si un paso requiere usar como argumento los resultados de uno o mas pasos anteriores, indicar entre pares de llaves el resultado de que paso es necesario, empezando por "{{step_1}}", separado por punto la clave si el resultado era un diccionario.
+NOTA: Solo debes llamar tools si tenes los argumentos (literales) que requieren.
 
 Ejemplo de plan de ejecucion (solo lo que esta dentro de las triples comillas):
 """
 {
     "steps": [
-        {"tool_name": "get_filmography_by_uid", "args": {"uid": "{{step_1.uid}}"}},
-        {"tool_name": "get_title_rating", "args": {"uid": "{{step_1.uid}}", "country": "US"}}
+        {"tool_name": "get_filmography_by_uid", "args": {"uid": "16c0c6e7ecbeec8e66f472f27852804b"}},
+        {"tool_name": "get_title_rating", "args": {"uid": "16c0c6e7ecbeec8e66f472f27852804b", "country": "US"}}
     ]
 }
 """
 
 Lista de tools disponibles:
-- Obtener metadatatos de un contenido a paritr del UID:
+- Obtener metadatatos de un contenido a partir del UID:
   - get_filmography_by_uid(uid: str)
 - Obtener rating de un contenido a partir del UID, por pais:
   - get_title_rating(uid: str, country: Optional[str] = None)

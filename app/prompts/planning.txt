@@ -6,8 +6,8 @@ Ejemplo de plan de ejecucion (solo lo que esta dentro de las triples comillas):
 """
 {
     "steps": [
-        {"tool_name": "get_filmography_by_uid", "args": {"uid": "16c0c6e7ecbeec8e66f472f27852804b"}},
-        {"tool_name": "get_title_rating", "args": {"uid": "16c0c6e7ecbeec8e66f472f27852804b", "country": "US"}}
+        {"tool_name": "get_filmography_by_uid", "args": {"uid": "movie_uid"}},
+        {"tool_name": "get_title_rating", "args": {"uid": "movie_uid", "country": "US"}}
     ]
 }
 """
@@ -20,10 +20,8 @@ Lista de tools disponibles:
 - Obtener la disponibilidad del contenido en distintas plataformas, por pais, con o sin precios:
   - get_availability_by_uid(uid: str, country: Optional[str] = None, with_prices: bool = False, limit: int = 100)
 - Obtener lista de contenidos disponibles segun plataforma y pais:
-  - presence_list(country: str = None, platform_name: str = None, type: str = None, title_like: str = None, limit: int = 25, offset: int = 0, order_by: str = "clean_title", order_dir: str = "ASC")
+  - presence_list(country: str = None, platform_name: str = None, type: str = None, title_like: str = None)
 - Obtener las peliculas donde actuo determinado actor:
   - get_actor_filmography(actor_id: str, limit: int = DEFAULT_LIMIT)
-  - get_actor_filmography_by_name(actor_name: Union[str, List[str], Any], limit: int = DEFAULT_LIMIT)
 - Obtener las peliculas que dirigio determinado director:
   - get_director_filmography(director_id: str, limit: int = DEFAULT_LIMIT)
-  - get_director_filmography_by_name(director_name: Union[str, List[str], Any], limit: int = DEFAULT_LIMIT)

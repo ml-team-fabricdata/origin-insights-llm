@@ -9,8 +9,8 @@ En cambio si no podes determinarlo a partir de la consulta o de los resultados d
 La respuesta debe contener unicamente un JSON valido como el siguiente:
 {
     "validations": [
-        {"entity_type": "title", "entity_name": "Inception", "entity_id": "16c0c6e7ecbeec8e66f472f27852804b"},
-        {"entity_type": "director", "entity_name": "Christopher Nolan", "entity_id": "615683"},
-        {"entity_type": "title", "entity_name": "Harry Potter", "entity_id": "ambiguous"},
+        {"entity_type": "title", "entity_name": "title_1", "entity_id": "movie_uid"},
+        {"entity_type": "director", "entity_name": "director_1", "entity_id": "director_id"},
+        {"entity_type": "title", "entity_name": "title_2", "entity_id": "ambiguous"},
     ]
 }

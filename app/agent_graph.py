@@ -174,6 +174,7 @@ def plan_node(state: State):
 
 # Nodo de ejecución: ejecuta cada tool del plan
 def execute_node(state: State):
+    print("## Ejecutando plan de ejecucion...")
     results = {}
 
     for i, step in enumerate(state['plan'], 1):

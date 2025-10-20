@@ -17,7 +17,7 @@ HITS_PRESENCE_TBL = f"{SCHEMA}.hits_presence_2"
 HITS_GLOBAL_TBL = f"{SCHEMA}.hits_global"
 
 # Additional tables
-AKAS_TABLE = f"{SCHEMA}.akas_with_year"
+AKAS_TABLE = f"{SCHEMA}.akas_with_details"
 CAST_TABLE = f"{SCHEMA}.cast"
 ACTED_IN_TABLE = f"{SCHEMA}.acted_in"
 DIRECTOR_TABLE = f"{SCHEMA}.directors"

@@ -18,9 +18,8 @@ ORDER BY m.uid, m.year NULLS LAST
 """
 
 FUZZY_SEARCH_SQL = f"""
-SELECT {SCHEMA}.similarity(clean_title, %s::text) as title_similarity, a.uid, a.title AS aka_title, s."year", s.directors
-FROM {AKAS_TABLE} a
-JOIN {META_TBL} s ON a.uid = s.uid
+SELECT {SCHEMA}.similarity(clean_title, %s::text) as title_similarity, uid, title AS aka_title, "year", directors, full_cast AS cast
+FROM {AKAS_TABLE}
 WHERE clean_title %% %s::text
 ORDER BY title_similarity DESC
 LIMIT %s;

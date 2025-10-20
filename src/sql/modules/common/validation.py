@@ -52,6 +52,8 @@ def _build_title_result(row: Dict, is_fuzzy: bool = False) -> Dict[str, Any]:
         "imdb_id": row.get('imdb_id'),
         "year": row.get('year'),
         "type": row.get('type'),
+        "directors": row.get('directors'),
+        "cast": row.get('cast'),
         "title_similarity": safe_cast_float(row.get('title_similarity'), default_similarity)
     }
 
@@ -64,9 +66,11 @@ def _build_title_options(results: List[Dict], is_fuzzy: bool = False) -> List[Di
         option = {
             "uid": result.get('uid'),
             "title": result.get(title_key),
+            "imdb_id": result.get('imdb_id'),
             "year": result.get('year'),
             "type": result.get('type'),
-            "imdb_id": result.get('imdb_id')
+            "directors": result.get('directors'),
+            "cast": result.get('cast'),
         }
         if is_fuzzy:
             option["title_similarity"] = safe_cast_float(

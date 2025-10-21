@@ -3,7 +3,6 @@ from strands import Agent
 from src.strands.config.models import MODEL_NODE_EXECUTOR
 from .state import MainRouterState
 from src.strands.common.common_modules.validation import validate_title, validate_actor, validate_director
-from src.strands.common.nodes.prompt_common import VALIDATION_ROUTER_PROMPT
 from src.strands.core.factories.router_factory import create_router
 
 ROUTING_MAP = {
@@ -30,13 +29,6 @@ TOOLS:
 - validate_title (for movies/series/shows)
 - validate_actor (for actors/actresses)
 - validate_director (for directors)
-
-EXAMPLES:
-Q: "filmography of Tom Hanks" → validate_actor
-Q: "movies directed by Spielberg" → validate_director
-Q: "information about Inception" → validate_title
-Q: "¿Cuál es la filmografía de Tom Hanks?" → validate_actor
-
 CRITICAL: Return ONLY the tool name. One word. Nothing else.
 """
 
@@ -48,21 +40,6 @@ RULES:
 - If TWO entities (collaborations): return "ENTITY1 | ENTITY2" separated by " | "
 - If NO specific entity (general query): return "NO_ENTITY"
 - No explanations, no additional text
-
-Examples with entities:
-- "filmography of Tom Hanks" → Tom Hanks
-- "movies directed by Steven Spielberg" → Steven Spielberg
-- "information about Inception" → Inception
-- "movies with Tom Hanks and Steven Spielberg" → Tom Hanks | Steven Spielberg
-- "¿En qué películas han trabajado juntos Tom Hanks y Steven Spielberg?" → Tom Hanks | Steven Spielberg
-
-Examples WITHOUT entities (general queries):
-- "action movies" → NO_ENTITY
-- "películas de acción" → NO_ENTITY
-- "best movies of 2023" → NO_ENTITY
-- "top rated series" → NO_ENTITY
-- "busca películas de terror" → NO_ENTITY
-
 Return ONLY the entity name(s), " | " separator for multiple, or "NO_ENTITY" for general queries.
 """
 

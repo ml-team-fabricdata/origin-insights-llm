@@ -14,8 +14,8 @@ from .config import (
     has_side_effects,
     filter_safe_candidates
 )
-from .clarifier import detect_missing_params
 from .telemetry import log_router_decision, log_candidate_discard, log_rerouting
+from .router_cache import get_router_cache
 
 
 def _extract_response(response) -> str:
@@ -93,26 +93,35 @@ async def advanced_router_node(state: MainRouterState) -> MainRouterState:
                 "clarification_message": f"I've tried {max_hops} different approaches but couldn't find a satisfactory answer. Could you rephrase your question?"
             }
     
-    # Build context-aware prompt for re-routing
-    question_context = state['question']
-    if state.get("needs_rerouting", False) and visited:
-        question_context = f"{state['question']}\n\nNote: Already tried {', '.join(visited).upper()} graph(s). Consider alternative categories."
+    # Check cache first
+    cache = get_router_cache()
+    cached_decision = cache.get(state['question'], visited)
     
-    agent = Agent(model=MODEL_CLASSIFIER, system_prompt=ADVANCED_ROUTER_PROMPT)
-    response = await agent.invoke_async(question_context)
-    result_str = _extract_response(response)
-    
-    try:
-        result = _parse_json_response(result_str)
-        primary = result.get("primary", "COMMON").upper()
-        confidence = float(result.get("confidence", 0.5))
-        candidates_raw = result.get("candidates", [])
-        candidates = _filter_candidates(candidates_raw, visited)
-    except (json.JSONDecodeError, ValueError) as e:
-        print(f"[ROUTER] Error parsing JSON, usando fallback: {e}")
-        primary = "COMMON"
-        confidence = 0.5
-        candidates = [(primary.lower(), confidence)]
+    if cached_decision:
+        primary = cached_decision["selected_graph"]
+        confidence = cached_decision["confidence"]
+        candidates = cached_decision["candidates"]
+    else:
+        # Build context-aware prompt for re-routing
+        question_context = state['question']
+        if state.get("needs_rerouting", False) and visited:
+            question_context = f"{state['question']}\n\nNote: Already tried {', '.join(visited).upper()} graph(s). Consider alternative categories."
+        
+        agent = Agent(model=MODEL_CLASSIFIER, system_prompt=ADVANCED_ROUTER_PROMPT)
+        response = await agent.invoke_async(question_context)
+        result_str = _extract_response(response)
+        
+        try:
+            result = _parse_json_response(result_str)
+            primary = result.get("primary", "COMMON").upper()
+            confidence = float(result.get("confidence", 0.5))
+            candidates_raw = result.get("candidates", [])
+            candidates = _filter_candidates(candidates_raw, visited)
+        except (json.JSONDecodeError, ValueError) as e:
+            print(f"[ROUTER] Error parsing JSON, usando fallback: {e}")
+            primary = "COMMON"
+            confidence = 0.5
+            candidates = [(primary.lower(), confidence)]
     
     selected_graph, alt_conf = _find_alternative(primary.lower(), candidates, visited)
     
@@ -141,25 +150,8 @@ async def advanced_router_node(state: MainRouterState) -> MainRouterState:
         confidence = alt_conf
     
     skip_validation = selected_graph not in GRAPHS_REQUIRING_VALIDATION
-    missing_params = detect_missing_params(state['question'], selected_graph)
     
-    if len(missing_params) == 1:
-        print(f"[ROUTER] Missing essential param: {missing_params[0]}")
-        print("[ROUTER] Routing to CLARIFIER")
-        print("="*80 + "\n")
-        return {
-            **state,
-            "selected_graph": selected_graph,
-            "routing_confidence": confidence,
-            "routing_candidates": candidates,
-            "needs_clarification": True,
-            "missing_params": missing_params
-        }
-    
-    if len(missing_params) > 1:
-        print(f"[ROUTER] Multiple missing params: {missing_params}")
-        print("[ROUTER] Continuing (domain graph will handle)")
-    
+    # Domain graphs will handle missing params via supervisor
     use_parallel = should_use_parallel_execution(confidence, len(candidates))
     
     if use_parallel:
@@ -222,6 +214,10 @@ async def advanced_router_node(state: MainRouterState) -> MainRouterState:
         previous = state.get("previous_graph", "unknown")
         log_rerouting(logger, previous, selected_graph, len(new_visited), "not_my_scope")
     
+    # Cache the decision for future similar queries
+    if not cached_decision:
+        cache.set(state['question'], visited, selected_graph, confidence, candidates)
+    
     return {
         **state,
         "selected_graph": selected_graph,
@@ -232,6 +228,5 @@ async def advanced_router_node(state: MainRouterState) -> MainRouterState:
         "skip_validation": skip_validation,
         "needs_rerouting": False,
         "parallel_execution": use_parallel,
-        "parallel_k": parallel_k,
-        "missing_params": missing_params
+        "parallel_k": parallel_k
     }

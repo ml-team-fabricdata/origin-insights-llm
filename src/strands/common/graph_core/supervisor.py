@@ -11,8 +11,7 @@ from .state import State
 governance_classifier = create_simple_classifier(
     name="governance",
     prompt=GOVERNANCE_PROMPT,
-    valid_options=["ADMIN", "VALIDATION"],
-    default_option="VALIDATION"
+    valid_options=["ADMIN", "VALIDATION"]
 )
 
 route_from_main_supervisor = create_route_from_supervisor("governance_node")

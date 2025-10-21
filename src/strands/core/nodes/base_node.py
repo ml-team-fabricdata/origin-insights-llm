@@ -1,4 +1,5 @@
 from typing import Dict, Callable, TypeVar, Any
+import time
 from strands import Agent
 
 T = TypeVar('T', bound=Dict[str, Any])
@@ -27,8 +28,13 @@ class BaseExecutorNode:
         tool_fn = self._get_tool(tool_name)
         if not tool_fn:
             return self._handle_tool_not_found(state, tool_name)
+        
+        # Track tool execution time
+        start_time = time.time()
         result = await self._execute_with_agent(state, tool_fn)
-        return self._update_state(state, result, tool_name)
+        execution_time = time.time() - start_time
+        
+        return self._update_state(state, result, tool_name, execution_time)
 
     def _log_header(self, state: T):
         print("\n" + "=" * 80)
@@ -97,14 +103,21 @@ class BaseExecutorNode:
             return f"{state['question']}\n\nValidated {self.entity_key}: {entity_id}"
         return state['question']
 
-    def _update_state(self, state: T, result: str, tool_name: str) -> T:
+    def _update_state(self, state: T, result: str, tool_name: str, execution_time: float) -> T:
         print(f"[DATA] Obtained: {len(result)} characters")
+        print(f"[TIMING] Tool execution time: {execution_time:.2f}s")
         print(f"[PREVIEW] {result[:200]}..." if len(result) > 200 else f"[DATA] {result}")
         state = dict(state)
         source = f"{self.node_name}_node/{tool_name}"
         state['accumulated_data'] = f"{state.get('accumulated_data', '')}\n\n--- Data from {source} ---\n{result}"
         state['tool_calls_count'] = state.get('tool_calls_count', 0) + 1
         state['last_node'] = f"{self.node_name}_node"
+        
+        # Track tool execution times
+        if 'tool_execution_times' not in state:
+            state['tool_execution_times'] = {}
+        state['tool_execution_times'][f"{self.node_name}/{tool_name}"] = execution_time
+        
         print(f"\n[SUCCESS] {self.node_name.capitalize()} node completed")
         print(f"   Total tool calls: {state.get('tool_calls_count')}")
         print(f"   Total accumulated data: {len(state.get('accumulated_data', ''))} characters")

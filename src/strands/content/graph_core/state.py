@@ -18,6 +18,7 @@ class State(TypedDict, total=False):
     iteration_history: Optional[List[Dict[str, Any]]]
     last_node: Optional[Literal["metadata_node", "discovery_node"]]
     should_continue: bool
+    tool_execution_times: Optional[Dict[str, float]]
 
 
 def create_initial_state(question: str, max_iterations: int = 3) -> State:
@@ -34,7 +35,8 @@ def create_initial_state(question: str, max_iterations: int = 3) -> State:
         "status": None,
         "iteration_history": [],
         "worker_errors": [],
-        "should_continue": True
+        "should_continue": True,
+        "tool_execution_times": {}
     }
 
 

@@ -30,8 +30,8 @@ Match to ONE tool. Return ONLY tool name.
 
 TOOLS:
 - build_sql
-- admin_run_sql
-- admin_validate_intent
+- run_sql_adapter
+- validate_intent
 """
 
 VALIDATION_ROUTER_PROMPT = """

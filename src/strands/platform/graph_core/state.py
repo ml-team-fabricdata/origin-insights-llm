@@ -27,6 +27,9 @@ class State(TypedDict, total=False):
     
     # Control de flujo
     should_continue: bool  # Flag explícito para continuar o no
+    
+    # Tool execution tracking
+    tool_execution_times: Optional[Dict[str, float]]
 
 
 def create_initial_state(question: str, max_iterations: int = 3) -> State:
@@ -44,7 +47,8 @@ def create_initial_state(question: str, max_iterations: int = 3) -> State:
         "status": None,
         "iteration_history": [],
         "node_errors": [],
-        "should_continue": True
+        "should_continue": True,
+        "tool_execution_times": {}
     }
 
 

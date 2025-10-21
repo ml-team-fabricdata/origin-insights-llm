@@ -3,8 +3,8 @@ from .state import MainRouterState
 from .config import MIN_CONFIDENCE_NO_CLARIFICATION
 
 
-def route_from_router(state: MainRouterState) -> Literal["clarifier", "validation_preprocessor"]:
-    """Router → Clarifier o Validation (siempre valida primero)"""
+def route_from_router(state: MainRouterState) -> Literal["clarifier", "validation_preprocessor", "domain_graph"]:
+    """Router → Clarifier, Validation (solo si necesario), o Domain Graph directo"""
     if state.get("needs_clarification", False):
         return "clarifier"
     
@@ -13,7 +13,13 @@ def route_from_router(state: MainRouterState) -> Literal["clarifier", "validatio
     if confidence < MIN_CONFIDENCE_NO_CLARIFICATION:
         return "clarifier"
     
-    return "validation_preprocessor"
+    # Solo validar para dominios TALENT y CONTENT
+    selected_graph = state.get("selected_graph", "").lower()
+    if selected_graph in ["talent", "content"]:
+        return "validation_preprocessor"
+    
+    # Para otros dominios (BUSINESS, PLATFORM, COMMON), ir directo a domain graph
+    return "domain_graph"
 
 
 def route_from_validation(state: MainRouterState) -> Literal["parallel_executor", "domain_graph", "disambiguation", "not_found_responder"]:
@@ -37,12 +43,12 @@ def route_from_validation(state: MainRouterState) -> Literal["parallel_executor"
     return "domain_graph"
 
 
-def route_from_domain_graph(state: MainRouterState) -> Literal["responder_formatter", "advanced_router", "clarifier", "error_handler"]:
-    """Domain Graph → Responder Formatter (si success) o Re-routing/Error"""
+def route_from_domain_graph(state: MainRouterState) -> Literal["format_response", "advanced_router", "clarifier", "error_handler"]:
+    """Domain Graph → Format Response (si success) o Re-routing/Error"""
     domain_status = state.get("domain_graph_status")
     
     if domain_status == "success":
-        return "responder_formatter"
+        return "format_response"
     
     if domain_status == "not_my_scope":
         return "advanced_router"
@@ -53,7 +59,7 @@ def route_from_domain_graph(state: MainRouterState) -> Literal["responder_format
     if domain_status == "error":
         return "error_handler"
     
-    return "responder_formatter"  # Default: formatear respuesta
+    return "format_response"  # Default: formatear respuesta
 
 
 def route_from_aggregator(state: MainRouterState) -> Literal["domain_graph", "error_handler"]:

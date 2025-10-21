@@ -38,60 +38,6 @@ COMMON_GRAPH_PENALTY = 0.15
 MAX_HOPS = 3
 MAX_VISITED_GRAPHS = 5
 
-TIME_BUDGET_PER_TURN = 30.0
-TOKEN_BUDGET_PER_TURN = 10000
-
-NODE_TIME_LIMITS = {
-    "advanced_router": 5.0,
-    "validation_preprocessor": 3.0,
-    "parallel_executor": 15.0,
-    "aggregator": 2.0,
-    "domain_graph": 20.0,
-    "schema_checker": 1.0,
-    "clarifier": 1.0,
-    "disambiguation": 1.0,
-    "not_found_responder": 1.0,
-    "error_handler": 1.0,
-    "responder_formatter": 2.0
-}
-
-NODE_TOKEN_LIMITS = {
-    "advanced_router": 1000,
-    "validation_preprocessor": 500,
-    "parallel_executor": 3000,
-    "aggregator": 500,
-    "domain_graph": 5000,
-    "schema_checker": 200,
-    "clarifier": 300,
-    "disambiguation": 300,
-    "not_found_responder": 200,
-    "error_handler": 200,
-    "responder_formatter": 500
-}
-
-BUDGET_EXHAUSTED_ACTION = "clarifier"
-
-TIMEOUT_MESSAGE = (
-    "Request Timeout\n\n"
-    "The request took too long to process. This could be due to:\n"
-    "- Complex query requiring multiple steps\n"
-    "- High system load\n\n"
-    "Please try:\n"
-    "- Simplifying your question\n"
-    "- Breaking it into smaller questions\n"
-    "- Trying again in a moment"
-)
-
-TOKEN_LIMIT_MESSAGE = (
-    "Token Limit Exceeded\n\n"
-    "The request exceeded the token budget. This could be due to:\n"
-    "- Very long or complex query\n"
-    "- Multiple re-routings\n\n"
-    "Please try:\n"
-    "- Asking a more specific question\n"
-    "- Reducing the scope of your request"
-)
-
 MIN_CONFIDENCE_NO_CLARIFICATION = 0.50
 MAX_CLARIFICATION_FIELDS = 2
 

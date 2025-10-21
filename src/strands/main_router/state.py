@@ -31,7 +31,5 @@ class MainRouterState(TypedDict, total=False):
     schema_errors: List[str]
     schema_warnings: List[str]
     missing_params: List[str]
-    budget_status: Dict[str, Any]
-    budget_exhausted: bool
-    budget_exhausted_reason: Optional[str]
     telemetry_logger: Optional[Any]
+    tool_execution_times: Optional[Dict[str, float]]

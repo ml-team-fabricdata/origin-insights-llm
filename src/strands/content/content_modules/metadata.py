@@ -109,26 +109,43 @@ def _validate_order_by(order_by: Optional[str], default: str = "year") -> str:
 
 
 def _validate_select(select: Optional[List[str]]) -> List[str]:
+    """Validate and normalize SELECT columns using META_ALLOWED_SELECT."""
     default_fields = ["uid", "title", "type", "year", "duration",
                       "primary_genre", "primary_language", "countries_iso"]
 
     if not select:
         return default_fields
 
+    # Filter only allowed columns
     safe = [c for c in select if c in META_ALLOWED_SELECT]
 
     if safe:
+        # Ensure uid and title are always included
         if "uid" not in safe:
             safe.insert(0, "uid")
         if "title" not in safe:
             safe.insert(1, "title")
         return safe
 
+    # Fallback to minimal set
     return ["uid", "title", "type", "year"]
 
 
 @dataclass
 class MetadataSimpleQuery:
+    """Query builder for metadata_simple_all table.
+    
+    Supported filters (from META_ALLOWED_SELECT):
+    - uid, title, type, year, age, duration, synopsis
+    - primary_genre, primary_language, languages
+    - primary_country, countries, countries_iso
+    - primary_company, production_companies
+    - directors, full_cast, writers
+    
+    Supported order_by (from META_ALLOWED_ORDER):
+    - title, type, year, age, duration
+    - primary_genre, primary_language, countries_iso
+    """
     type: Optional[str] = None
     countries_iso: Optional[str] = None
     year_from: Optional[int] = None
@@ -139,11 +156,15 @@ class MetadataSimpleQuery:
     title_like: Optional[str] = None
     synopsis_like: Optional[str] = None
     primary_genre: Optional[str] = None
+    primary_language: Optional[str] = None
+    primary_country: Optional[str] = None
+    primary_company: Optional[str] = None
     languages_any: Optional[List[str]] = None
     countries_iso_any: Optional[List[str]] = None
     directors_any: Optional[List[str]] = None
     writers_any: Optional[List[str]] = None
     cast_any: Optional[List[str]] = None
+    production_companies_any: Optional[List[str]] = None
     select: Optional[List[str]] = None
     order_by: Optional[str] = None
     order_dir: str = "DESC"
@@ -182,10 +203,6 @@ def build_metadata_simple_all_query(q: MetadataSimpleQuery) -> Tuple[str, Dict[s
             where.append("countries_iso = %(countries_iso)s")
             params["countries_iso"] = iso
 
-    if q.age:
-        where.append("age ILIKE %(age)s")
-        params["age"] = build_like_pattern(q.age)
-
     if q.duration_min is not None:
         where.append("duration >= %(dmin)s")
         params["dmin"] = int(q.duration_min)
@@ -207,28 +224,50 @@ def build_metadata_simple_all_query(q: MetadataSimpleQuery) -> Tuple[str, Dict[s
             where.append("primary_genre = %(pgen)s")
             params["pgen"] = resolved_genre
 
+    if q.primary_language:
+        where.append("primary_language ILIKE %(plang)s")
+        params["plang"] = build_like_pattern(q.primary_language)
+
+    if q.primary_country:
+        iso = resolve_country_iso(q.primary_country)
+        if iso:
+            where.append("primary_country = %(pcountry)s")
+            params["pcountry"] = iso
+
+    if q.primary_company:
+        where.append("primary_company ILIKE %(pcomp)s")
+        params["pcomp"] = build_like_pattern(q.primary_company)
+
+    # Array/text search conditions
     array_conditions = [
         ("languages", q.languages_any, "l_"),
         ("directors", q.directors_any, "dir_"),
         ("writers", q.writers_any, "wri_"),
+        ("production_companies", q.production_companies_any, "pc_"),
         ("countries_iso", q.countries_iso_any, "ci_")
     ]
 
     for col, values, prefix in array_conditions:
         if values:
-            cond = build_like_any(col, values, params, prefix)
-            if cond:
-                where.append(cond)
+            # Special handling for countries_iso (normalize to ISO codes)
+            if col == "countries_iso":
+                vals = values if isinstance(values, list) else [values]
+                norm_vals = [resolve_country_iso(v) for v in vals if v]
+                norm_vals = [v for v in norm_vals if v]
+                if norm_vals:
+                    cond = build_like_any(col, norm_vals, params, prefix)
+                    if cond:
+                        where.append(cond)
+            else:
+                cond = build_like_any(col, values, params, prefix)
+                if cond:
+                    where.append(cond)
 
-    if q.countries_iso_any:
-        vals = q.countries_iso_any if isinstance(q.countries_iso_any, list) else [
-            q.countries_iso_any]
-        norm_vals = [resolve_country_iso(v) for v in vals if v]
-        norm_vals = [v for v in norm_vals if v]
-        if norm_vals:
-            cond = build_like_any("countries_iso", norm_vals, params, "ci_")
-            if cond:
-                where.append(cond)
+    # Handle full_cast search (alias for cast_any)
+    if q.cast_any:
+        cond = build_like_any("full_cast", q.cast_any, params, "cast_")
+        if cond:
+            where.append(cond)
 
     where_sql = " WHERE " + " AND ".join(where) if where else ""
 

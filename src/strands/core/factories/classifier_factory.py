@@ -23,7 +23,6 @@ def create_classifier(
     name: str,
     prompt: str,
     valid_options: List[str],
-    default_option: str,
     verbose: bool = False
 ):
     """
@@ -33,7 +32,6 @@ def create_classifier(
         name: Classifier name (e.g., "business", "content")
         prompt: System prompt for the classifier
         valid_options: List of valid classification options (uppercase)
-        default_option: Default option if none matched (must be in valid_options)
         verbose: Whether to print detailed logging
         
     Returns:
@@ -44,14 +42,9 @@ def create_classifier(
         ...     name="business",
         ...     prompt=BUSINESS_PROMPT,
         ...     valid_options=["PRICING", "RANKINGS", "INTELLIGENCE"],
-        ...     default_option="INTELLIGENCE",
         ...     verbose=True
         ... )
     """
-    
-    # Validate inputs
-    if default_option not in valid_options:
-        raise ValueError(f"default_option '{default_option}' must be in valid_options {valid_options}")
     
     async def classifier(state: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -109,11 +102,11 @@ def create_classifier(
                     matched = True
                     break
             
-            # Fall back to default if no match
+            # Fall back to first option if no match
             if not matched:
                 if verbose:
-                    print(f"[{name.upper()} CLASSIFIER] Decision no válida, usando default: {default_option}")
-                decision = default_option
+                    print(f"[{name.upper()} CLASSIFIER] Decision no válida, usando primera opción: {valid_options[0]}")
+                decision = valid_options[0]
         
         task = decision.lower()
         
@@ -133,7 +126,6 @@ def create_classifier(
     {name.title()} domain classifier.
     
     Valid options: {', '.join(valid_options)}
-    Default: {default_option}
     
     Created by classifier_factory.create_classifier()
     """
@@ -144,19 +136,16 @@ def create_classifier(
 def create_simple_classifier(
     name: str,
     prompt: str,
-    valid_options: List[str],
-    default_option: str
+    valid_options: List[str]
 ):
     """
     Create a simple classifier without verbose logging.
-    
-    Convenience wrapper around create_classifier with verbose=False.
+    Alias for create_classifier with verbose=False.
     """
     return create_classifier(
         name=name,
         prompt=prompt,
         valid_options=valid_options,
-        default_option=default_option,
         verbose=False
     )
 
@@ -164,18 +153,15 @@ def create_simple_classifier(
 def create_verbose_classifier(
     name: str,
     prompt: str,
-    valid_options: List[str],
-    default_option: str
+    valid_options: List[str]
 ):
     """
     Create a verbose classifier with detailed logging.
-    
-    Convenience wrapper around create_classifier with verbose=True.
+    Alias for create_classifier with verbose=True.
     """
     return create_classifier(
         name=name,
         prompt=prompt,
         valid_options=valid_options,
-        default_option=default_option,
         verbose=True
     )

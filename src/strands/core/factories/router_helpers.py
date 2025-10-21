@@ -67,11 +67,20 @@ async def route_with_llm(
     # Case-insensitive lookup
     tools_lower_map = {tool.lower(): tool for tool in valid_tools}
     
+    # Intento 1: Respuesta exacta
     if response in tools_lower_map:
         actual_tool = tools_lower_map[response]
         print(f"   Tool valida, usando: {actual_tool}")
         return actual_tool
     
+    # Intento 2: Buscar nombre del tool en el texto (si el LLM generó texto adicional)
+    for tool_name in valid_tools:
+        if tool_name.lower() in response:
+            print(f"   Tool encontrada en texto: {tool_name}")
+            return tool_name
+    
     error_msg = f"Tool invalida: '{response}'. Tools validas: {', '.join(sorted(valid_tools))}"
     print(f"   {error_msg}")
     raise ValueError(error_msg)
+
+    

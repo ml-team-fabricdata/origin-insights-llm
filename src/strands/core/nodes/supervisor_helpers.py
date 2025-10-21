@@ -86,8 +86,13 @@ def create_route_from_supervisor(classifier_node_name: str):
 
 
 async def format_response(state: TypedDict) -> TypedDict:
-    formatter = Agent(model=MODEL_FORMATTER, tools=[], system_prompt=RESPONSE_PROMPT)
+    """
+    Optimized format_response: Only uses LLM for complex responses.
+    Simple/structured data is returned directly without LLM formatting.
+    """
     accumulated = state.get('accumulated_data', state.get('answer', ''))
+    
+    # Case 1: Insufficient data
     if not accumulated or len(accumulated.strip()) < 20:
         return {
             "question": state["question"],
@@ -96,6 +101,27 @@ async def format_response(state: TypedDict) -> TypedDict:
             "tool_calls_count": state.get("tool_calls_count", 0),
             "status": "insufficient_data"
         }
+    
+    # Case 2: Already well-formatted (only skip LLM for truly structured data)
+    # Be conservative: only skip LLM if data is clearly pre-formatted
+    is_json_list = accumulated.strip().startswith('[') and accumulated.strip().endswith(']')
+    is_json_object = accumulated.strip().startswith('{') and accumulated.strip().endswith('}')
+    has_markdown_lists = '\n- ' in accumulated or '\n* ' in accumulated
+    
+    # Only skip LLM if data is clearly structured (JSON or markdown lists)
+    if is_json_list or is_json_object or has_markdown_lists:
+        print("[FORMAT] Data already structured (JSON/Markdown), skipping LLM formatting")
+        return {
+            "question": state["question"],
+            "answer": accumulated,
+            "task": state.get("task"),
+            "tool_calls_count": state.get("tool_calls_count", 0),
+            "status": "success"
+        }
+    
+    # Case 3: Complex/unstructured data - use LLM to format
+    print("[FORMAT] Complex data detected, using LLM formatting")
+    formatter = Agent(model=MODEL_FORMATTER, tools=[], system_prompt=RESPONSE_PROMPT)
     payload = f"""Question: {state['question']}
 
         Raw data:

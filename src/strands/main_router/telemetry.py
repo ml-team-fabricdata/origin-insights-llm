@@ -47,7 +47,7 @@ class TelemetryLogger:
             "final_answer": state.get("answer", "")[:200],
             "route_summary": self._build_route_summary(state),
             "events": self.events,
-            "budget_status": state.get("budget_status", {}),
+            "tool_execution_times": state.get("tool_execution_times", {}),
             "final_state": {
                 "selected_graph": state.get("selected_graph"),
                 "routing_confidence": state.get("routing_confidence"),
@@ -55,7 +55,6 @@ class TelemetryLogger:
                 "parallel_execution": state.get("parallel_execution"),
                 "parallel_k": state.get("parallel_k"),
                 "needs_clarification": state.get("needs_clarification"),
-                "budget_exhausted": state.get("budget_exhausted"),
                 "schema_valid": state.get("schema_valid")
             }
         }
@@ -137,11 +136,10 @@ def log_clarification(logger: TelemetryLogger, missing_params: List[str], reason
     })
 
 
-def log_budget_exhausted(logger: TelemetryLogger, reason: str, elapsed_time: float, tokens_used: int):
-    logger.log_event("BUDGET_EXHAUSTED", {
+def log_timeout(logger: TelemetryLogger, reason: str, elapsed_time: float):
+    logger.log_event("TIMEOUT", {
         "reason": reason,
-        "elapsed_time": round(elapsed_time, 2),
-        "tokens_used": tokens_used
+        "elapsed_time": round(elapsed_time, 2)
     })
 
 
@@ -153,11 +151,10 @@ def log_schema_validation(logger: TelemetryLogger, valid: bool, errors: List[str
     })
 
 
-def log_node_execution(logger: TelemetryLogger, node_name: str, execution_time: float, tokens_used: int, status: str = "success"):
+def log_node_execution(logger: TelemetryLogger, node_name: str, execution_time: float, status: str = "success"):
     logger.log_event("NODE_EXECUTION", {
         "node": node_name,
         "execution_time": round(execution_time, 2),
-        "tokens_used": tokens_used,
         "status": status
     })
 
@@ -197,30 +194,16 @@ def print_telemetry_summary(logger: TelemetryLogger, state: MainRouterState):
             print(f"   Hop {data['hop_number']}: {data['from_graph']} -> {data['to_graph']}")
             print(f"   Reason: {data['reason']}")
     
-    budget_status = state.get("budget_status", {})
-    print("\nExecution Times:")
-    print(f"   Total: {budget_status.get('elapsed_time', 0):.2f}s")
-    
-    node_times = budget_status.get("node_execution_times", {})
-    if node_times:
-        print("   By node:")
-        for node, time_val in sorted(node_times.items(), key=lambda x: x[1], reverse=True):
-            print(f"   - {node}: {time_val:.2f}s")
-    
-    print("\nToken Usage:")
-    print(f"   Total: {budget_status.get('total_tokens_used', 0)}")
-    
-    node_tokens = budget_status.get("node_token_usage", {})
-    if node_tokens:
-        print("   By node:")
-        for node, tokens in sorted(node_tokens.items(), key=lambda x: x[1], reverse=True):
-            print(f"   - {node}: {tokens}")
+    tool_times = state.get("tool_execution_times", {})
+    if tool_times:
+        print("\nTool Execution Times:")
+        for tool, time_val in sorted(tool_times.items(), key=lambda x: x[1], reverse=True):
+            print(f"   - {tool}: {time_val:.2f}s")
     
     print("\nFinal Status:")
     print(f"   Graph: {state.get('selected_graph', 'N/A')}")
     print(f"   Confidence: {state.get('routing_confidence', 0):.2f}")
     print(f"   Schema Valid: {state.get('schema_valid', False)}")
-    print(f"   Budget Exhausted: {state.get('budget_exhausted', False)}")
     print(f"   Needs Clarification: {state.get('needs_clarification', False)}")
     
     print("="*80 + "\n")

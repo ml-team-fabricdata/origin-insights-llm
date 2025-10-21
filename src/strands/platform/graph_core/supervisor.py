@@ -11,8 +11,7 @@ from .state import State
 platform_classifier = create_simple_classifier(
     name="platform",
     prompt=PLATFORM_PROMPT,
-    valid_options=["AVAILABILITY", "PRESENCE"],
-    default_option="PRESENCE"
+    valid_options=["AVAILABILITY", "PRESENCE"]
 )
 
 route_from_main_supervisor = create_route_from_supervisor("platform_node")

@@ -11,13 +11,13 @@ from .specialized_nodes import (
     error_handler_node,
     responder_formatter_node
 )
+from src.strands.core.nodes.supervisor_helpers import format_response
 from .routing_gates import (
     route_from_router,
     route_from_validation,
     route_from_domain_graph,
     route_from_aggregator
 )
-from .budget_manager import BudgetManager
 from .telemetry import TelemetryLogger, print_telemetry_summary
 
 from src.strands.business.graph_core.graph import process_question as business_process_question
@@ -56,6 +56,8 @@ async def domain_graph_node(state: MainRouterState) -> MainRouterState:
     validated_entities = state.get('validated_entities', {})
     
     try:
+        start_time = time.time()
+        
         if selected_graph in ["talent", "content"]:
             result = await processor(
                 state['question'],
@@ -68,6 +70,17 @@ async def domain_graph_node(state: MainRouterState) -> MainRouterState:
                 max_iterations=3
             )
         
+        execution_time = time.time() - start_time
+        
+        # Extraer tool execution times del resultado si existen
+        tool_times = result.get('tool_execution_times', {})
+        if tool_times:
+            print(f"\n[DOMAIN] Tool Execution Times:")
+            for tool_name, tool_time in tool_times.items():
+                print(f"  - {tool_name}: {tool_time:.2f}s")
+        
+        print(f"[DOMAIN] Tiempo total de ejecución: {execution_time:.2f}s")
+        
         supervisor_decision = result.get('supervisor_decision', '')
         
         if 'VOLVER_MAIN_ROUTER' in supervisor_decision or 'return_to_main_router' in supervisor_decision.lower():
@@ -76,7 +89,8 @@ async def domain_graph_node(state: MainRouterState) -> MainRouterState:
                 **state,
                 "answer": result.get('accumulated_data', ''),
                 "needs_rerouting": True,
-                "domain_graph_status": "not_my_scope"
+                "domain_graph_status": "not_my_scope",
+                "tool_execution_times": tool_times
             }
         
         answer = result.get('answer', result.get('accumulated_data', ''))
@@ -87,7 +101,8 @@ async def domain_graph_node(state: MainRouterState) -> MainRouterState:
                 **state,
                 "answer": answer,
                 "needs_rerouting": True,
-                "domain_graph_status": "not_my_scope"
+                "domain_graph_status": "not_my_scope",
+                "tool_execution_times": tool_times
             }
         
         print(f"[DOMAIN] Completado exitosamente ({len(answer)} chars)")
@@ -96,7 +111,8 @@ async def domain_graph_node(state: MainRouterState) -> MainRouterState:
         return {
             **state,
             "answer": answer,
-            "domain_graph_status": "success"
+            "domain_graph_status": "success",
+            "tool_execution_times": tool_times
         }
         
     except Exception as e:
@@ -109,6 +125,15 @@ async def domain_graph_node(state: MainRouterState) -> MainRouterState:
         }
 
 
+async def format_response_node(state: MainRouterState) -> MainRouterState:
+    """Format response wrapper for MainRouterState."""
+    result = await format_response(state)
+    return {
+        **state,
+        "answer": result.get("answer", state.get("answer", ""))
+    }
+
+
 def create_advanced_graph():
     graph = StateGraph(MainRouterState)
     
@@ -118,6 +143,7 @@ def create_advanced_graph():
     graph.add_node("aggregator", aggregator_node)
     graph.add_node("validation_preprocessor", validation_preprocessor_node)
     graph.add_node("domain_graph", domain_graph_node)
+    graph.add_node("format_response", format_response_node)
     graph.add_node("disambiguation", disambiguation_node)
     graph.add_node("not_found_responder", not_found_responder_node)
     graph.add_node("error_handler", error_handler_node)
@@ -130,7 +156,8 @@ def create_advanced_graph():
         route_from_router,
         {
             "clarifier": "clarifier",
-            "validation_preprocessor": "validation_preprocessor"
+            "validation_preprocessor": "validation_preprocessor",
+            "domain_graph": "domain_graph"
         }
     )
     
@@ -165,13 +192,14 @@ def create_advanced_graph():
         "domain_graph",
         route_from_domain_graph,
         {
-            "responder_formatter": "responder_formatter",
+            "format_response": "format_response",
             "advanced_router": "advanced_router",
             "clarifier": "clarifier",
             "error_handler": "error_handler"
         }
     )
     
+    graph.add_edge("format_response", "responder_formatter")
     graph.add_edge("responder_formatter", END)
     graph.add_edge("error_handler", "responder_formatter")
     
@@ -184,7 +212,6 @@ async def process_question_advanced(
     max_hops: int = 3,
     enable_telemetry: bool = True
 ) -> MainRouterState:
-    budget_manager = BudgetManager()
     telemetry_logger = TelemetryLogger(log_to_file=enable_telemetry) if enable_telemetry else None
     start_time = time.time()
     
@@ -219,27 +246,31 @@ async def process_question_advanced(
         "schema_errors": [],
         "schema_warnings": [],
         "missing_params": [],
-        "budget_status": {
-            "elapsed_time": 0,
-            "total_tokens_used": 0,
-            "node_execution_times": {},
-            "node_token_usage": {}
-        },
-        "budget_exhausted": False,
-        "budget_exhausted_reason": None,
-        "telemetry_logger": telemetry_logger
+        "telemetry_logger": telemetry_logger,
+        "tool_execution_times": {}
     }
     
     graph = create_advanced_graph()
     result = await graph.ainvoke(initial_state)
     
     total_time = time.time() - start_time
-    result["budget_status"]["elapsed_time"] = total_time
     
-    budget_manager.total_tokens_used = result["budget_status"]["total_tokens_used"]
-    budget_manager.node_execution_times = result["budget_status"]["node_execution_times"]
-    budget_manager.node_token_usage = result["budget_status"]["node_token_usage"]
-    budget_manager.print_budget_status()
+    # Print execution summary
+    print(f"\n{'='*80}")
+    print("EXECUTION SUMMARY")
+    print(f"{'='*80}")
+    print(f"Total time: {total_time:.2f}s")
+    print(f"{'='*80}\n")
+    
+    # Print tool execution times
+    tool_times = result.get("tool_execution_times", {})
+    if tool_times:
+        print("\n" + "="*80)
+        print("TOOL EXECUTION TIMES")
+        print("="*80)
+        for tool_name, tool_time in sorted(tool_times.items(), key=lambda x: x[1], reverse=True):
+            print(f"  {tool_name}: {tool_time:.2f}s")
+        print("="*80 + "\n")
     
     if telemetry_logger:
         print_telemetry_summary(telemetry_logger, result)

@@ -86,15 +86,6 @@ async def responder_formatter_node(state: MainRouterState) -> MainRouterState:
     print("="*80)
     
     answer = state.get("answer", "")
-    
-    if not answer:
-        print("[FORMATTER] No hay respuesta para formatear")
-        return {
-            **state,
-            "answer": "I couldn't generate a response. Please try again."
-        }
-    
-    print(f"[FORMATTER] Respuesta formateada ({len(answer)} caracteres)")
-    print("="*80 + "\n")
+
     
     return state

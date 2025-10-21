@@ -36,19 +36,22 @@ async def collaborations_node(state: State) -> State:
     """
     Collaborations node - MUST execute after actor or director validation.
     
-    This node requires validated entities (actor and/or director) to function.
+    This node requires validated entities (actor_id and/or director_id) to function.
     If no validated entities are found, it will return an error.
     """
-    # Check if we have validated entities
+    # Check if we have validated entities from validation preprocessor
     validated_entities = state.get("validated_entities") or {}
-    # Check for truthy values (not None, not empty string, not False)
-    has_actor = bool(validated_entities.get("actor"))
-    has_director = bool(validated_entities.get("director"))
+    # Check for actor_id or director_id (set by validation preprocessor)
+    has_actor = bool(validated_entities.get("actor_id"))
+    has_director = bool(validated_entities.get("director_id"))
+    
+    print(f"\n[COLLABORATIONS] Validated entities: {validated_entities}")
+    print(f"[COLLABORATIONS] Has actor: {has_actor}, Has director: {has_director}")
     
     # If no validated entities, return error
     if not has_actor and not has_director:
         error_msg = (
-            "ERROR: Collaborations node requires validated actor or director entities. "
+            "ERROR: Collaborations node requires validated actor_id or director_id. "
             "Please validate actor/director first before requesting collaborations."
         )
         print(f"\n[COLLABORATIONS] {error_msg}\n")
@@ -61,4 +64,5 @@ async def collaborations_node(state: State) -> State:
         }
     
     # If we have validated entities, proceed normally
+    print(f"[COLLABORATIONS] Proceeding with validated entities")
     return await _collaborations_executor.execute(state)

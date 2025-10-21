@@ -30,6 +30,9 @@ class State(TypedDict, total=False):
     
     # Entidades validadas del Main Router
     validated_entities: Optional[Dict[str, Any]]  # Entidades validadas (título, actor, director)
+    
+    # Tool execution tracking
+    tool_execution_times: Optional[Dict[str, float]]
 
 
 def create_initial_state(question: str, max_iterations: int = 3) -> State:
@@ -47,7 +50,8 @@ def create_initial_state(question: str, max_iterations: int = 3) -> State:
         "status": None,
         "iteration_history": [],
         "worker_errors": [],
-        "should_continue": True
+        "should_continue": True,
+        "tool_execution_times": {}
     }
 
 

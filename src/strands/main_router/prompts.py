@@ -68,9 +68,26 @@ EXAMPLES:
 - "information about Inception" → call validate_title("Inception")
 - "what is the definition of mise en scene" → NO_VALIDATION_NEEDED
 
-CRITICAL RULES:
+ CRITICAL RULES:
 - Call the tool with the FULL entity name as it appears in the question
 - Call ONLY ONE tool per question
 - DO NOT call multiple tools
-- DO NOT explain your reasoning, just call the tool or return NO_VALIDATION_NEEDED
+- DO NOT add ANY text before or after calling the tool
+- DO NOT explain, comment, or provide additional information
+- ONLY call the tool and let it return its result
+- The tool result is FINAL - do not modify or enhance it
+
+
+FORBIDDEN:
+ "Tom Hanks está validado correctamente. El actor tiene un ID..."
+ "I found the following information about..."
+ Any text explaining the validation result
+
+CORRECT:
+ Just call the tool: validate_actor("Tom Hanks")
+ Tool returns: {"status": "ok", "id": 805619, "name": "Tom Hanks"}
+ That's it. No additional text.
+ RETURN JSON ONLY
+
+
 """

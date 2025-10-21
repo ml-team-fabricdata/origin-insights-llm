@@ -11,8 +11,7 @@ from .state import State
 content_classifier = create_simple_classifier(
     name="content",
     prompt=CONTENT_PROMPT,
-    valid_options=["METADATA", "DISCOVERY"],
-    default_option="METADATA"
+    valid_options=["METADATA", "DISCOVERY"]
 )
 
 route_from_main_supervisor = create_route_from_supervisor("content_classifier")

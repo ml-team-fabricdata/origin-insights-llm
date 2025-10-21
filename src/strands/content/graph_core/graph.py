@@ -1,59 +1,85 @@
 from langgraph.graph import StateGraph, END
 from .state import State, create_initial_state
-from .supervisor import content_classifier, main_supervisor, route_from_main_supervisor, format_response
+from .supervisor import main_supervisor, content_classifier
 from src.strands.content.nodes.discovery import discovery_node
-from src.strands.core.nodes.param_validation import validation_node, create_validation_edge
+from src.strands.content.nodes.metadata import metadata_node
+
+
+def _route_from_supervisor(state: State) -> str:
+    """Route from supervisor: classifier or specific node or return to main router."""
+    supervisor_decision = state.get("supervisor_decision", "")
+    tool_calls = state.get("tool_calls_count", 0)
+    
+    # First call: go to classifier
+    if tool_calls == 0:
+        return "content_classifier"
+    
+    if "COMPLETO" in supervisor_decision:
+        return "return_to_main_router"
+    
+    if "VOLVER_MAIN_ROUTER" in supervisor_decision:
+        return "return_to_main_router"
+    
+    # After classification, route to appropriate node
+    task = state.get("task", "").lower()
+    if task == "metadata":
+        return "metadata_node"
+    elif task == "discovery":
+        return "discovery_node"
+    
+    # Default to metadata
+    return "metadata_node"
 
 
 def _route_from_classifier(state: State) -> str:
-    # Content only has discovery_node
-    return "discovery_node"
+    """Route from classifier to appropriate node."""
+    task = state.get("task", "").lower()
+    
+    if task == "discovery":
+        return "discovery_node"
+    
+    # Default to metadata
+    return "metadata_node"
 
 
 def create_streaming_graph():
-    """Create content graph with validation node."""
+    """Create content graph with classifier and both metadata/discovery nodes."""
     graph = StateGraph(State)
 
-    # Add validation node first
-    graph.add_node("validation", validation_node)
+    # Add all nodes
     graph.add_node("main_supervisor", main_supervisor)
     graph.add_node("content_classifier", content_classifier)
+    graph.add_node("metadata_node", metadata_node)
     graph.add_node("discovery_node", discovery_node)
-    graph.add_node("format_response", format_response)
 
-    # Start with validation
-    graph.set_entry_point("validation")
-    
-    # Route from validation: continue to supervisor or format error
-    graph.add_conditional_edges(
-        "validation",
-        create_validation_edge,
-        {
-            "continue": "main_supervisor",
-            "format_response": "format_response"
-        }
-    )
+    # Start with supervisor
+    graph.set_entry_point("main_supervisor")
 
+    # Supervisor routes to classifier or back to main router
     graph.add_conditional_edges(
         "main_supervisor",
-        route_from_main_supervisor,
+        _route_from_supervisor,
         {
             "content_classifier": "content_classifier",
-            "format_response": "format_response",
+            "metadata_node": "metadata_node",
+            "discovery_node": "discovery_node",
             "return_to_main_router": END
         }
     )
 
+    # Classifier routes to metadata or discovery
     graph.add_conditional_edges(
         "content_classifier",
         _route_from_classifier,
         {
+            "metadata_node": "metadata_node",
             "discovery_node": "discovery_node"
         }
     )
 
+    # Both nodes return to supervisor
+    graph.add_edge("metadata_node", "main_supervisor")
     graph.add_edge("discovery_node", "main_supervisor")
-    graph.add_edge("format_response", END)
 
     return graph.compile()
 

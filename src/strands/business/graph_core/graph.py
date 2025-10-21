@@ -1,6 +1,6 @@
 from langgraph.graph import StateGraph, END
 from .state import State, create_initial_state
-from .supervisor import business_classifier, main_supervisor, route_from_main_supervisor, format_response
+from .supervisor import business_classifier, main_supervisor, route_from_main_supervisor
 from src.strands.business.nodes.intelligence import intelligence_node
 from src.strands.business.nodes.rankings import rankings_node
 from src.strands.business.nodes.pricing import pricing_node
@@ -28,20 +28,18 @@ def create_streaming_graph():
     graph.add_node("intelligence_node", intelligence_node)
     graph.add_node("rankings_node", rankings_node)
     graph.add_node("pricing_node", pricing_node)
-    graph.add_node("format_response", format_response)
 
     # Start with supervisor (no validation needed)
     graph.set_entry_point("main_supervisor")
     
-    print("[BUSINESS GRAPH] Compiled with nodes: main_supervisor, business_classifier, intelligence_node, rankings_node, pricing_node, format_response")
-    print("[BUSINESS GRAPH] Entry point: main_supervisor (NO validation node)")
+    print("[BUSINESS GRAPH] Compiled with nodes: main_supervisor, business_classifier, intelligence_node, rankings_node, pricing_node")
+    print("[BUSINESS GRAPH] Entry point: main_supervisor (NO validation node, NO format_response)")
 
     graph.add_conditional_edges(
         "main_supervisor",
         route_from_main_supervisor,
         {
             "business_classifier": "business_classifier",
-            "format_response": "format_response",
             "return_to_main_router": END
         }
     )
@@ -59,7 +57,6 @@ def create_streaming_graph():
     graph.add_edge("rankings_node", "main_supervisor")
     graph.add_edge("pricing_node", "main_supervisor")
     graph.add_edge("intelligence_node", "main_supervisor")
-    graph.add_edge("format_response", END)
 
     return graph.compile()
 

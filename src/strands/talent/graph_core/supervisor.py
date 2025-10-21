@@ -12,8 +12,7 @@ from typing import Literal
 talent_classifier = create_simple_classifier(
     name="talent",
     prompt=TALENT_PROMPT,
-    valid_options=["ACTORS", "DIRECTORS", "COLLABORATIONS"],
-    default_option="COLLABORATIONS"
+    valid_options=["ACTORS", "DIRECTORS", "COLLABORATIONS"]
 )
 
 route_from_main_supervisor = create_route_from_supervisor("talent_classifier")

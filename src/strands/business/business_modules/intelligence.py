@@ -7,11 +7,11 @@ Provides competitive intelligence tools for platform analysis:
 """
 
 from typing import Dict, List, Any, Optional, Tuple
-from src.strands.utils.default_import import *
-from src.strands.utils.db_utils_sql import *
-from src.strands.utils.constants_sql import *
-from src.strands.utils.validators import *
-from src.strands.utils.query_cache import intelligence_cache
+from src.strands.config.default_import import *
+from src.strands.infrastructure.database.utils import *
+from src.strands.infrastructure.database.constants import *
+from src.strands.infrastructure.validators.legacy import *
+from src.strands.infrastructure.cache.query_cache import intelligence_cache
 from src.strands.business.business_queries.intelligence_queries import *
 from strands import tool
 

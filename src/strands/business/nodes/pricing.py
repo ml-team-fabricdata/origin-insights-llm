@@ -6,9 +6,9 @@ from src.strands.business.nodes.router_configs import (
     PRICING_TOOLS,
     PRICING_ROUTER_PROMPT
 )
-from src.strands.utils.config import MODEL_NODE_EXECUTOR
-from src.strands.utils.base_node import BaseExecutorNode
-from src.strands.utils.router_config import create_router
+from src.strands.config.models import MODEL_NODE_EXECUTOR
+from src.strands.core.nodes.base_node import BaseExecutorNode
+from src.strands.core.factories.router_factory import create_router
 
 from src.strands.business.business_modules.pricing import (
     query_presence_with_price,

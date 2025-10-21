@@ -5,7 +5,6 @@ from .advanced_router import advanced_router_node
 from .clarifier import clarifier_node
 from .parallel_executor import parallel_executor_node, aggregator_node
 from .validation_preprocessor import validation_preprocessor_node
-from .schema_checker import schema_checker_node
 from .specialized_nodes import (
     disambiguation_node,
     not_found_responder_node,
@@ -16,8 +15,7 @@ from .routing_gates import (
     route_from_router,
     route_from_validation,
     route_from_domain_graph,
-    route_from_aggregator,
-    route_from_schema_checker
+    route_from_aggregator
 )
 from .budget_manager import BudgetManager
 from .telemetry import TelemetryLogger, print_telemetry_summary
@@ -120,7 +118,6 @@ def create_advanced_graph():
     graph.add_node("aggregator", aggregator_node)
     graph.add_node("validation_preprocessor", validation_preprocessor_node)
     graph.add_node("domain_graph", domain_graph_node)
-    graph.add_node("schema_checker", schema_checker_node)
     graph.add_node("disambiguation", disambiguation_node)
     graph.add_node("not_found_responder", not_found_responder_node)
     graph.add_node("error_handler", error_handler_node)
@@ -137,7 +134,7 @@ def create_advanced_graph():
         }
     )
     
-    graph.add_edge("clarifier", END)
+    graph.add_edge("clarifier", "responder_formatter")
     
     graph.add_conditional_edges(
         "validation_preprocessor",
@@ -161,31 +158,22 @@ def create_advanced_graph():
         }
     )
     
-    graph.add_edge("disambiguation", END)
-    graph.add_edge("not_found_responder", END)
+    graph.add_edge("disambiguation", "responder_formatter")
+    graph.add_edge("not_found_responder", "responder_formatter")
     
     graph.add_conditional_edges(
         "domain_graph",
         route_from_domain_graph,
         {
-            "schema_checker": "schema_checker",
+            "responder_formatter": "responder_formatter",
             "advanced_router": "advanced_router",
             "clarifier": "clarifier",
             "error_handler": "error_handler"
         }
     )
     
-    graph.add_conditional_edges(
-        "schema_checker",
-        route_from_schema_checker,
-        {
-            "responder_formatter": "responder_formatter",
-            "error_handler": "error_handler"
-        }
-    )
-    
     graph.add_edge("responder_formatter", END)
-    graph.add_edge("error_handler", END)
+    graph.add_edge("error_handler", "responder_formatter")
     
     return graph.compile()
 

@@ -6,9 +6,9 @@ from src.strands.business.nodes.router_configs import (
     INTELLIGENCE_TOOLS,
     INTELLIGENCE_ROUTER_PROMPT
 )
-from src.strands.utils.config import MODEL_NODE_EXECUTOR
-from src.strands.utils.base_node import BaseExecutorNode
-from src.strands.utils.router_config import create_router
+from src.strands.config.models import MODEL_NODE_EXECUTOR
+from src.strands.core.nodes.base_node import BaseExecutorNode
+from src.strands.core.factories.router_factory import create_router
 
 from src.strands.business.business_modules.intelligence import (
     get_platform_exclusivity_by_country,
@@ -36,18 +36,4 @@ _intelligence_executor = BaseExecutorNode(
 
 
 async def intelligence_node(state: State) -> State:
-    """
-    Execute intelligence tools dynamically.
-    
-    Handles:
-    - Platform exclusivity analysis
-    - Catalog similarity comparisons
-    - Title differences between platforms
-    
-    Args:
-        state: Current state with question and validated entities
-        
-    Returns:
-        Updated state with results
-    """
     return await _intelligence_executor.execute(state)

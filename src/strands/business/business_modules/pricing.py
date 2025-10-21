@@ -10,10 +10,10 @@ Provides pricing and hits analysis tools:
 
 from typing import Dict, List, Any, Optional, Union, Tuple
 from datetime import date
-from src.strands.utils.db_utils_sql import *
-from src.strands.utils.default_import import *
+from src.strands.infrastructure.database.utils import *
+from src.strands.config.default_import import *
 from src.strands.business.business_queries.pricing_queries import *
-from src.strands.utils.validators import *
+from src.strands.infrastructure.validators.legacy import *
 from src.strands.content.content_modules.metadata import _validate_select
 from strands import tool
 

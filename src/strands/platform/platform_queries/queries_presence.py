@@ -1,4 +1,4 @@
-from src.strands.utils.constants_sql import *
+from src.strands.infrastructure.database.constants import *
 
 QUERY_PRESENCE_COUNT = f"""
     SELECT COUNT(*)::bigint AS total 

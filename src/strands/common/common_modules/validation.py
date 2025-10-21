@@ -1,6 +1,6 @@
 from __future__ import annotations
-from src.strands.utils.default_import import *
-from src.strands.utils.db_utils_sql import *
+from src.strands.config.default_import import *
+from src.strands.infrastructure.database.utils import *
 from src.strands.common.common_queries.queries_validation import *
 from strands import tool
 

@@ -4,9 +4,9 @@ from src.strands.platform.nodes.router_configs import (
     PRESENCE_TOOLS,
     PRESENCE_ROUTER_PROMPT
 )
-from src.strands.utils.config import MODEL_NODE_EXECUTOR
-from src.strands.utils.base_node import BaseExecutorNode
-from src.strands.utils.router_config import create_router
+from src.strands.config.models import MODEL_NODE_EXECUTOR
+from src.strands.core.nodes.base_node import BaseExecutorNode
+from src.strands.core.factories.router_factory import create_router
 
 from src.strands.platform.platform_modules.presence import (
     presence_count, 

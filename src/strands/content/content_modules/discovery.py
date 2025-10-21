@@ -1,8 +1,8 @@
-from src.strands.utils.default_import import *
-from src.strands.utils.constants_sql import *
+from src.strands.config.default_import import *
+from src.strands.infrastructure.database.constants import *
 from src.strands.content.content_queries.queries_discovery import *
-from src.strands.utils.sql_db import db
-from src.strands.utils.validators import *
+from src.strands.infrastructure.database.connection import db
+from src.strands.infrastructure.validators.legacy import *
 from strands import tool
 
 @tool

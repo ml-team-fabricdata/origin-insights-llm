@@ -1,6 +1,6 @@
 import json
 from strands import Agent
-from src.strands.utils.config import MODEL_CLASSIFIER
+from src.strands.config.models import MODEL_CLASSIFIER
 from .state import MainRouterState
 from .prompts import ADVANCED_ROUTER_PROMPT
 from .config import (

@@ -1,15 +1,3 @@
-MAIN_ROUTER_PROMPT = """
-Classify into ONE category. Return ONLY the category name.
-
-BUSINESS - pricing, plans, rankings, market share
-TALENT - actors, directors, filmography
-CONTENT - title metadata (year, genre, duration, rating)
-PLATFORM - availability, where to watch, catalogs
-COMMON - system admin, technical queries
-
-Return ONLY: BUSINESS, TALENT, CONTENT, PLATFORM, or COMMON
-"""
-
 ADVANCED_ROUTER_PROMPT = """
 Classify and return ONLY valid JSON.
 
@@ -64,29 +52,25 @@ IMPORTANT DISTINCTIONS:
 - "Compare Netflix and Disney+ catalogs" → BUSINESS (catalog comparison)
 """
 
-VALIDATION_PREPROCESSOR_PROMPT = """
-Identify entities and call validation tool ONCE.
+VALIDATION_PREPROCESSOR_PROMPT = """You are a validation assistant that identifies entities in user questions and validates them.
 
-No entity -> return: NO_VALIDATION_NEEDED
+INSTRUCTIONS:
+1. Analyze the user's question to identify if it contains an entity that needs validation
+2. Determine the entity type and call the appropriate tool ONCE:
+   - validate_actor: for actors/actresses
+   - validate_director: for directors
+   - validate_title: for movies/series/shows
+3. If NO entity needs validation, respond with: NO_VALIDATION_NEEDED
 
-Has entity -> call ONE tool:
-- validate_title (movies/series)
-- validate_actor (actors)
-- validate_director (directors)
+EXAMPLES:
+- "filmography of Tom Hanks" → call validate_actor("Tom Hanks")
+- "movies directed by Spielberg" → call validate_director("Steven Spielberg")
+- "information about Inception" → call validate_title("Inception")
+- "what is the definition of mise en scene" → NO_VALIDATION_NEEDED
 
-Then:
-- status=resolved/not_found -> return exact JSON from tool
-- status=ambiguous -> print ONLY:
-
-Multiple results for "<name>":
-1. <option 1>
-2. <option 2>
-
-Which one? (1, 2...)
-
-FORBIDDEN:
-- Calling tools twice
-- Modifying tool output
-- Choosing for user
-- Adding extra text
+CRITICAL RULES:
+- Call the tool with the FULL entity name as it appears in the question
+- Call ONLY ONE tool per question
+- DO NOT call multiple tools
+- DO NOT explain your reasoning, just call the tool or return NO_VALIDATION_NEEDED
 """

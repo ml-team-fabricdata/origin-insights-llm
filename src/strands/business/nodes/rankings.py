@@ -1,12 +1,14 @@
+"""Rankings node - handles top lists and momentum queries."""
+
 from src.strands.business.graph_core.state import State
 from src.strands.business.nodes.prompt_business import RANKINGS_PROMPT
 from src.strands.business.nodes.router_configs import (
     RANKINGS_TOOLS,
     RANKINGS_ROUTER_PROMPT
 )
-from src.strands.utils.config import MODEL_NODE_EXECUTOR
-from src.strands.utils.base_node import BaseExecutorNode
-from src.strands.utils.router_config import create_router
+from src.strands.config.models import MODEL_NODE_EXECUTOR
+from src.strands.core.nodes.base_node import BaseExecutorNode
+from src.strands.core.factories.router_factory import create_router
 
 from src.strands.business.business_modules.rankings import (
     get_genre_momentum,

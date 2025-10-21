@@ -4,9 +4,9 @@ from src.strands.talent.nodes.router_configs import (
     COLLABORATIONS_TOOLS,
     COLLABORATIONS_ROUTER_PROMPT
 )
-from src.strands.utils.config import MODEL_NODE_EXECUTOR
-from src.strands.utils.base_node import BaseExecutorNode
-from src.strands.utils.router_config import create_router
+from src.strands.config.models import MODEL_NODE_EXECUTOR
+from src.strands.core.nodes.base_node import BaseExecutorNode
+from src.strands.core.factories.router_factory import create_router
 
 from src.strands.talent.talent_modules.collaborations import (
     find_common_titles_actor_director,

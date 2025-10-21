@@ -1,4 +1,4 @@
-from src.strands.utils.constants_sql import *
+from src.strands.infrastructure.database.constants import *
 
 COMMON_TITLES_ACTOR_DIRECTOR_SQL = f"""
     SELECT DISTINCT

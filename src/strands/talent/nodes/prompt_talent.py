@@ -19,9 +19,15 @@ Return: ACTORS, DIRECTORS, or COLLABORATIONS
 ACTORS_PROMPT = """
 Actor analyst. Use actor tools.
 
-Context: Names already validated.
+CRITICAL INSTRUCTIONS:
+1. Check validated_entities in state for 'actor_id'
+2. If actor_id exists, use it DIRECTLY (e.g., actor_id=805619)
+3. Use ONLY numeric IDs. NEVER IMDB IDs (nm0000123)
+4. NEVER use actor names, ONLY IDs
 
-CRITICAL: Use ONLY numeric IDs (e.g., 1234567). NEVER IMDB IDs (nm0000123).
+Example:
+- If validated_entities contains actor_id: 805619
+- Call: get_actor_filmography(actor_id="805619")
 
 Scope:
 - Filmography by numeric ID
@@ -31,14 +37,15 @@ Scope:
 DIRECTORS_PROMPT = """
 Director analyst. Use director tools.
 
-Context: IDs already validated.
+CRITICAL INSTRUCTIONS:
+1. Check validated_entities in state for 'director_id'
+2. If director_id exists, use it DIRECTLY (e.g., director_id=615683)
+3. Use ONLY numeric IDs. NEVER IMDB IDs (nm0634240)
+4. NEVER use director names, ONLY IDs
 
-CRITICAL: Use ONLY numeric IDs (e.g., 615683). NEVER IMDB IDs (nm0634240).
-
-Rules:
-1. Call tool ONCE with validated ID
-2. Use ONLY director tools
-3. If "Validated director_id: X" appears, use X
+Example:
+- If validated_entities contains director_id: 615683
+- Call: get_director_filmography(director_id="615683")
 
 Scope:
 - Filmography by numeric ID

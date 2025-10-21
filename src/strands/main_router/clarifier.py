@@ -1,6 +1,6 @@
 from typing import List
 from .state import MainRouterState
-from src.strands.utils.validators_shared import resolve_country_iso, resolve_platform_name
+from src.strands.infrastructure.validators.shared import resolve_country_iso, resolve_platform_name
 
 ESSENTIAL_PARAMS = {
     "platform": {

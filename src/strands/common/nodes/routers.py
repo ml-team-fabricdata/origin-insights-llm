@@ -1,6 +1,6 @@
 from src.strands.common.graph_core.state import State
-from src.strands.utils.router_helpers import route_with_llm
-from src.strands.utils.config import MODEL_CLASSIFIER
+from src.strands.core.factories.router_helpers import route_with_llm
+from src.strands.config.models import MODEL_CLASSIFIER
 from src.strands.common.nodes.prompt_common import (
     ADMIN_ROUTER_PROMPT,
     VALIDATION_ROUTER_PROMPT

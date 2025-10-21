@@ -4,9 +4,9 @@ from src.strands.talent.nodes.router_configs import (
     ACTORS_TOOLS,
     ACTORS_ROUTER_PROMPT
 )
-from src.strands.utils.config import MODEL_NODE_EXECUTOR
-from src.strands.utils.base_node import BaseExecutorNode
-from src.strands.utils.router_config import create_router
+from src.strands.config.models import MODEL_NODE_EXECUTOR
+from src.strands.core.nodes.base_node import BaseExecutorNode
+from src.strands.core.factories.router_factory import create_router
 
 from src.strands.talent.talent_modules.actors import (
     get_actor_filmography,
@@ -30,7 +30,8 @@ _actors_executor = BaseExecutorNode(
         valid_tools=ACTORS_TOOLS
     ),
     system_prompt=ACTORS_PROMPT,
-    model=MODEL_NODE_EXECUTOR
+    model=MODEL_NODE_EXECUTOR,
+    entity_key="actor_id"
 )
 
 

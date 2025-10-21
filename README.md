@@ -24,6 +24,16 @@ app/
   router_query.py        # Endpoint /query (multi-intents, traducción, país)
   router_llm.py          # Endpoints /llm/test*
   modules/               # Lógica determinista (hits, availability, metadata, etc.)
+src/
+  strands/
+    main_router/         # Router principal con LangGraph
+    business/            # Dominio de inteligencia de negocio
+    talent/              # Dominio de talento (actores, directores)
+    content/             # Dominio de contenido (títulos, metadata)
+    platform/            # Dominio de plataformas (disponibilidad)
+    common/              # Utilidades comunes
+    core/                # Componentes core (BaseExecutorNode, factories)
+    infrastructure/      # Cache, validators, database
 infra/
   config.py              # Configuración (ENV + Secrets Manager)
   db.py                  # Conexión Aurora (psycopg2 + pool)
@@ -33,6 +43,10 @@ requirements.txt
 setup.py
 terraform/              # Infraestructura IaC (mantener en Git, ignorar en Docker)
 ```
+
+**📖 Documentación Técnica:**
+- [ARCHITECTURE.md](ARCHITECTURE.md) - Arquitectura del sistema LangGraph
+- [TESTING.md](TESTING.md) - Guía completa de testing
 
 ---
 

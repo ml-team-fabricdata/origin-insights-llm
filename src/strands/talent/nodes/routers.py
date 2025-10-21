@@ -1,8 +1,8 @@
 # talent/nodes/routers.py - Routers usando helpers genéricos
 
 from src.strands.common.graph_core.state import State
-from src.strands.utils.router_helpers import route_with_llm
-from src.strands.utils.config import MODEL_CLASSIFIER
+from src.strands.core.factories.router_helpers import route_with_llm
+from src.strands.config.models import MODEL_CLASSIFIER
 from src.strands.talent.nodes.prompt_talent import (
     ACTORS_ROUTER_PROMPT,
     DIRECTORS_ROUTER_PROMPT,

@@ -1,10 +1,10 @@
 from src.strands.common.nodes.prompt_common import GOVERNANCE_PROMPT
-from src.strands.utils.supervisor_helpers import (
+from src.strands.core.nodes.supervisor_helpers import (
     main_supervisor,
     create_route_from_supervisor,
     format_response
 )
-from src.strands.utils.classifier_factory import create_simple_classifier
+from src.strands.core.factories.classifier_factory import create_simple_classifier
 from .state import State
 
 

@@ -1,4 +1,4 @@
-from src.strands.utils.constants_sql import *
+from src.strands.infrastructure.database.constants import *
 
 # Optimized: Only select needed columns instead of SELECT *
 FILMOGRAPHY_SQL = f"""

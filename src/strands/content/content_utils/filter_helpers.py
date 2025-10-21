@@ -4,7 +4,7 @@ Extracted from metadata.py to reduce complexity.
 """
 import re
 from typing import Dict, List, Any, Tuple, Optional
-from src.strands.utils.validators import (
+from src.strands.infrastructure.validators.legacy import (
     resolve_country_iso, 
     resolve_content_type,
     get_region_iso_list
@@ -20,7 +20,7 @@ NO_FILTER_KEYWORDS = {
 
 def normalize_args_kwargs(args, kwargs, parse_arg1=False):
     """Normalize positional args into kwargs."""
-    from src.strands.utils.validators import normalize_args_kwargs as base_normalize
+    from src.strands.infrastructure.validators.legacy import normalize_args_kwargs as base_normalize
     kwargs = base_normalize(args, kwargs)
 
     if parse_arg1 and "__arg1" in kwargs:

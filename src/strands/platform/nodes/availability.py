@@ -4,9 +4,9 @@ from src.strands.platform.nodes.router_configs import (
     AVAILABILITY_TOOLS,
     AVAILABILITY_ROUTER_PROMPT
 )
-from src.strands.utils.config import MODEL_NODE_EXECUTOR
-from src.strands.utils.base_node import BaseExecutorNode
-from src.strands.utils.router_config import create_router
+from src.strands.config.models import MODEL_NODE_EXECUTOR
+from src.strands.core.nodes.base_node import BaseExecutorNode
+from src.strands.core.factories.router_factory import create_router
 
 from src.strands.platform.platform_modules.availability import (
     get_availability_by_uid, 

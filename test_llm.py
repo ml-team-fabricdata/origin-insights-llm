@@ -14,5 +14,5 @@ def test_model(prompt: str):
 
 if __name__ == "__main__":
     # solo prueba
-    prompt = "¿Cuál fue la película más vista en Argentina durante el último mes?"
+    prompt = "donde puedo ver stranger things?"
     test_model(prompt)

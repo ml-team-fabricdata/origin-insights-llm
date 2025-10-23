@@ -11,11 +11,14 @@ override.tf.json
 
 # Python (por si lo usás)
 __pycache__/
+__pycache__
 *.pyc
 .env
 .venv
 dist/
 build/
+telemetry_logs/
+docs/
 
 # Node (solo si se suma frontend)
 node_modules/
@@ -30,8 +33,11 @@ node_modules/
 # Entornos
 .env.local
 .env.*
+.vs
 
 # Python packaging artifacts
 *.egg-info/
 dist/
 build/
+.pytest_cache
+.github

@@ -8,7 +8,7 @@ from infra.db import db_health
 from app.supervisor import handle_query
 
 # --- Routers ---
-from app.router_determinista import router as determinista_router
+# from app.router_determinista import router as determinista_router
 from app.router_llm import router as llm_router
 from app.router_query import router as query_router
 from app.router_popularity import router as popularity_router
@@ -30,7 +30,7 @@ app.add_middleware(
 )
 
 # --- Routers ---
-app.include_router(determinista_router)
+# app.include_router(determinista_router)
 app.include_router(llm_router)
 app.include_router(query_router)
 app.include_router(popularity_router)

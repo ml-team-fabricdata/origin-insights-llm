@@ -1,0 +1,40 @@
+from app.strands.platform.graph_core.state import State
+from app.strands.platform.nodes.prompt_platform import AVAILABILITY_PROMPT
+from app.strands.platform.nodes.router_configs import (
+    AVAILABILITY_TOOLS,
+    AVAILABILITY_ROUTER_PROMPT
+)
+from app.strands.config.llm_models import MODEL_NODE_EXECUTOR
+from app.strands.core.nodes.base_node import BaseExecutorNode
+from app.strands.core.factories.router_factory import create_router
+
+from app.strands.platform.platform_modules.availability import (
+    get_availability_by_uid, 
+    get_platform_exclusives, 
+    compare_platforms_for_title, 
+    get_recent_premieres_by_country
+)
+
+
+AVAILABILITY_TOOLS_MAP = {
+    "availability_by_uid": get_availability_by_uid,
+    "platform_exclusives": get_platform_exclusives,
+    "compare_platforms": compare_platforms_for_title,
+    "recent_premieres": get_recent_premieres_by_country
+}
+
+
+_availability_executor = BaseExecutorNode(
+    node_name="availability",
+    tools_map=AVAILABILITY_TOOLS_MAP,
+    router_fn=create_router(
+        prompt=AVAILABILITY_ROUTER_PROMPT,
+        valid_tools=AVAILABILITY_TOOLS
+    ),
+    system_prompt=AVAILABILITY_PROMPT,
+    model=MODEL_NODE_EXECUTOR
+)
+
+
+async def availability_node(state: State) -> State:
+    return await _availability_executor.execute(state)

@@ -177,7 +177,7 @@ def translate_if_needed(text: str, target_lang: str) -> str:
             src = (_ld_detect(text or "") or "").split("-")[0]
     except Exception:
         src = None
-    if src and src.startswith(target_lang):
+    if src and app.startswith(target_lang):
         return text
     if target_lang == "es":
         return _translate_with_llm(text, "es")

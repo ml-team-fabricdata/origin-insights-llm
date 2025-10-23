@@ -13,6 +13,7 @@ from app.router_llm import router as llm_router
 from app.router_query import router as query_router
 from app.router_popularity import router as popularity_router
 from app.router_agent import router as agent_router
+from app.strands.routes import router as strands_router
 
 # -----------------------------------------------------------------------------
 # FastAPI App
@@ -35,6 +36,7 @@ app.include_router(llm_router)
 app.include_router(query_router)
 app.include_router(popularity_router)
 app.include_router(agent_router)
+app.include_router(strands_router, prefix="/strand")
 
 # -----------------------------------------------------------------------------
 # Endpoints básicos

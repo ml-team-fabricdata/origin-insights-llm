@@ -102,6 +102,13 @@ def extract_entities_node(state: State):
     return state
 
 
+def entities_exist(state: dict):
+    if bool(state.get("entities")):
+        return "search_entities"
+    else:
+        return "plan"
+
+
 def search_entities_node(state: dict):
     print("## Buscando entidades extraídas...")
     results = {}
@@ -232,6 +239,7 @@ graph.add_node("execute", execute_node)
 graph.add_node("answer", answer_node)
 
 graph.add_edge(START, "extract_entities")
+graph.add_conditional_edges("extract_entities", entities_exist)
 graph.add_edge("extract_entities", "search_entities")
 graph.add_edge("search_entities", "validate")
 graph.add_edge("validate", "execute_validation")

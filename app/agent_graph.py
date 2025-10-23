@@ -1,3 +1,16 @@
+import time
+from functools import wraps
+
+def medir_tiempo(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        inicio = time.perf_counter()
+        resultado = func(*args, **kwargs)
+        fin = time.perf_counter()
+        print(f"{func.__name__} tardó {fin - inicio:.4f} segundos.")
+        return resultado
+    return wrapper
+
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parent.parent))
@@ -91,6 +104,7 @@ def substitute_placeholders(args, results):
     return args
 
 
+@medir_tiempo
 def extract_entities_node(state: State):
     print("## Extrayendo entidades de la consulta del usuario...")
     with open("./prompts/entity_extraction.txt", encoding="utf-8") as file:
@@ -109,6 +123,7 @@ def entities_exist(state: dict):
         return "plan"
 
 
+@medir_tiempo
 def search_entities_node(state: dict):
     print("## Buscando entidades extraídas...")
     results = {}
@@ -141,6 +156,7 @@ def search_entities_node(state: dict):
 
 
 # Nodo de validacion de nombres y titulos
+@medir_tiempo
 def validate_node(state: State):
     print("## Validando entidades encontradas...")
     with open("./prompts/validation.txt", encoding="utf-8") as file:
@@ -159,6 +175,7 @@ def validate_node(state: State):
 
 
 # Resuelve las ambigüedades consultando al usuario
+@medir_tiempo
 def execute_validation_node(state: State):
     print("## Ejecutando validaciones con intervencion del usuario...")
     for i, entity in enumerate(state['validation_results']):
@@ -178,6 +195,7 @@ def execute_validation_node(state: State):
 
 
 # Nodo de planificación: llama al LLM para generar el plan (qué tools usar)
+@medir_tiempo
 def plan_node(state: State):
     print("## Generando plan de ejecucion...")
     with open("./prompts/planning.txt", encoding="utf-8") as file:
@@ -191,6 +209,7 @@ def plan_node(state: State):
 
 
 # Nodo de ejecución: ejecuta cada tool del plan
+@medir_tiempo
 def execute_node(state: State):
     print("## Ejecutando plan de ejecucion...")
     results = {}
@@ -218,6 +237,7 @@ def execute_node(state: State):
 
 
 # Nodo de respuesta final: llama al LLM para generar la respuesta final
+@medir_tiempo
 def answer_node(state: State):
     with open("./prompts/answer.txt", encoding="utf-8") as file:
         answer_prompt = file.read()

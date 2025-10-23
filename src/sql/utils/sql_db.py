@@ -5,7 +5,6 @@ import base64
 import json
 import logging
 import os
-import time
 from functools import lru_cache
 
 # =============================================================================
@@ -15,6 +14,7 @@ import boto3
 import psycopg
 from botocore.exceptions import ClientError
 from psycopg.rows import dict_row
+from psycopg_pool import ConnectionPool
 
 # =============================================================================
 # LOGGER
@@ -83,64 +83,18 @@ class SQLConnectionManager:
         self._cfg = get_secret()
         self._connection_uri = f"postgresql://{self._cfg['user']}:{self._cfg['password']}@{self._cfg['host']}:{self._cfg['port']}/{self._cfg['db']}"
         self.conn_options = "-c search_path=public,ms"
-        self._connection = None
+        self._connection_pool = None
         self._initialized = False
         self._initialize_connection()
 
     def _initialize_connection(self):
-        try:
-            self._connection = psycopg.connect(self._connection_uri, options=self.conn_options)
-            if not self._initialized:
-                print(
-                    f"✅ Connected to PostgreSQL: {self._cfg['db']}@"
-                    f"{self._cfg['host']}:{self._cfg['port']}"
-                )
-                self._initialized = True
-
-        except psycopg.Error as e:
-            print(f"❌ Initial connection failed: {e}")
-            self._connection = None
-                
-        except psycopg.Error as e:
-            logger.error(f"❌ Initial connection failed: {e}")
-            self._connection = None
-
-    def get_connection(self, retry_count=3):
-        for attempt in range(retry_count):
-            try:
-                if self._connection and not self._connection.closed:
-                    try:
-                        with self._connection.cursor() as c:
-                            c.execute("SELECT 1")
-                        return self._connection
-                    except (psycopg.Error, psycopg.OperationalError):
-                        self.close()
-
-                if attempt == 0:
-                    print("🔄 Creating new PostgreSQL connection")
-                self._connection = psycopg.connect(self._connection_uri, options=self.conn_options)
-                self._connection.autocommit = True
-                return self._connection
-
-            except psycopg.Error as e:
-                if attempt < retry_count - 1:
-                    print(f"⚠️ Connection attempt {attempt+1} failed: {e}")
-                    time.sleep(2 ** attempt)
-                else:
-                    print(f"❌ All connection attempts failed: {e}")
-                    raise
-
-    def cursor(self, dictionary=True):
-        conn = self.get_connection()
-        return conn.cursor(row_factory=dict_row) if dictionary else conn.cursor()
-
-    def close(self):
-        if self._connection and not self._connection.closed:
-            try:
-                self._connection.close()
-            except Exception:
-                pass
-        self._connection = None
+        self._connection_pool = ConnectionPool(self._connection_uri, min_size=1, max_size=10, options=self.conn_options)
+        if not self._initialized:
+            print(
+                f"✅ Connected to PostgreSQL: {self._cfg['db']}@"
+                f"{self._cfg['host']}:{self._cfg['port']}"
+            )
+            self._initialized = True
 
     def execute_query(self, query, params=None, operation_name=None):
         """
@@ -151,26 +105,26 @@ class SQLConnectionManager:
             params: Optional parameters for the query
             operation_name: Optional name for the operation (for compatibility with tools)
         """
-        conn = self.get_connection()
-        try:
-            with conn.cursor(row_factory=dict_row) as cur:
-                cur.execute(query, params)
-
-                # Para DDL y DML hacer commit explícito
-                query_upper = query.strip().upper()
-                if query_upper.startswith(('CREATE', 'DROP', 'ALTER', 'INSERT', 'UPDATE', 'DELETE')):
-                    conn.commit()
-                if cur.description:  # SELECT query
-                    return cur.fetchall()
-                else:  # INSERT/UPDATE/DELETE
-                    return cur.rowcount
-        except psycopg.Error as e:
-            print(f"❌ Query execution failed: {e}")
+        with self._connection_pool.connection() as conn:
             try:
-                conn.rollback()
-            except Exception:
-                pass
-            raise
+                with conn.cursor(row_factory=dict_row) as cur:
+                    cur.execute(query, params)
+
+                    # Para DDL y DML hacer commit explícito
+                    query_upper = query.strip().upper()
+                    if query_upper.startswith(('CREATE', 'DROP', 'ALTER', 'INSERT', 'UPDATE', 'DELETE')):
+                        conn.commit()
+                    if cur.description:  # SELECT query
+                        return cur.fetchall()
+                    else:  # INSERT/UPDATE/DELETE
+                        return cur.rowcount
+            except psycopg.Error as e:
+                print(f"❌ Query execution failed: {e}")
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+                raise
 
 
 db = SQLConnectionManager()

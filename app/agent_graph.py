@@ -4,6 +4,7 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 import json
 import re
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import StateGraph, START, END
 from langgraph.types import interrupt, Command
@@ -101,23 +102,33 @@ def extract_entities_node(state: State):
     return state
 
 
-def search_entities_node(state: State):
+def search_entities_node(state: dict):
     print("## Buscando entidades extraídas...")
     results = {}
-    entities = state.get('entities', {})
-    for entity_type, names in entities.items():
-        for name in names:
-            if entity_type == "titles":
-                result = validate_title(name)
-            elif entity_type == "cast":
-                result = validate_actor(name)
-            elif entity_type == "directors":
-                result = validate_director(name)
-            else:
-                raise ValueError(f"Tipo de entidad desconocido: {entity_type}")
+    entities = state.get("entities", {})
+
+    def process_entity(entity_type, name):
+        if entity_type == "titles":
+            return name, validate_title(name)
+        elif entity_type == "cast":
+            return name, validate_actor(name)
+        elif entity_type == "directors":
+            return name, validate_director(name)
+        else:
+            raise ValueError(f"Tipo de entidad desconocido: {entity_type}")
+
+    futures = []
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        for entity_type, names in entities.items():
+            for name in names:
+                futures.append(executor.submit(process_entity, entity_type, name))
+
+        for future in as_completed(futures):
+            name, result = future.result()
             results[name] = result
             print(result)
-    state['search_results'] = results
+
+    state["search_results"] = results
     print(state)
     return state
 

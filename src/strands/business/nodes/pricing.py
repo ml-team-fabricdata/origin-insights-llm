@@ -21,7 +21,6 @@ from src.strands.business.business_modules.pricing import (
 
 
 PRICING_TOOLS_MAP = {
-    "query_presence_with_price": query_presence_with_price,
     "tool_prices_latest": tool_prices_latest,
     "tool_prices_history": tool_prices_history,
     "tool_prices_changes_last_n_days": tool_prices_changes_last_n_days,

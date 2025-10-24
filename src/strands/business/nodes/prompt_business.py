@@ -129,11 +129,6 @@ Available Tools:
    - limit: Max results (default: 50)
    - Example: "Top Netflix movies in US" → get_top_generic("US", "netflix", None, "movie", 7, 50)
 
-4. get_top_global(platform, genre, content_type, days_back, limit)
-   - Use for: "global top", "worldwide rankings", "top global"
-   - Same params as get_top_generic but no country filter
-   - Example: "Global top Netflix shows" → get_top_global("netflix", None, "show", 7, 50)
-
 Parameter Guidelines:
 - Platform names: 'netflix', 'disney+', 'prime', 'hbo', 'apple tv+', 'paramount+'
 - Countries: ISO-2 codes ('US', 'MX', 'AR') or regions ('LATAM', 'EU', 'ASIA')
@@ -143,7 +138,7 @@ Parameter Guidelines:
 - If tool returns error, report it directly to user
 
 Workflow:
-1. Check state for validated entities (uid, actor_id, director_id)
+1. Check state for validated entities (uid)
 2. If uid exists and question is about position/rating → use get_top_by_uid(uid)
 3. Otherwise, identify question type (genre momentum/top rankings)
 4. Extract parameters (country, platform, genre, etc.)
@@ -192,9 +187,5 @@ Match to ONE tool. Return ONLY tool name.
 TOOLS:
 - get_genre_momentum
 - get_top_generic
-- get_top_presence
-- get_top_global
 - get_top_by_uid
-- get_top_generic_tool
-- new_top_by_country_tool
 """

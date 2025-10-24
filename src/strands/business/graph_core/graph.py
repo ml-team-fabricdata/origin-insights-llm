@@ -38,6 +38,7 @@ def create_streaming_graph():
         route_from_main_supervisor,
         {
             "business_classifier": "business_classifier",
+            "format_response": END,  # Si está COMPLETO, terminar
             "return_to_main_router": END
         }
     )

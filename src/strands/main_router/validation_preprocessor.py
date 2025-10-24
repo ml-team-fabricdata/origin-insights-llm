@@ -20,7 +20,7 @@ VALIDATION_TOOLS_MAP = {
     "validate_director": validate_director
 }
 
-VALIDATION_TOOLS = list(VALIDATION_TOOLS_MAP.keys())
+VALIDATION_TOOLS = list(VALIDATION_TOOLS_MAP.keys()) + ["NO_ENTITY"]
 
 
 def _extract_text_from_result(result) -> str:
@@ -224,32 +224,44 @@ async def validation_preprocessor_node(state: MainRouterState) -> MainRouterStat
     if state.get("validation_done", False):
         print("[VALIDATION] Ya validado, saltando...")
         return state
-    
+
     if state.get("skip_validation", False):
         return _handle_skip_validation(state)
-    
+
     try:
         print("[VALIDATION] Ejecutando router y extractor en paralelo...")
-        tool_name, entity_names_raw = await asyncio.gather(
-            _validation_router(state),
-            _extract_entity_name(state['question'])
-        )
-        print(f"[VALIDATION] Tool seleccionado: {tool_name}")
+        try:
+            tool_name, entity_names_raw = await asyncio.gather(
+                _validation_router(state),
+                _extract_entity_name(state['question'])
+            )
+        except ValueError as router_error:
+            # Si el router falla (LLM genera respuesta inválida), skip validation
+            print(f"[VALIDATION] Router error: {router_error}")
+            print("[VALIDATION] Skipping validation due to router error")
+            return _handle_no_entity(state)
         
+        print(f"[VALIDATION] Tool seleccionado: {tool_name}")
+
+        # Check if NO validation needed
+        if tool_name and "NO_ENTITY" in tool_name.upper():
+            print("[VALIDATION] Consulta general detectada, saltando validación")
+            return _handle_no_entity(state)
+
         tool_fn = VALIDATION_TOOLS_MAP.get(tool_name)
         if not tool_fn:
             return _handle_tool_not_found(state, tool_name)
-        
+
         if not entity_names_raw:
             return _handle_extraction_error(state)
-        
+
         print(f"[VALIDATION] Entidad(es) extraída(s): '{entity_names_raw}'")
-        
+
         if "NO_ENTITY" in entity_names_raw.upper():
             return _handle_no_entity(state)
-        
+
         entity_names = [name.strip() for name in entity_names_raw.split(" | ")]
-        
+
         if len(entity_names) > 1:
             validation_status, needs_user_input, validated_entities = _process_multiple_entities(
                 entity_names, tool_name, tool_fn

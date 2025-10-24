@@ -103,6 +103,37 @@ async def format_response(state: TypedDict) -> TypedDict:
             "status": "insufficient_data"
         }
     
+    # Use LLM to check if response contains real data or is a "no data" response
+    check_prompt = """Evaluate if the response contains REAL DATA or is a "no data" response.
+
+REAL DATA = specific information, numbers, lists, titles, names, facts from database
+NO DATA = "no results", "not found", "not available", "0 rows", generic apologies
+
+Response to evaluate:
+{response}
+
+Answer ONLY with ONE WORD: DATA or NO_DATA
+"""
+    
+    checker = Agent(model=MODEL_SUPERVISOR, system_prompt=check_prompt.format(response=accumulated[:500]))
+    check_result = await checker.invoke_async("Evaluate:")
+    
+    decision = ""
+    if isinstance(check_result, dict):
+        decision = str(check_result.get('message', check_result)).strip().upper()
+    else:
+        decision = str(getattr(check_result, "message", check_result)).strip().upper()
+    
+    if "NO_DATA" in decision or "NO DATA" in decision:
+        print("[FORMAT] LLM detected 'NO DATA' response, returning as-is without formatting")
+        return {
+            "question": state["question"],
+            "answer": accumulated,
+            "task": state.get("task"),
+            "tool_calls_count": state.get("tool_calls_count", 0),
+            "status": "no_data"
+        }
+    
     is_json_list = accumulated.strip().startswith('[') and accumulated.strip().endswith(']')
     is_json_object = accumulated.strip().startswith('{') and accumulated.strip().endswith('}')
     has_markdown_lists = '\n- ' in accumulated or '\n* ' in accumulated

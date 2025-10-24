@@ -15,16 +15,20 @@ from src.strands.business.business_modules.pricing import (
     tool_hits_with_quality,
     tool_prices_latest,
     tool_prices_history,
+    tool_prices_history_light,
     tool_prices_changes_last_n_days,
-    tool_prices_stats
+    tool_prices_stats,
+    tool_prices_stats_fast
 )
 
 
 PRICING_TOOLS_MAP = {
     "tool_prices_latest": tool_prices_latest,
     "tool_prices_history": tool_prices_history,
+    "tool_prices_history_light": tool_prices_history_light,
     "tool_prices_changes_last_n_days": tool_prices_changes_last_n_days,
     "tool_prices_stats": tool_prices_stats,
+    "tool_prices_stats_fast": tool_prices_stats_fast,
     "tool_hits_with_quality": tool_hits_with_quality
 }
 

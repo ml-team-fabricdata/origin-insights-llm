@@ -61,12 +61,28 @@ CORRECT:
 """
 
 
-VALIDATION_ROUTER_PROMPT_STRICT = """Return ONLY ONE word: the tool name. NO explanations.
-TOOLS:
-- validate_title (for movies/series/shows)
-- validate_actor (for actors/actresses)
-- validate_director (for directors)
-CRITICAL: Return ONLY the tool name. One word. Nothing else.
+VALIDATION_ROUTER_PROMPT_STRICT = """Complete this sentence with EXACTLY ONE WORD:
+
+The required validation tool is: _____
+
+ONLY use ONE of these 4 words:
+1. validate_title
+2. validate_actor
+3. validate_director
+4. NO_ENTITY
+
+RULES:
+- Questions about movie/series/show TITLES → validate_title
+- Questions about ACTOR/ACTRESS names → validate_actor  
+- Questions about DIRECTOR names → validate_director
+- Questions about PRICES, RANKINGS, PLATFORMS, CATALOGS, STATS → NO_ENTITY
+- ANY other question type → NO_ENTITY
+
+CRITICAL: DO NOT write explanations, sentences, or multiple words.
+CRITICAL: DO NOT invent tool names like "validate_price" or "validate_platform".
+CRITICAL: ONLY respond with ONE of the 4 words listed above.
+
+Complete: The required validation tool is: _____
 """
 
 

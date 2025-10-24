@@ -2,8 +2,10 @@
   "ExpandedNodes": [
     "",
     "\\app",
-    "\\app\\modules"
+    "\\infra",
+    "\\src",
+    "\\src\\data"
   ],
-  "SelectedNode": "\\app\\router_query.py",
+  "SelectedNode": "\\src\\strands",
   "PreviewInSolutionExplorer": false
 }

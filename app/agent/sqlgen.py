@@ -8,7 +8,6 @@ from infra.config import SETTINGS
 from infra.db import run_sql
 
 # ---------- Whitelist de tablas/columnas permitidas ----------
-# (Basado en tu esquema compartido)
 _ALLOWED: Dict[str, List[str]] = {
     "ms.hits_presence_2": [
         "uid","imdb","country","content_type","date_hits","hits","week","title","year",

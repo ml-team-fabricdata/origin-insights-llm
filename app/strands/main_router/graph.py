@@ -13,6 +13,7 @@ from .specialized_nodes import (
     error_handler_node,
     responder_formatter_node
 )
+from app.router_query import _ensure_session, _sess_get, _sess_set
 from app.strands.core.nodes.supervisor_helpers import format_response
 from .routing_gates import (
     route_from_router,

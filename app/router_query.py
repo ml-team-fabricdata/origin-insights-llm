@@ -22,10 +22,16 @@ class QueryIn(BaseModel):
 def get_thread_id(user_id: str | None, session_id: str | None) -> str:
     """
     Genera un identificador de hilo (thread_id) estable y único.
-    - Si se recibe session_id desde el frontend, se usa directamente.
-    - Si no, se genera un hash corto del user_id o del timestamp.
+
+    - Si el frontend ya provee un session_id (por ejemplo 'thread-uuid'),
+      se usa directamente sin duplicar el prefijo.
+    - Si no tiene prefijo, se antepone 'thread-'.
+    - Si no hay session_id, se genera a partir del user_id o timestamp.
     """
     if session_id:
+        # Evita duplicar el prefijo
+        if session_id.startswith("thread-"):
+            return session_id
         return f"thread-{session_id}"
 
     base_id = user_id or f"anon-{time.time()}"

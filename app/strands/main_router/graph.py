@@ -375,6 +375,11 @@ async def process_question_advanced(
         print_telemetry_summary(telemetry_logger, result)
         telemetry_logger.save_to_file(result)
 
+    trace_path = [n["id"] for n in result.get("visited_nodes", [])] if "visited_nodes" in result else []
+
+    result["trace_path"] = trace_path
+    result["source"] = "strands"
+
     return result
 
 

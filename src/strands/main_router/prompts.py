@@ -35,12 +35,14 @@ INSTRUCTIONS:
 
 EXAMPLES:
 - "filmography of Tom Hanks" -> call validate_actor("Tom Hanks")
-- "movies directed by Spielberg" -> call validate_director("Steven Spielberg")
+- "movies directed by Spielberg" -> call validate_director("Spielberg")
+- "peliculas de Coppola" -> call validate_director("Coppola")
 - "information about Inception" -> call validate_title("Inception")
 - "what is the definition of mise en scene" -> NO_VALIDATION_NEEDED
 
 CRITICAL RULES:
-- Call the tool with the FULL entity name as it appears in the question
+- Call the tool with the entity name EXACTLY as it appears in the question
+- DO NOT expand or assume full names (e.g., "Coppola" NOT "Francis Ford Coppola")
 - Call ONLY ONE tool per question
 - DO NOT call multiple tools
 - DO NOT add ANY text before or after calling the tool
@@ -70,21 +72,27 @@ CRITICAL: Return ONLY the tool name. One word. Nothing else.
 """
 
 
-ENTITY_EXTRACTION_PROMPT = """EXTRACT ENTITY NAME(S). NO EXPLANATIONS.
+ENTITY_EXTRACTION_PROMPT = """EXTRACT ENTITY NAME(S) EXACTLY AS WRITTEN. NO EXPLANATIONS.
 
-RULES:
-- Extract movie/series titles, actor names, or director names
-- Specific entity -> return the name
+CRITICAL RULES:
+- Extract the name EXACTLY as it appears in the question
+- DO NOT expand partial names (e.g., "Coppola" stays "Coppola", NOT "Francis Ford Coppola")
+- DO NOT add first names if only last name is given
+- DO NOT add last names if only first name is given
+- Specific entity -> return EXACTLY what user wrote
 - Two entities -> "NAME1 | NAME2"
 - General query with NO specific entity -> "NO_ENTITY"
 
 EXAMPLES:
 "Tom Hanks filmography" -> Tom Hanks
+"peliculas de Coppola" -> Coppola
 "where can I watch Avatar" -> Avatar
 "donde puedo ver Inception" -> Inception
-"Spielberg and Cruise films" -> Steven Spielberg | Tom Cruise
+"Spielberg and Cruise films" -> Spielberg | Cruise
 "best action movies" -> NO_ENTITY
 "popular directors" -> NO_ENTITY
+
+REMEMBER: Extract EXACTLY what the user wrote. Do NOT assume or expand names.
 """
 
 

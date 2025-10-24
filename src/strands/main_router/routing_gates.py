@@ -46,11 +46,20 @@ def route_from_validation(state: MainRouterState) -> Literal["parallel_executor"
 def route_from_domain_graph(state: MainRouterState) -> Literal["format_response", "advanced_router", "clarifier", "error_handler"]:
     """Domain Graph → Format Response (si success) o Re-routing/Error"""
     domain_status = state.get("domain_graph_status")
+    visited_graphs = state.get("visited_graphs", [])
+    current_hop = len(visited_graphs)
+    max_hops = state.get("max_hops", 3)
+    
+    # CRITICAL: Prevenir loops infinitos
+    if current_hop >= max_hops:
+        print(f"[ROUTING] Max hops reached ({current_hop}/{max_hops}). Forcing format_response.")
+        return "format_response"
     
     if domain_status == "success":
         return "format_response"
     
     if domain_status == "not_my_scope":
+        print(f"[ROUTING] Re-routing requested. Hop: {current_hop + 1}/{max_hops}")
         return "advanced_router"
     
     if domain_status == "needs_clarification":

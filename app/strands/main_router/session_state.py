@@ -1,7 +1,7 @@
 import time
 
 class SessionMemory:
-    """Memoria temporal por thread_id (se limpia automáticamente)."""
+    """Memoria temporal por thread_id (se limpia automaticamente)."""
     def __init__(self, ttl_seconds: int = 600):
         self._store = {}
         self.ttl = ttl_seconds

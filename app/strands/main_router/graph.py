@@ -305,9 +305,9 @@ def _verify_checkpoint(graph, config: dict):
     final_snapshot = graph.get_state(config)
     if final_snapshot and hasattr(final_snapshot, 'values'):
         final_state = final_snapshot.values
-        print(f"\n[PROCESS] ✅ Checkpoint saved: pending_disambiguation={final_state.get('pending_disambiguation', False)}")
+        print(f"\n[PROCESS] Checkpoint saved: pending_disambiguation={final_state.get('pending_disambiguation', False)}")
         if final_state.get('pending_disambiguation'):
-            print(f"[PROCESS] ✅ Options saved: {len(final_state.get('disambiguation_options', []))}")
+            print(f"[PROCESS] Options saved: {len(final_state.get('disambiguation_options', []))}")
 
 
 async def process_question_advanced(
@@ -318,51 +318,58 @@ async def process_question_advanced(
     thread_id: str = "default",
     context: dict = None
 ) -> MainRouterState:
+    """Router principal de Strands con interceptores y logs."""
+
+    # --- Interceptor de saludos ---
+    normalized = question.strip().lower()
+    greetings = ["hola", "buenas", "hello", "hi", "hey"]
+    if normalized in greetings:
+        print(f"[STRANDS] Detected greeting: '{normalized}' (thread_id={thread_id})")
+        return {
+            "answer": "¡Hola! Soy el asistente virtual de Fabric. "
+                      "Puedo ayudarte a encontrar dónde ver contenidos, "
+                      "su popularidad (HITS) o información sobre títulos. "
+                      "¿Qué te gustaría explorar hoy?",
+            "selected_graph": None,
+            "domain_graph_status": "greeting",
+            "pending_disambiguation": False,
+            "disambiguation_options": [],
+            "visited_graphs": [],
+            "routing_done": True,
+            "needs_user_input": False,
+        }
+
+    # --- Telemetría / inicialización ---
     telemetry_logger = TelemetryLogger(log_to_file=enable_telemetry) if enable_telemetry else None
     start_time = time.time()
 
-    # 🔹 1. Recuperar último UID de la sesión (si existe)
-    session_data = session_memory.get(thread_id)
-    last_uid = session_data.get("last_uid")
-    if last_uid:
-        print(f"[SESSION] Reutilizando UID previo: {last_uid}")
+    print(f"[STRANDS] Iniciando flujo avanzado (thread_id={thread_id})")
+    print(f"[STRANDS] Pregunta recibida: {question}")
 
-    # 🔹 2. Crear grafo avanzado
     graph = create_advanced_graph(use_checkpointer=True)
     config = {"configurable": {"thread_id": thread_id}}
 
-    # 🔹 3. Cargar estado existente si hay una desambiguación pendiente
+    # --- Verificar estado persistido ---
     existing_state = _load_existing_state(graph, config)
-
     if existing_state and existing_state.get("pending_disambiguation", False):
-        print("[PROCESS] Continuing disambiguation flow...")
-        print(f"[PROCESS] Original question: {existing_state.get('original_question')}")
-        print(f"[PROCESS] Options available: {len(existing_state.get('disambiguation_options', []))}")
+        print("[STRANDS] Reanudando flujo de desambiguación previa.")
         initial_state = {**existing_state, "question": question}
     else:
         initial_state = _create_initial_state(question, max_hops)
 
-    # 🔹 4. Inyectar UID previo en el contexto si no hay otro definido
-    if last_uid and "context" not in initial_state:
-        initial_state["context"] = {"uid_context": last_uid}
-    elif last_uid and isinstance(initial_state.get("context"), dict):
-        initial_state["context"]["uid_context"] = last_uid
-
-    # 🔹 5. Ejecutar el grafo
+    # --- Ejecución principal ---
     result = await graph.ainvoke(initial_state, config=config)
-
-    # 🔹 6. Verificar y guardar UID si se seleccionó uno nuevo
-    selected_uid = result.get("selected_uid") or result.get("resolved_uid")
-    if selected_uid:
-        session_memory.update(thread_id, last_uid=selected_uid)
-        print(f"[SESSION] UID actualizado: {selected_uid}")
 
     _verify_checkpoint(graph, config)
 
-    # 🔹 7. Métricas de tiempo y telemetría
     total_time = time.time() - start_time
     tool_times = result.get("tool_execution_times", {})
-    _print_execution_summary(total_time, tool_times)
+
+    print(f"[STRANDS] Tiempo total: {total_time:.2f}s")
+    if "selected_graph" in result:
+        print(f"[STRANDS] Grafo seleccionado: {result.get('selected_graph')}")
+    else:
+        print("[STRANDS] No se detectó grafo en el resultado")
 
     if telemetry_logger:
         print_telemetry_summary(telemetry_logger, result)

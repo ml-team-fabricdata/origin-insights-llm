@@ -1,4 +1,5 @@
 from .state import MainRouterState
+from app.strands.main_router.session_state import session_memory
 import re
 
 
@@ -68,20 +69,31 @@ async def user_selection_resolver_node(state: MainRouterState) -> MainRouterStat
             "needs_user_input": True
         }
     
+    # ------------------------------
+    # Obtener y validar selección
+    # ------------------------------
     selected_option = options[selection - 1]
-    
     print(f"[SELECTION] Usuario seleccionó opción {selection}")
     print(f"[SELECTION] Opción: {selected_option}")
     
     validated_entities = _create_validated_entities(selected_option, original_question)
-    
-    if "uid" in selected_option:
-        print(f"[SELECTION] Title UID: {selected_option.get('uid')}")
-    elif "id" in selected_option:
-        print(f"[SELECTION] Entity ID: {selected_option.get('id')}")
-    
+
+    # ------------------------------
+    # Persistir el UID en memoria
+    # ------------------------------
+    thread_id = state.get("thread_id") or state.get("session_id")
+    if "uid" in selected_option and thread_id:
+        session_memory.update(thread_id, last_uid=selected_option["uid"])
+        print(f"[SESSION] UID guardado en memoria: {selected_option['uid']} (thread {thread_id})")
+    elif "id" in selected_option and thread_id:
+        session_memory.update(thread_id, last_uid=selected_option["id"])
+        print(f"[SESSION] ID guardado en memoria: {selected_option['id']} (thread {thread_id})")
+
     print("="*80 + "\n")
     
+    # ------------------------------
+    # Devolver nuevo estado limpio
+    # ------------------------------
     return {
         **state,
         "question": original_question,

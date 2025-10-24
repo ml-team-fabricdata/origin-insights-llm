@@ -21,6 +21,7 @@ from .routing_gates import (
     route_from_aggregator
 )
 from .telemetry import TelemetryLogger, print_telemetry_summary
+from app.strands.main_router.session_state import session_memory
 
 from app.strands.business.graph_core.graph import process_question as business_process_question
 from app.strands.talent.graph_core.graph import process_question as talent_process_question
@@ -319,33 +320,54 @@ async def process_question_advanced(
 ) -> MainRouterState:
     telemetry_logger = TelemetryLogger(log_to_file=enable_telemetry) if enable_telemetry else None
     start_time = time.time()
-    
+
+    # 🔹 1. Recuperar último UID de la sesión (si existe)
+    session_data = session_memory.get(thread_id)
+    last_uid = session_data.get("last_uid")
+    if last_uid:
+        print(f"[SESSION] Reutilizando UID previo: {last_uid}")
+
+    # 🔹 2. Crear grafo avanzado
     graph = create_advanced_graph(use_checkpointer=True)
     config = {"configurable": {"thread_id": thread_id}}
-    
+
+    # 🔹 3. Cargar estado existente si hay una desambiguación pendiente
     existing_state = _load_existing_state(graph, config)
-    
+
     if existing_state and existing_state.get("pending_disambiguation", False):
-        print("[PROCESS] ✅ Continuing disambiguation flow...")
+        print("[PROCESS] Continuing disambiguation flow...")
         print(f"[PROCESS] Original question: {existing_state.get('original_question')}")
         print(f"[PROCESS] Options available: {len(existing_state.get('disambiguation_options', []))}")
         initial_state = {**existing_state, "question": question}
     else:
         initial_state = _create_initial_state(question, max_hops)
-    
+
+    # 🔹 4. Inyectar UID previo en el contexto si no hay otro definido
+    if last_uid and "context" not in initial_state:
+        initial_state["context"] = {"uid_context": last_uid}
+    elif last_uid and isinstance(initial_state.get("context"), dict):
+        initial_state["context"]["uid_context"] = last_uid
+
+    # 🔹 5. Ejecutar el grafo
     result = await graph.ainvoke(initial_state, config=config)
-    
+
+    # 🔹 6. Verificar y guardar UID si se seleccionó uno nuevo
+    selected_uid = result.get("selected_uid") or result.get("resolved_uid")
+    if selected_uid:
+        session_memory.update(thread_id, last_uid=selected_uid)
+        print(f"[SESSION] UID actualizado: {selected_uid}")
+
     _verify_checkpoint(graph, config)
-    
+
+    # 🔹 7. Métricas de tiempo y telemetría
     total_time = time.time() - start_time
     tool_times = result.get("tool_execution_times", {})
-    
     _print_execution_summary(total_time, tool_times)
-    
+
     if telemetry_logger:
         print_telemetry_summary(telemetry_logger, result)
         telemetry_logger.save_to_file(result)
-    
+
     return result
 
 

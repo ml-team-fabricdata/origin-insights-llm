@@ -1,4 +1,4 @@
-from src.strands.infrastructure.database.constants import *
+from app.strands.infrastructure.database.constants import *
 
 PLATFORM_FILTER = "p.platform_name ILIKE %(platform)s" 
 

@@ -1,8 +1,8 @@
 from langgraph.graph import StateGraph, END
 from .state import State, create_initial_state
 from .supervisor import main_supervisor, content_classifier
-from src.strands.content.nodes.discovery import discovery_node
-from src.strands.content.nodes.metadata import metadata_node
+from app.strands.content.nodes.discovery import discovery_node
+from app.strands.content.nodes.metadata import metadata_node
 
 
 def _route_from_supervisor(state: State) -> str:

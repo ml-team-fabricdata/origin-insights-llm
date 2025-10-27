@@ -1,6 +1,6 @@
 from strands import Agent
 from src.prompt import RESPONSE_PROMPT, get_supervisor_prompt
-from src.strands.config.llm_models import (
+from app.strands.config.llm_models import (
     MODEL_SUPERVISOR,
     MODEL_FORMATTER,
 )

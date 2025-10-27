@@ -7,12 +7,12 @@ Provides competitive intelligence tools for platform analysis:
 """
 
 from typing import Dict, List, Any, Optional, Tuple
-from src.strands.core.shared_imports import *
-from src.strands.infrastructure.database.utils import *
-from src.strands.infrastructure.database.constants import *
-from src.strands.infrastructure.validators.shared import *
-from src.strands.infrastructure.cache.query_cache import intelligence_cache
-from src.strands.business.business_queries.intelligence_queries import *
+from app.strands.core.shared_imports import *
+from app.strands.infrastructure.database.utils import *
+from app.strands.infrastructure.database.constants import *
+from app.strands.infrastructure.validators.shared import *
+from app.strands.infrastructure.cache.query_cache import intelligence_cache
+from app.strands.business.business_queries.intelligence_queries import *
 from strands import tool
 
 
@@ -63,7 +63,11 @@ def get_platform_exclusivity_by_country(
            .replace("{PRES_TBL}", PRES_TBL)
            .replace("{META_TBL}", META_TBL))
     
-    params = (resolved_platform, resolved_country, limit_norm)
+    params = {
+        'platform': resolved_platform,
+        'country': resolved_country,
+        'limit': limit_norm
+    }
     rows = db.execute_query(sql, params)
     
     ident = f"{resolved_platform} @ {resolved_country} limit={limit_norm}"

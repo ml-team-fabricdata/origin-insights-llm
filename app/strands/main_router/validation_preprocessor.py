@@ -1,10 +1,10 @@
 import asyncio
 from strands import Agent
-from src.strands.config.llm_models import MODEL_NODE_EXECUTOR
+from app.strands.config.llm_models import MODEL_NODE_EXECUTOR
 from .state import MainRouterState
-from src.strands.common.common_modules.validation import validate_title, validate_actor, validate_director
-from src.strands.core.factories.router_factory import create_router
-from src.strands.main_router.prompts import ENTITY_EXTRACTION_PROMPT, VALIDATION_ROUTER_PROMPT_STRICT
+from app.strands.common.common_modules.validation import validate_title, validate_actor, validate_director
+from app.strands.core.factories.router_factory import create_router
+from app.strands.main_router.prompts import ENTITY_EXTRACTION_PROMPT, VALIDATION_ROUTER_PROMPT_STRICT
 
 ROUTING_MAP = {
     "business": "business_graph",

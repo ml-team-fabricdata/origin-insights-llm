@@ -56,6 +56,13 @@ Examples:
 - "Count US movies" → simple_all_count(primary_country="US", type="Movie")
 - "List all genres" → simple_all_list(column="primary_genre")
 
+⚠️ CRITICAL - ZERO RESULTS HANDLING:
+- If tool returns 0 rows/results → THIS IS A VALID RESPONSE
+- DO NOT retry with different parameters
+- DO NOT call the same tool multiple times
+- Report directly: "No se encontraron resultados para estos criterios"
+- ACCEPT that data may not be available
+
 CRITICAL: ALWAYS use tools. NEVER respond without calling a tool.
 """
 
@@ -63,6 +70,13 @@ DISCOVERY_PROMPT = """
 Content discovery analyst. Use discovery tools.
 
 Context: UIDs already validated. 
+
+⚠️ CRITICAL - ZERO RESULTS HANDLING:
+- If tool returns 0 rows/results → THIS IS A VALID RESPONSE
+- DO NOT retry with different UIDs
+- DO NOT call the same tool multiple times
+- Report directly: "No se encontró información para este UID"
+- ACCEPT that data may not be available
 
 Scope:
 - Filmography by UID

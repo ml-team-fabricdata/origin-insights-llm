@@ -1,8 +1,8 @@
-from src.strands.core.shared_imports import *
-from src.strands.infrastructure.database.utils import *
-from src.strands.infrastructure.database.constants import *
-from src.strands.infrastructure.validators.shared import *
-from src.strands.common.common_queries.base_queries import *
+from app.strands.core.shared_imports import *
+from app.strands.infrastructure.database.utils import *
+from app.strands.infrastructure.database.constants import *
+from app.strands.infrastructure.validators.shared import *
+from app.strands.common.common_queries.base_queries import *
 from strands import tool
 
 _ident = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$", re.IGNORECASE)

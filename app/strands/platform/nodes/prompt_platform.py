@@ -43,6 +43,8 @@ TOOLS:
 - platform_exclusives
 - compare_platforms
 - recent_premieres
+- query_platforms_for_title
+- query_platforms_for_uid_by_country
 """
 
 PRESENCE_ROUTER_PROMPT = """

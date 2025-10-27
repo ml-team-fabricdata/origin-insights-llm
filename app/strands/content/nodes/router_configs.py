@@ -3,7 +3,7 @@
 Tool sets and configurations for content domain routers.
 """
 
-from src.strands.content.nodes.prompt_content import (
+from app.strands.content.nodes.prompt_content import (
     METADATA_ROUTER_PROMPT,
     DISCOVERY_ROUTER_PROMPT
 )

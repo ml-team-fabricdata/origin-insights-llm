@@ -55,18 +55,24 @@ async def user_selection_resolver_node(state: MainRouterState) -> MainRouterStat
     
     if not selection:
         print("[SELECTION] No se pudo extraer número de selección")
+        error_msg = "Por favor, selecciona una de las opciones enviando el número correspondiente (1, 2, 3, etc.)."
         return {
             **state,
-            "answer": "Invalid selection. Please provide a number (e.g., '1' or 'option 2').",
-            "needs_user_input": True
+            "answer": error_msg,
+            "needs_user_input": False,  # Cambiar a False para terminar el flujo
+            "pending_disambiguation": True,  # Mantener pending para que el frontend sepa
+            "domain_graph_status": "error"  # Marcar como error para evitar re-routing
         }
     
     if selection < 1 or selection > len(options):
         print(f"[SELECTION] Selección fuera de rango: {selection} (opciones: 1-{len(options)})")
+        error_msg = f"Selección inválida. Por favor, elige un número entre 1 y {len(options)}."
         return {
             **state,
-            "answer": f"Invalid selection. Please choose a number between 1 and {len(options)}.",
-            "needs_user_input": True
+            "answer": error_msg,
+            "needs_user_input": False,  # Cambiar a False para terminar el flujo
+            "pending_disambiguation": True,  # Mantener pending para que el frontend sepa
+            "domain_graph_status": "error"  # Marcar como error para evitar re-routing
         }
     
     # ------------------------------
@@ -105,7 +111,8 @@ async def user_selection_resolver_node(state: MainRouterState) -> MainRouterStat
         "disambiguation_options": None,
         "routing_done": False,
         "visited_graphs": [],
-        "needs_rerouting": False
+        "needs_rerouting": False,
+        "domain_graph_status": None  # Limpiar status para que routing funcione
     }
 
 

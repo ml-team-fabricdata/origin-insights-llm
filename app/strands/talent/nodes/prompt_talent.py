@@ -25,9 +25,18 @@ CRITICAL INSTRUCTIONS:
 3. Use ONLY numeric IDs. NEVER IMDB IDs (nm0000123)
 4. NEVER use actor names, ONLY IDs
 
+⚠️ CRITICAL - ZERO RESULTS HANDLING:
+- If tool returns 0 rows/results → THIS IS A VALID RESPONSE
+- DO NOT retry with different parameters
+- DO NOT call the same tool multiple times
+- DO NOT try alternative approaches
+- Report directly: "No se encontraron películas para este actor en la base de datos"
+- ACCEPT that data may not be available
+
 Example:
 - If validated_entities contains actor_id: 805619
 - Call: get_actor_filmography(actor_id="805619")
+- If returns 0 rows → Report "No data found" and STOP
 
 Scope:
 - Filmography by numeric ID
@@ -43,9 +52,18 @@ CRITICAL INSTRUCTIONS:
 3. Use ONLY numeric IDs. NEVER IMDB IDs (nm0634240)
 4. NEVER use director names, ONLY IDs
 
+⚠️ CRITICAL - ZERO RESULTS HANDLING:
+- If tool returns 0 rows/results → THIS IS A VALID RESPONSE
+- DO NOT retry with different parameters
+- DO NOT call the same tool multiple times
+- DO NOT try alternative approaches
+- Report directly: "No se encontraron películas para este director en la base de datos"
+- ACCEPT that data may not be available
+
 Example:
 - If validated_entities contains director_id: 615683
 - Call: get_director_filmography(director_id="615683")
+- If returns 0 rows → Report "No data found" and STOP
 
 Scope:
 - Filmography by numeric ID

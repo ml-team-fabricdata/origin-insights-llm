@@ -7,15 +7,15 @@ Helper functions for pricing operations:
 """
 
 from typing import List, Optional, Tuple, Literal
-from src.strands.infrastructure.database.utils import db
-from src.strands.infrastructure.database.constants import PRICES_TBL, PRES_TBL
-from src.strands.infrastructure.validators.shared import (
+from app.strands.infrastructure.database.utils import db
+from app.strands.infrastructure.database.constants import PRICES_TBL, PRES_TBL
+from app.strands.infrastructure.validators.shared import (
     resolve_country_iso,
     resolve_platform_name,
     validate_limit,
     validate_days_back
 )
-from src.strands.business.business_queries.pricing_queries import (
+from app.strands.business.business_queries.pricing_queries import (
     SQL_GET_HASHES_BY_UID,
     SQL_DETECT_HASH_EXISTS,
     SQL_DETECT_UID_EXISTS
@@ -64,7 +64,7 @@ def normalize_tool_call(args, kwargs):
 
 def resolve_definition(values: Optional[List[str]]) -> Optional[List[str]]:
     """Normalize and validate video definitions."""
-    from src.strands.infrastructure.validators.shared import DEF_ALIASES, VALID_DEFINITIONS
+    from app.strands.infrastructure.validators.shared import DEF_ALIASES, VALID_DEFINITIONS
     
     if not values:
         return None
@@ -88,7 +88,7 @@ def resolve_definition(values: Optional[List[str]]) -> Optional[List[str]]:
 
 def resolve_license(values: Optional[List[str]]) -> Optional[List[str]]:
     """Normalize and validate license types."""
-    from src.strands.infrastructure.validators.shared import LIC_ALIASES, VALID_LICENSES
+    from app.strands.infrastructure.validators.shared import LIC_ALIASES, VALID_LICENSES
     
     if not values:
         return None

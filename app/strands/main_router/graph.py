@@ -13,7 +13,7 @@ from .specialized_nodes import (
     error_handler_node,
     responder_formatter_node
 )
-from src.strands.core.nodes.supervisor_helpers import format_response
+from app.strands.core.nodes.supervisor_helpers import format_response
 from .routing_gates import (
     route_from_router,
     route_from_validation,
@@ -22,11 +22,11 @@ from .routing_gates import (
 )
 from .telemetry import TelemetryLogger, print_telemetry_summary
 
-from src.strands.business.graph_core.graph import process_question as business_process_question
-from src.strands.talent.graph_core.graph import process_question as talent_process_question
-from src.strands.content.graph_core.graph import process_question as content_process_question
-from src.strands.platform.graph_core.graph import process_question as platform_process_question
-from src.strands.common.graph_core.graph import process_question as common_process_question
+from app.strands.business.graph_core.graph import process_question as business_process_question
+from app.strands.talent.graph_core.graph import process_question as talent_process_question
+from app.strands.content.graph_core.graph import process_question as content_process_question
+from app.strands.platform.graph_core.graph import process_question as platform_process_question
+from app.strands.common.graph_core.graph import process_question as common_process_question
 
 checkpointer = MemorySaver()
 
@@ -194,8 +194,19 @@ def _add_nodes(graph: StateGraph):
 
 
 def _route_from_router_with_disambiguation(state: MainRouterState) -> str:
-    if state.get("pending_disambiguation", False):
+    # Solo ir a resolver selección si:
+    # 1. Hay disambiguación pendiente
+    # 2. HAY opciones guardadas (no es la primera pregunta)
+    pending = state.get("pending_disambiguation", False)
+    options = state.get("disambiguation_options", [])
+    
+    if pending and options and len(options) > 0:
+        print("[ROUTER] Pending disambiguation detected, going to resolver...")
         return "user_selection_resolver"
+    
+    if pending and not options:
+        print("[ROUTER] Pending disambiguation but no options, skipping resolver...")
+    
     return route_from_router(state)
 
 
@@ -213,7 +224,25 @@ def _add_edges(graph: StateGraph):
         }
     )
     
-    graph.add_edge("user_selection_resolver", "advanced_router")
+    # Routing condicional desde user_selection_resolver
+    def route_from_selection_resolver(state: MainRouterState) -> str:
+        # Si hay error (no se pudo extraer número), terminar
+        if state.get("domain_graph_status") == "error":
+            print("[ROUTING] Selection failed, going to responder")
+            return "responder_formatter"
+        # Si la selección fue exitosa, continuar con routing
+        print("[ROUTING] Selection successful, going to router")
+        return "advanced_router"
+    
+    graph.add_conditional_edges(
+        "user_selection_resolver",
+        route_from_selection_resolver,
+        {
+            "advanced_router": "advanced_router",
+            "responder_formatter": "responder_formatter"
+        }
+    )
+    
     graph.add_edge("clarifier", "responder_formatter")
     
     graph.add_conditional_edges(

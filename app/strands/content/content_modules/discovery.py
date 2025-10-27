@@ -1,8 +1,8 @@
-from src.strands.core.shared_imports import *
-from src.strands.infrastructure.database.constants import *
-from src.strands.content.content_queries.queries_discovery import *
-from src.strands.infrastructure.database.connection import db
-from src.strands.infrastructure.validators.shared import *
+from app.strands.core.shared_imports import *
+from app.strands.infrastructure.database.constants import *
+from app.strands.content.content_queries.queries_discovery import *
+from app.strands.infrastructure.database.connection import db
+from app.strands.infrastructure.validators.shared import *
 from strands import tool
 
 @tool

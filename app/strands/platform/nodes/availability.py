@@ -12,15 +12,19 @@ from app.strands.platform.platform_modules.availability import (
     get_availability_by_uid, 
     get_platform_exclusives, 
     compare_platforms_for_title, 
-    get_recent_premieres_by_country
+    get_recent_premieres_by_country,
+    query_platforms_for_title,
+    query_platforms_for_uid_by_country
 )
 
 
 AVAILABILITY_TOOLS_MAP = {
     "availability_by_uid": get_availability_by_uid,
-    "platform_exclusives": get_platform_exclusives,
-    "compare_platforms": compare_platforms_for_title,
-    "recent_premieres": get_recent_premieres_by_country
+    "get_platform_exclusives": get_platform_exclusives,
+    "compare_platforms_for_title": compare_platforms_for_title,
+    "get_recent_premieres_by_country": get_recent_premieres_by_country,
+    "query_platforms_for_title": query_platforms_for_title,
+    "query_platforms_for_uid_by_country": query_platforms_for_uid_by_country
 }
 
 

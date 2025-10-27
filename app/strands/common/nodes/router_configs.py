@@ -3,7 +3,7 @@
 Tool sets and configurations for common/governance domain routers.
 """
 
-from src.strands.common.nodes.prompt_common import (
+from app.strands.common.nodes.prompt_common import (
     ADMIN_ROUTER_PROMPT,
     VALIDATION_ROUTER_PROMPT
 )

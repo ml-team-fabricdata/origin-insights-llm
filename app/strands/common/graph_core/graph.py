@@ -1,8 +1,8 @@
 from langgraph.graph import StateGraph, END
 from .state import State, create_initial_state
 from .supervisor import governance_classifier, main_supervisor, route_from_main_supervisor, format_response
-from src.strands.common.nodes.validation import validation_node
-from src.strands.common.nodes.admin import admin_node
+from app.strands.common.nodes.validation import validation_node
+from app.strands.common.nodes.admin import admin_node
 
 
 def _route_from_classifier(state: State) -> str:

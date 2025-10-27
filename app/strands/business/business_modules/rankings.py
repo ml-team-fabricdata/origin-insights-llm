@@ -9,10 +9,10 @@ Provides ranking and momentum analysis tools:
 
 from typing import Dict, List, Any, Optional, Tuple
 from datetime import date, datetime, timedelta
-from src.strands.infrastructure.database.utils import *
-from src.strands.core.shared_imports import *
-from src.strands.infrastructure.validators.shared import *
-from src.strands.business.business_queries.rankings_queries import *
+from app.strands.infrastructure.database.utils import *
+from app.strands.core.shared_imports import *
+from app.strands.infrastructure.validators.shared import *
+from app.strands.business.business_queries.rankings_queries import *
 from strands import tool
 
 def compute_window_anchored_to_table(days_back: int) -> Optional[Tuple[str, str]]:

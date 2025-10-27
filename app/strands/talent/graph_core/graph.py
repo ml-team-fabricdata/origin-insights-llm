@@ -1,9 +1,9 @@
 from langgraph.graph import StateGraph, END
 from .state import State, create_initial_state
 from .supervisor import talent_classifier, main_supervisor, route_from_main_supervisor
-from src.strands.talent.nodes.actors import actors_node
-from src.strands.talent.nodes.directors import directors_node
-from src.strands.talent.nodes.collaborations import collaborations_node
+from app.strands.talent.nodes.actors import actors_node
+from app.strands.talent.nodes.directors import directors_node
+from app.strands.talent.nodes.collaborations import collaborations_node
 
 
 def _route_from_classifier(state: State) -> str:

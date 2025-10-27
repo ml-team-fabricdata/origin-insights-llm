@@ -1,7 +1,7 @@
 from __future__ import annotations
-from src.strands.core.shared_imports import *
-from src.strands.infrastructure.database.utils import *
-from src.strands.common.common_queries.queries_validation import *
+from app.strands.core.shared_imports import *
+from app.strands.infrastructure.database.utils import *
+from app.strands.common.common_queries.queries_validation import *
 from strands import tool
 
 MAX_OPTIONS_DISPLAY = 8

@@ -3,7 +3,7 @@
 Tool sets and configurations for business domain routers.
 """
 
-from src.strands.business.nodes.prompt_business import (
+from app.strands.business.nodes.prompt_business import (
     INTELLIGENCE_ROUTER_PROMPT,
     PRICING_ROUTER_PROMPT,
     RANKINGS_ROUTER_PROMPT

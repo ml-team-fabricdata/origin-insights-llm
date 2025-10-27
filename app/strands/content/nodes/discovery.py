@@ -1,14 +1,14 @@
-from src.strands.content.graph_core.state import State
-from src.strands.content.nodes.prompt_content import DISCOVERY_PROMPT
-from src.strands.content.nodes.router_configs import (
+from app.strands.content.graph_core.state import State
+from app.strands.content.nodes.prompt_content import DISCOVERY_PROMPT
+from app.strands.content.nodes.router_configs import (
     DISCOVERY_TOOLS,
     DISCOVERY_ROUTER_PROMPT
 )
-from src.strands.config.llm_models import MODEL_NODE_EXECUTOR
-from src.strands.core.nodes.base_node import BaseExecutorNode
-from src.strands.core.factories.router_factory import create_router
+from app.strands.config.llm_models import MODEL_NODE_EXECUTOR
+from app.strands.core.nodes.base_node import BaseExecutorNode
+from app.strands.core.factories.router_factory import create_router
 
-from src.strands.content.content_modules.discovery import (
+from app.strands.content.content_modules.discovery import (
     get_filmography_by_uid, 
     get_title_rating, 
     get_multiple_titles_info

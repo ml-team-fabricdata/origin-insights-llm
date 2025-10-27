@@ -1,9 +1,9 @@
 from langgraph.graph import StateGraph, END
 from .state import State, create_initial_state
 from .supervisor import platform_classifier, main_supervisor, route_from_main_supervisor, format_response
-from src.strands.platform.nodes.availability import availability_node
-from src.strands.platform.nodes.presence import presence_node
-from src.strands.core.nodes.param_validation import validation_node, create_validation_edge
+from app.strands.platform.nodes.availability import availability_node
+from app.strands.platform.nodes.presence import presence_node
+from app.strands.core.nodes.param_validation import validation_node, create_validation_edge
 
 
 def _route_from_classifier(state: State) -> str:

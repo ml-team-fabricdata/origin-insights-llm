@@ -105,25 +105,19 @@ class BaseExecutorNode:
             uid = validated_entities['uid']
             title_name = validated_entities.get('name', 'Unknown')
             print(f"[VALIDATED] Using uid: {uid} ({title_name})")
-            context_parts.append(f"\n VALIDATED UID: {uid}")
-            context_parts.append(f"   Title: '{title_name}'")
-            context_parts.append(f"   USE THIS UID IN YOUR TOOL CALL: uid=\"{uid}\"")
+            context_parts.append(f"\nValidated title: '{title_name}' (UID: {uid})")
         
         if 'actor_id' in validated_entities:
             actor_id = validated_entities['actor_id']
-            actor_name = validated_entities.get('actor_name', validated_entities.get('name', 'Unknown'))
+            actor_name = validated_entities.get('actor_name', 'Unknown')
             print(f"[VALIDATED] Using actor_id: {actor_id} ({actor_name})")
-            context_parts.append(f"\n VALIDATED ACTOR_ID: {actor_id}")
-            context_parts.append(f"   Actor: '{actor_name}'")
-            context_parts.append(f"   USE THIS ID IN YOUR TOOL CALL: actor_id=\"{actor_id}\"")
+            context_parts.append(f"\nValidated actor: '{actor_name}' (ID: {actor_id})")
         
         if 'director_id' in validated_entities:
             director_id = validated_entities['director_id']
-            director_name = validated_entities.get('director_name', validated_entities.get('name', 'Unknown'))
+            director_name = validated_entities.get('director_name', 'Unknown')
             print(f"[VALIDATED] Using director_id: {director_id} ({director_name})")
-            context_parts.append(f"\n VALIDATED DIRECTOR_ID: {director_id}")
-            context_parts.append(f"   Director: '{director_name}'")
-            context_parts.append(f"   USE THIS ID IN YOUR TOOL CALL: director_id=\"{director_id}\"")
+            context_parts.append(f"\nValidated director: '{director_name}' (ID: {director_id})")
         
         return "\n".join(context_parts)
 

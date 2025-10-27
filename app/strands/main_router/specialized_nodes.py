@@ -152,6 +152,16 @@ Please specify which one you meant:
 
 Reply with the number of your choice (e.g., "1" or "option 2")."""
     
+    # Agregar option_number a cada opción para el frontend
+    options_with_numbers = []
+    for i, option in enumerate(options, 1):
+        option_copy = option.copy()
+        option_copy["option_number"] = i
+        # Agregar campo 'count' si es persona (n_titles)
+        if "n_titles" in option:
+            option_copy["count"] = option["n_titles"]
+        options_with_numbers.append(option_copy)
+    
     print("[DISAMBIGUATION] Opciones formateadas:")
     print(options_text)
     print("[DISAMBIGUATION]   Setting pending_disambiguation=True")
@@ -164,7 +174,7 @@ Reply with the number of your choice (e.g., "1" or "option 2")."""
         "answer": formatted_message,
         "needs_user_input": True,
         "pending_disambiguation": True,
-        "disambiguation_options": options,
+        "disambiguation_options": options_with_numbers,
         "original_question": question
     }
     

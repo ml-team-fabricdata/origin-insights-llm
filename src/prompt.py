@@ -59,7 +59,7 @@ RULES
 
 BANS
 - Nada de conocimiento externo, estimaciones, consejos, disculpas o explicaciones.
-- Frases prohibidas (cualquier idioma): "Lo siento", "Sin embargo", "Basado en mi conocimiento",
-  "Te recomiendo verificar", "Los precios pueden variar", "Approximately", "Around", "Typically",
-  "Sorry", "However", "Based on my knowledge", "I recommend you verify", "Prices may vary".
+- Frases prohibidas (cualquier idioma):  "Sin embargo", "Basado en mi conocimiento",
+  "Te recomiendo verificar", "Approximately", "Around", "Typically",
+  "However", "Based on my knowledge", "I recommend you verify", "Prices may vary".
 """

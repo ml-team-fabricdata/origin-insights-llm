@@ -49,25 +49,36 @@ def route_from_domain_graph(state: MainRouterState) -> Literal["format_response"
     visited_graphs = state.get("visited_graphs", [])
     current_hop = len(visited_graphs)
     max_hops = state.get("max_hops", 3)
+    answer = state.get("answer", "")
+    
+    print(f"\n[ROUTING_GATE] route_from_domain_graph:")
+    print(f"  - domain_status: {domain_status}")
+    print(f"  - current_hop: {current_hop}/{max_hops}")
+    print(f"  - visited_graphs: {visited_graphs}")
+    print(f"  - answer length: {len(answer)} chars")
     
     # CRITICAL: Prevenir loops infinitos
     if current_hop >= max_hops:
-        print(f"[ROUTING] Max hops reached ({current_hop}/{max_hops}). Forcing format_response.")
+        print(f"[ROUTING] ⚠️ Max hops reached ({current_hop}/{max_hops}). Forcing format_response.")
         return "format_response"
     
     if domain_status == "success":
+        print(f"[ROUTING] ✅ Success → format_response")
         return "format_response"
     
     if domain_status == "not_my_scope":
-        print(f"[ROUTING] Re-routing requested. Hop: {current_hop + 1}/{max_hops}")
+        print(f"[ROUTING] 🔄 Re-routing requested. Hop: {current_hop + 1}/{max_hops}")
         return "advanced_router"
     
     if domain_status == "needs_clarification":
+        print(f"[ROUTING] ❓ Needs clarification → clarifier")
         return "clarifier"
     
     if domain_status == "error":
+        print(f"[ROUTING] ❌ Error → error_handler")
         return "error_handler"
     
+    print(f"[ROUTING] ⚠️ No status match, defaulting to format_response")
     return "format_response"  # Default: formatear respuesta
 
 

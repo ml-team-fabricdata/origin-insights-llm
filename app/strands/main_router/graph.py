@@ -101,7 +101,23 @@ async def domain_graph_node(state: MainRouterState) -> MainRouterState:
     print("="*80)
     
     selected_graph = state.get("selected_graph", "common")
-    print(f"[DOMAIN] Ejecutando: {selected_graph}")
+    visited_graphs = state.get("visited_graphs", [])
+    current_hop = len(visited_graphs)
+    max_hops = state.get("max_hops", 3)
+    
+    print(f"[DOMAIN] Ejecutando: {selected_graph} (hop {current_hop}/{max_hops})")
+    print(f"[DOMAIN] Visited: {visited_graphs}")
+    
+    # SAFETY: Si ya visitamos este grafo 2+ veces, forzar success
+    graph_visit_count = visited_graphs.count(selected_graph)
+    if graph_visit_count >= 2:
+        print(f"[DOMAIN] ⚠️ SAFETY: {selected_graph} visitado {graph_visit_count} veces. Forzando success.")
+        return {
+            **state,
+            "answer": state.get("answer", "No pude obtener una respuesta completa después de múltiples intentos."),
+            "domain_graph_status": "success",
+            "tool_execution_times": {}
+        }
     
     processor = GRAPH_PROCESSORS.get(selected_graph)
     if not processor:
@@ -129,6 +145,8 @@ async def domain_graph_node(state: MainRouterState) -> MainRouterState:
     print(f"[DOMAIN] Tiempo total de ejecución: {execution_time:.2f}s")
     
     supervisor_decision = result.get('supervisor_decision', '')
+    print(f"[DOMAIN] Supervisor decision: {supervisor_decision}")
+    
     if _should_reroute(supervisor_decision):
         return _handle_rerouting_request(state, result, tool_times)
     
@@ -329,7 +347,10 @@ async def process_question_advanced(
     start_time = time.time()
     
     graph = create_advanced_graph(use_checkpointer=True)
-    config = {"configurable": {"thread_id": thread_id}}
+    config = {
+        "configurable": {"thread_id": thread_id},
+        "recursion_limit": 50  # Aumentar límite para queries complejas
+    }
     
     existing_state = _load_existing_state(graph, config)
     

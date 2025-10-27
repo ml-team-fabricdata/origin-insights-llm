@@ -1,4 +1,4 @@
-from app.strands.infrastructure.database.constants import *
+from src.strands.infrastructure.database.constants import *
 
 
 EXACT_SEARCH_SQL = f"""
@@ -89,20 +89,25 @@ ORDER BY t.n_titles DESC NULLS LAST, d.name ASC
 LIMIT {MAX_CANDIDATES}
 """
 
-
 DIRECTOR_FUZZY_SQL_ILIKE = f"""
+WITH q AS (SELECT %s::text AS s)
 SELECT 
-    d.id, 
-    d.name, 
-    0.0 AS sim, 
-    COUNT(db.director_id)::integer AS n_titles
+  d.id, 
+  d.name, 
+  0.0 AS sim,
+  t.n_titles
 FROM {DIRECTOR_TABLE} d
-LEFT JOIN {DIRECTED_TABLE} db ON db.director_id = d.id
-WHERE d.name ILIKE '%%' || %s || '%%'
-GROUP BY d.id, d.name
+CROSS JOIN q
+LEFT JOIN LATERAL (
+  SELECT COUNT(*)::integer AS n_titles
+  FROM {DIRECTED_TABLE} db 
+  WHERE db.director_id = d.id
+) t ON TRUE
+WHERE d.name ILIKE '%%' || q.s || '%%'
 ORDER BY 
-    COUNT(db.director_id) DESC,
-    CASE WHEN d.name ILIKE %s || '%%' THEN 1 ELSE 2 END,
-    d.name ASC
+  CASE WHEN d.name ILIKE q.s || '%%' THEN 1 ELSE 2 END,
+  t.n_titles DESC NULLS LAST, 
+  d.name ASC
 LIMIT {MAX_CANDIDATES}
 """
+

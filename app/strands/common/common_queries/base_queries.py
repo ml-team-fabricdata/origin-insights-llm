@@ -1,5 +1,5 @@
-from app.strands.infrastructure.database.constants import *
-from app.strands.core.shared_imports import *
+from src.strands.infrastructure.database.constants import *
+from src.strands.core.shared_imports import *
 
 SCHEMAS: Dict[str, Tuple[str, ...]] = {
     "ms.metadata_simple_all": (

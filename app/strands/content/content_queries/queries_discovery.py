@@ -1,4 +1,4 @@
-from app.strands.infrastructure.database.constants import *
+from src.strands.infrastructure.database.constants import *
 
 FILMOGRAPHY_SQL = f"""
 SELECT 

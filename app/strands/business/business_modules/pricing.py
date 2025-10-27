@@ -10,11 +10,11 @@ Provides pricing and hits analysis tools:
 
 from typing import Dict, List, Any, Optional, Union, Tuple
 from datetime import date
-from app.strands.infrastructure.database.utils import *
-from app.strands.core.shared_imports import *
-from app.strands.business.business_queries.pricing_queries import *
-from app.strands.infrastructure.validators.shared import *
-from app.strands.content.content_modules.metadata import _validate_select
+from src.strands.infrastructure.database.utils import *
+from src.strands.core.shared_imports import *
+from src.strands.business.business_queries.pricing_queries import *
+from src.strands.infrastructure.validators.shared import *
+from src.strands.content.content_modules.metadata import _validate_select
 from strands import tool
 
 def _resolve_definition(values: Optional[List[str]]) -> Optional[List[str]]:
@@ -268,7 +268,7 @@ def build_presence_with_price_query(q: PresenceWithPriceQuery) -> Tuple[str, Dic
 
     if q.today:
         params["today_p"] = q.today
-        where.append("(p.out_on IS NULL OR p.out_on >= %(today_p)s)")
+        where.append("(p.out_on IS NULL")
 
     if q.uid:
         where.append("p.uid = %(uid)s")
@@ -280,7 +280,7 @@ def build_presence_with_price_query(q: PresenceWithPriceQuery) -> Tuple[str, Dic
         where.append("p.platform_code ILIKE (%(platform_code)s)")
         params["platform_code"] = q.platform_code
     if q.platform_name:
-        where.append("p.platform_name = %(platform_name)s")
+        where.append("p.platform_name ILIKE %(platform_name)s")
         params["platform_name"] = q.platform_name
     if q.iso_alpha2:
         where.append("p.iso_alpha2 = %(iso_alpha2)s")
@@ -381,37 +381,39 @@ def query_presence_with_price(**kwargs) -> List[Dict[str, Any]]:
     return rows
 
 @tool
-def tool_prices_latest(*args, **kwargs):
-    """Últimos precios con filtros flexibles (hash/uid/país/plataforma, etc.)."""
-    kwargs = normalize_args_kwargs(args, kwargs)
-    arg1 = kwargs.get("arg1")
-    hash_unique = kwargs.get("hash_unique")
-    uid = kwargs.get("uid")
-    country = kwargs.get("country")
-    platform_name = kwargs.get("platform_name")
-    platform_code = kwargs.get("platform_code")
-    price_type = kwargs.get("price_type")
-    definition = _resolve_definition(kwargs.get("definition"))
-    license_ = _resolve_license(kwargs.get("license_"))
-    currency = kwargs.get("currency")
-    min_price = kwargs.get("min_price")
-    max_price = kwargs.get("max_price")
-    limit = validate_limit(kwargs.get("limit", MAX_LIMIT),
-                           DEFAULT_LIMIT, MAX_LIMIT)
+def tool_prices_latest(
+    platform_name: str = None,
+    country: str = None,
+    platform_code: str = None,
+    price_type: str = None,
+    limit: int = 20
+):
+    """Últimos precios con filtros flexibles.
+    
+    Args:
+        platform_name: Nombre de la plataforma (e.g., 'netflix', 'disney+', 'prime')
+        country: Código ISO-2 del país (e.g., 'US', 'MX', 'AR')
+        platform_code: Código específico de plataforma (opcional)
+        price_type: Tipo de precio (opcional)
+        limit: Máximo de resultados (default: 20)
+    
+    Returns:
+        Lista de precios más recientes
+    """
+    # Normalize inputs
+    hash_unique = None
+    uid = None
+    definition = None
+    license_ = None
+    currency = None
+    min_price = None
+    max_price = None
+    
+    limit = validate_limit(limit if limit else MAX_LIMIT, DEFAULT_LIMIT, MAX_LIMIT)
 
     iso, plat_name, price_type, currency = _normalize_price_filters(
         country, platform_name, price_type, currency
     )
-
-    if arg1 and not (hash_unique or uid or country):
-        kind, _ = detect_id_kind(arg1, PRICES_TBL, PRES_TBL)
-        if kind == "hash_unique":
-            hash_unique = arg1
-        elif kind in ("uid", "both"):
-            uid = arg1
-        else:
-            country = arg1
-            iso = resolve_country_iso(country)
 
     scopes, scope_params = [], []
 
@@ -504,6 +506,7 @@ def tool_prices_history(*args, **kwargs):
     hash_unique = kwargs.get("hash_unique")
     uid = kwargs.get("uid")
     title_like = kwargs.get("title_like")
+    country = kwargs.get("country")
     platform_name = kwargs.get("platform_name")
     platform_code = kwargs.get("platform_code")
     price_type = kwargs.get("price_type")
@@ -760,4 +763,220 @@ def tool_prices_stats(*args, **kwargs):
         rows,
         "presence_prices.stats",
         f"iso={iso or 'any'} plat_code={platform_code or 'any'} plat_name={plat_name or 'any'}",
+    )
+
+@tool
+def tool_prices_stats_fast(*args, **kwargs):
+    """Estadísticas de precio ULTRA-RÁPIDAS (aproximadas) para datasets grandes (>100k).
+    
+    Usa PERCENTILE_DISC en lugar de PERCENTILE_CONT para cálculo más rápido.
+    Ideal para análisis exploratorio o dashboards en tiempo real.
+    
+    Args:
+        country: País (nombre o ISO-2)
+        platform_code: Código de plataforma
+        platform_name: Nombre de plataforma
+        price_type: Tipo(s) de precio
+        definition: Definición(es) de video
+        license_: Tipo(s) de licencia
+        currency: Moneda(s)
+        
+    Returns:
+        Estadísticas aproximadas de precios (min, max, avg, p50, p75, p90, p99)
+    """
+    kwargs = normalize_args_kwargs(args, kwargs)
+    country = kwargs.get("country") or kwargs.get("arg1")
+    platform_code = kwargs.get("platform_code")
+    platform_name = kwargs.get("platform_name")
+    price_type = kwargs.get("price_type")
+    definition = _resolve_definition(kwargs.get("definition"))
+    license_ = _resolve_license(kwargs.get("license_"))
+    currency = kwargs.get("currency")
+
+    iso, plat_name, price_type, currency = _normalize_price_filters(
+        country, platform_name, price_type, currency
+    )
+
+    join_pres = (
+        f"JOIN {PRES_TBL} p ON p.hash_unique = pr.hash_unique" if (
+            iso or plat_name) else ""
+    )
+
+    scopes, params = [], []
+    if iso:
+        scopes.append("p.iso_alpha2 = %s")
+        params.append(iso)
+    if plat_name:
+        scopes.append("p.platform_name= %s")
+        params.append(plat_name)
+    if platform_code:
+        scopes.append("pr.platform_code = %s")
+        params.append(platform_code)
+
+    pt_clause, pt_params = build_in_clause("pr.price_type", price_type)
+    if pt_clause:
+        scopes.append(pt_clause)
+        params.extend(pt_params)
+
+    def_clause, def_params = build_in_clause("pr.definition", definition)
+    if def_clause:
+        scopes.append(def_clause)
+        params.extend(def_params)
+
+    lic_clause, lic_params = build_in_clause("pr.license", license_)
+    if lic_clause:
+        scopes.append(lic_clause)
+        params.extend(lic_params)
+
+    curr_clause, curr_params = build_in_clause("pr.currency", currency)
+    if curr_clause:
+        scopes.append(curr_clause)
+        params.extend(curr_params)
+
+    where_scopes = " AND ".join(scopes) if scopes else "TRUE"
+    sql = (
+        SQL_PRICE_STATS_FAST
+        .replace("{JOIN_PRES}", join_pres)
+        .replace("{WHERE_SCOPES}", where_scopes)
+    )
+
+    rows = db.execute_query(sql, tuple(params)) or []
+    return handle_query_result(
+        rows,
+        "presence_prices.stats_fast",
+        f"iso={iso or 'any'} plat_code={platform_code or 'any'} plat_name={plat_name or 'any'} [FAST/APPROX]",
+    )
+
+@tool
+def tool_prices_history_light(*args, **kwargs):
+    """Histórico de precios LIGERO (solo campos esenciales) para mejor performance.
+    
+    Versión optimizada de tool_prices_history que retorna menos columnas,
+    ideal para consultas rápidas o cuando solo necesitas precio y fecha.
+    
+    Args:
+        arg1: hash_unique, uid o título (auto-detectado)
+        hash_unique: Hash único del título
+        uid: UID del título
+        title_like: Filtro por título (búsqueda parcial)
+        platform_name: Nombre de plataforma
+        platform_code: Código de plataforma
+        price_type: Tipo(s) de precio
+        definition: Definición(es) de video
+        license_: Tipo(s) de licencia
+        currency: Moneda(s)
+        min_price: Precio mínimo
+        max_price: Precio máximo
+        limit: Límite de resultados (default 500)
+        
+    Returns:
+        Histórico ligero de precios (hash, platform_code, price_type, price, currency, created_at)
+    """
+    kwargs = normalize_args_kwargs(args, kwargs)
+    arg1 = kwargs.get("arg1")
+    hash_unique = kwargs.get("hash_unique")
+    uid = kwargs.get("uid")
+    title_like = kwargs.get("title_like")
+    platform_name = kwargs.get("platform_name")
+    platform_code = kwargs.get("platform_code")
+    price_type = kwargs.get("price_type")
+    definition = _resolve_definition(kwargs.get("definition"))
+    license_ = _resolve_license(kwargs.get("license_"))
+    currency = kwargs.get("currency")
+    min_price = kwargs.get("min_price")
+    max_price = kwargs.get("max_price")
+    limit = validate_limit(kwargs.get("limit", 500), 500, MAX_LIMIT)
+
+    iso, plat_name, price_type, currency = _normalize_price_filters(
+        None, platform_name, price_type, currency
+    )
+
+    if arg1 and not (hash_unique or uid):
+        kind, _ = detect_id_kind(arg1, PRICES_TBL, PRES_TBL)
+        if kind == "hash_unique":
+            hash_unique = arg1
+        elif kind in ("uid", "both"):
+            uid = arg1
+        else:
+            title_like = title_like or arg1
+
+    joins, where_parts = [], []
+    params: List[Any] = []
+
+    if hash_unique:
+        where_parts.append("pr.hash_unique = %s")
+        params.append(hash_unique)
+    else:
+        if uid and not (iso or plat_name or title_like):
+            one = db.execute_query(
+                f"SELECT p.hash_unique FROM {PRES_TBL} p WHERE p.uid = %s AND p.hash_unique IS NOT NULL LIMIT 1",
+                (uid,),
+            ) or []
+            if one:
+                where_parts.append("pr.hash_unique = %s")
+                params.append(one[0]["hash_unique"])
+        if not where_parts and (uid or iso or plat_name or title_like):
+            joins.append(
+                f"JOIN {PRES_TBL} p ON p.hash_unique = pr.hash_unique")
+            if uid:
+                where_parts.append("p.uid = %s")
+                params.append(uid)
+            if title_like:
+                where_parts.append("p.clean_title ILIKE %s")
+                params.append(f"%{title_like}%")
+            if iso:
+                where_parts.append("p.iso_alpha2 = %s")
+                params.append(iso)
+            if plat_name:
+                where_parts.append("p.platform_name ILIKE %s")
+                params.append(plat_name)
+
+    if platform_code:
+        where_parts.append("pr.platform_code = %s")
+        params.append(platform_code)
+
+    pt_clause, pt_params = build_in_clause("pr.price_type", price_type)
+    if pt_clause:
+        where_parts.append(pt_clause)
+        params.extend(pt_params)
+
+    def_clause, def_params = build_in_clause("pr.definition", definition)
+    if def_clause:
+        where_parts.append(def_clause)
+        params.extend(def_params)
+
+    lic_clause, lic_params = build_in_clause("pr.license", license_)
+    if lic_clause:
+        where_parts.append(lic_clause)
+        params.extend(lic_params)
+
+    curr_clause, curr_params = build_in_clause("pr.currency", currency)
+    if curr_clause:
+        where_parts.append(curr_clause)
+        params.extend(curr_params)
+
+    if min_price is not None:
+        where_parts.append("pr.price >= %s")
+        params.append(min_price)
+    if max_price is not None:
+        where_parts.append("pr.price <= %s")
+        params.append(max_price)
+
+    if not where_parts:
+        raise ValueError(
+            "Provide at least one filter: hash_unique, uid, title_like, or platform_name"
+        )
+
+    sql = (
+        SQL_PRICE_HISTORY_LIGHT
+        .replace("{HEAD_CTE}", "")
+        .replace("{JOIN_CONDITIONS}", (" " + " ".join(joins) + " ") if joins else " ")
+        .replace("{WHERE_CLAUSE}", " AND ".join(where_parts))
+    )
+
+    rows = db.execute_query(sql, tuple(params + [limit])) or []
+    return handle_query_result(
+        rows,
+        "presence_prices.history_light",
+        f"uid={uid or '-'} iso={iso or '-'} plat_name={plat_name or '-'} limit={limit} [LIGHT]",
     )

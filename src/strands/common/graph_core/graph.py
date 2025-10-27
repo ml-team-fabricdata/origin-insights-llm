@@ -28,7 +28,7 @@ def create_streaming_graph():
         route_from_main_supervisor,
         {
             "governance_node": "governance_node",
-            "format_response": "format_response",
+            "COMPLETO": "format_response",
             "return_to_main_router": END
         }
     )

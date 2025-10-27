@@ -1,7 +1,7 @@
 from __future__ import annotations
-from app.strands.core.shared_imports import *
-from app.strands.infrastructure.database.utils import *
-from app.strands.common.common_queries.queries_validation import *
+from src.strands.core.shared_imports import *
+from src.strands.infrastructure.database.utils import *
+from src.strands.common.common_queries.queries_validation import *
 from strands import tool
 
 MAX_OPTIONS_DISPLAY = 8
@@ -311,42 +311,6 @@ def validate_director(name: Union[str, List[str], Any], threshold: Optional[floa
     Returns:
         Dict with validation result (status, id, name, options, etc.)
     """
-    normalized_query = _normalize_and_validate_input(name)
-    if not normalized_query:
-        return {"status": "not_found"}
-    
-    # CRITICAL: Si el nombre es muy corto/genérico (ej: solo apellido),
-    # FORZAR fuzzy search para mostrar opciones en lugar de aceptar 1 match exacto
-    is_generic_name = len(normalized_query.split()) == 1 and len(normalized_query) <= 15
-    
-    if is_generic_name:
-        # Saltar exact search, ir directo a fuzzy para mostrar opciones
-        logger.debug(f"Generic director name detected: '{normalized_query}'. Using fuzzy search to show options.")
-        threshold = normalize_threshold(threshold)
-        
-        for current_threshold in [0.1, 0.05]:  # Threshold muy bajo para capturar muchas opciones
-            fuzzy_results = _perform_fuzzy_search(
-                DIRECTOR_FUZZY_SQL_ILIKE, (normalized_query, normalized_query), "director", current_threshold)
-            
-            if fuzzy_results:
-                # Filtrar solo directores con películas
-                valid_results = [r for r in fuzzy_results if r.get('n_titles', 0) > 0]
-                
-                if not valid_results:
-                    continue
-                
-                # Calcular similarity
-                for result in valid_results:
-                    result['similarity_score'] = _calculate_name_similarity(normalized_query, result.get('name'))
-                
-                # Query SQL ya ordena por n_titles DESC, solo tomamos los resultados
-                options = _build_person_options(valid_results, include_titles_count=True)
-                
-                return {"status": "ambiguous", "options": options}
-        
-        return {"status": "not_found"}
-    
-    # Nombre completo: usar flujo normal
     result = _validate_person_entity(
         query_text=name,
         exact_sql=DIRECTOR_EXACT_SQL,

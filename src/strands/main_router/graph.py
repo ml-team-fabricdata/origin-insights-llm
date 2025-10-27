@@ -133,6 +133,14 @@ async def domain_graph_node(state: MainRouterState) -> MainRouterState:
         return _handle_rerouting_request(state, result, tool_times)
     
     answer = result.get('answer', result.get('accumulated_data', ''))
+    
+    # Si el supervisor decidió COMPLETO, respetar esa decisión incluso si la respuesta es corta
+    # Una respuesta de "no hay datos" es válida y completa
+    if supervisor_decision.upper() == "COMPLETO":
+        print(f"[DOMAIN] Supervisor aprobó respuesta (COMPLETO), aceptando resultado")
+        return _handle_success(state, answer, tool_times)
+    
+    # Solo verificar longitud si el supervisor NO aprobó explícitamente
     if not answer or len(answer) < 50:
         return _handle_insufficient_answer(state, answer, tool_times)
     

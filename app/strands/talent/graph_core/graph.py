@@ -1,9 +1,9 @@
 from langgraph.graph import StateGraph, END
 from .state import State, create_initial_state
-from .supervisor import talent_classifier, main_supervisor, route_from_main_supervisor, format_response
-from app.strands.talent.nodes.actors import actors_node
-from app.strands.talent.nodes.directors import directors_node
-from app.strands.talent.nodes.collaborations import collaborations_node
+from .supervisor import talent_classifier, main_supervisor, route_from_main_supervisor
+from src.strands.talent.nodes.actors import actors_node
+from src.strands.talent.nodes.directors import directors_node
+from src.strands.talent.nodes.collaborations import collaborations_node
 
 
 def _route_from_classifier(state: State) -> str:
@@ -37,9 +37,6 @@ def create_streaming_graph():
     graph.add_node("actors_node", actors_node)
     graph.add_node("directors_node", directors_node)
     graph.add_node("collaborations_node", collaborations_node)
-    graph.add_node("format_response", format_response)
-
-
 
     graph.set_entry_point("main_supervisor")
 
@@ -48,7 +45,7 @@ def create_streaming_graph():
         route_from_main_supervisor,
         {
             "talent_classifier": "talent_classifier",
-            "format_response": "format_response",
+            "COMPLETO": END,
             "return_to_main_router": END
         }
     )
@@ -66,7 +63,6 @@ def create_streaming_graph():
     graph.add_edge("actors_node", "main_supervisor")
     graph.add_edge("directors_node", "main_supervisor")
     graph.add_edge("collaborations_node", "main_supervisor")
-    graph.add_edge("format_response", END)
 
     return graph.compile()
 

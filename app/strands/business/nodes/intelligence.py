@@ -1,16 +1,16 @@
 """Intelligence node - handles platform intelligence and catalog analysis queries."""
 
-from app.strands.business.graph_core.state import State
-from app.strands.business.nodes.prompt_business import INTELLIGENCE_PROMPT
-from app.strands.business.nodes.router_configs import (
+from src.strands.business.graph_core.state import State
+from src.strands.business.nodes.prompt_business import INTELLIGENCE_PROMPT
+from src.strands.business.nodes.router_configs import (
     INTELLIGENCE_TOOLS,
     INTELLIGENCE_ROUTER_PROMPT
 )
-from app.strands.config.llm_models import MODEL_NODE_EXECUTOR
-from app.strands.core.nodes.base_node import BaseExecutorNode
-from app.strands.core.factories.router_factory import create_router
+from src.strands.config.llm_models import MODEL_NODE_EXECUTOR
+from src.strands.core.nodes.base_node import BaseExecutorNode
+from src.strands.core.factories.router_factory import create_router
 
-from app.strands.business.business_modules.intelligence import (
+from src.strands.business.business_modules.intelligence import (
     get_platform_exclusivity_by_country,
     catalog_similarity_for_platform,
     titles_in_A_not_in_B_sql

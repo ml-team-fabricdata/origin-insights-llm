@@ -9,21 +9,13 @@ Provides ranking and momentum analysis tools:
 
 from typing import Dict, List, Any, Optional, Tuple
 from datetime import date, datetime, timedelta
-from app.strands.infrastructure.database.utils import *
-from app.strands.core.shared_imports import *
-from app.strands.infrastructure.validators.shared import *
-from app.strands.business.business_queries.rankings_queries import *
+from src.strands.infrastructure.database.utils import *
+from src.strands.core.shared_imports import *
+from src.strands.infrastructure.validators.shared import *
+from src.strands.business.business_queries.rankings_queries import *
 from strands import tool
 
 def compute_window_anchored_to_table(days_back: int) -> Optional[Tuple[str, str]]:
-    """Compute date window anchored to MAX(date_hits) in the database.
-    
-    Args:
-        days_back: Number of days to look back from max date
-        
-    Returns:
-        Tuple of (date_from, date_to) as ISO strings, or None if no data
-    """
     logger.debug(f"Computing window anchored to table with days_back={days_back}")
 
     rows = db.execute_query(QUERY_MAX_DATE)
@@ -45,26 +37,11 @@ def compute_window_anchored_to_table(days_back: int) -> Optional[Tuple[str, str]
     return (date_from, date_to)
 
 def max_date_hits() -> date:
-    """Get the maximum date_hits value from the hits_presence table.
-    
-    Returns:
-        Most recent date with hits data, or current date if none found
-    """
     row = db.execute_query(
         f"SELECT MAX(date_hits)::date AS mx FROM {HITS_PRESENCE_TBL};", []) or []
     return row[0]["mx"] or datetime.now().date()
 
 def _clamp_rolling(max_d: date, days: int, prev_days: int) -> Tuple[date, date, date, date]:
-    """Calculate rolling date windows for current and previous periods.
-    
-    Args:
-        max_d: Maximum date (end of current period)
-        days: Number of days in current period
-        prev_days: Number of days in previous period
-        
-    Returns:
-        Tuple of (cur_from, cur_to, prev_from, prev_to)
-    """
     cur_to = max_d
     cur_from = max_d - timedelta(days=days-1)
     prev_to = cur_from - timedelta(days=1)
@@ -79,22 +56,7 @@ def get_genre_momentum(
     days_back: Optional[int] = None,
     prev_days_back: Optional[int] = None
 ) -> List[Dict]:
-    """Analyze genre momentum by comparing current vs previous period growth.
-    
-    Compares genre performance across time periods to identify trending genres.
-    Uses presence data (ms.hits_presence) if country specified, otherwise global.
-    Date windows are anchored to MAX(date_hits) from the table.
-    
-    Args:
-        country: Country ISO-2 code (e.g., 'US', 'MX') - optional
-        content_type: Content type - 'Movie' or 'Series' - optional
-        limit: Maximum results (default 20)
-        days_back: Days for current period (default 30)
-        prev_days_back: Days for previous period (defaults to days_back)
-    
-    Returns:
-        List of dicts with genre names, current/previous scores, and growth metrics
-    """
+
     if days_back is None or days_back <= 0:
         days_back = 30
     if prev_days_back is None or prev_days_back <= 0:
@@ -157,12 +119,7 @@ def get_genre_momentum(
 @tool
 def get_top_by_uid(uid: str) -> List[Dict]:
     """Get top/rating information for a specific title UID.
-    
-    Args:
-        uid: Unique identifier for the title
-        
-    Returns:
-        List of dicts with rating and ranking information
+
     """
     if not uid:
         return [{"error": "UID required"}]

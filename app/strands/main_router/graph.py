@@ -13,7 +13,7 @@ from .specialized_nodes import (
     error_handler_node,
     responder_formatter_node
 )
-from app.strands.core.nodes.supervisor_helpers import format_response
+from src.strands.core.nodes.supervisor_helpers import format_response
 from .routing_gates import (
     route_from_router,
     route_from_validation,
@@ -21,13 +21,12 @@ from .routing_gates import (
     route_from_aggregator
 )
 from .telemetry import TelemetryLogger, print_telemetry_summary
-from app.strands.main_router.session_state import session_memory
 
-from app.strands.business.graph_core.graph import process_question as business_process_question
-from app.strands.talent.graph_core.graph import process_question as talent_process_question
-from app.strands.content.graph_core.graph import process_question as content_process_question
-from app.strands.platform.graph_core.graph import process_question as platform_process_question
-from app.strands.common.graph_core.graph import process_question as common_process_question
+from src.strands.business.graph_core.graph import process_question as business_process_question
+from src.strands.talent.graph_core.graph import process_question as talent_process_question
+from src.strands.content.graph_core.graph import process_question as content_process_question
+from src.strands.platform.graph_core.graph import process_question as platform_process_question
+from src.strands.common.graph_core.graph import process_question as common_process_question
 
 checkpointer = MemorySaver()
 
@@ -134,6 +133,14 @@ async def domain_graph_node(state: MainRouterState) -> MainRouterState:
         return _handle_rerouting_request(state, result, tool_times)
     
     answer = result.get('answer', result.get('accumulated_data', ''))
+    
+    # Si el supervisor decidió COMPLETO, respetar esa decisión incluso si la respuesta es corta
+    # Una respuesta de "no hay datos" es válida y completa
+    if supervisor_decision.upper() == "COMPLETO":
+        print(f"[DOMAIN] Supervisor aprobó respuesta (COMPLETO), aceptando resultado")
+        return _handle_success(state, answer, tool_times)
+    
+    # Solo verificar longitud si el supervisor NO aprobó explícitamente
     if not answer or len(answer) < 50:
         return _handle_insufficient_answer(state, answer, tool_times)
     
@@ -305,9 +312,9 @@ def _verify_checkpoint(graph, config: dict):
     final_snapshot = graph.get_state(config)
     if final_snapshot and hasattr(final_snapshot, 'values'):
         final_state = final_snapshot.values
-        print(f"\n[PROCESS] Checkpoint saved: pending_disambiguation={final_state.get('pending_disambiguation', False)}")
+        print(f"\n[PROCESS] ✅ Checkpoint saved: pending_disambiguation={final_state.get('pending_disambiguation', False)}")
         if final_state.get('pending_disambiguation'):
-            print(f"[PROCESS] Options saved: {len(final_state.get('disambiguation_options', []))}")
+            print(f"[PROCESS] ✅ Options saved: {len(final_state.get('disambiguation_options', []))}")
 
 
 async def process_question_advanced(
@@ -318,68 +325,35 @@ async def process_question_advanced(
     thread_id: str = "default",
     context: dict = None
 ) -> MainRouterState:
-    """Router principal de Strands con interceptores y logs."""
-
-    # --- Interceptor de saludos ---
-    normalized = question.strip().lower()
-    greetings = ["hola", "buenas", "hello", "hi", "hey"]
-    if normalized in greetings:
-        print(f"[STRANDS] Detected greeting: '{normalized}' (thread_id={thread_id})")
-        return {
-            "answer": "¡Hola! Soy el asistente virtual de Fabric. "
-                      "Puedo ayudarte a encontrar dónde ver contenidos, "
-                      "su popularidad (HITS) o información sobre títulos. "
-                      "¿Qué te gustaría explorar hoy?",
-            "selected_graph": None,
-            "domain_graph_status": "greeting",
-            "pending_disambiguation": False,
-            "disambiguation_options": [],
-            "visited_graphs": [],
-            "routing_done": True,
-            "needs_user_input": False,
-        }
-
-    # --- Telemetría / inicialización ---
     telemetry_logger = TelemetryLogger(log_to_file=enable_telemetry) if enable_telemetry else None
     start_time = time.time()
-
-    print(f"[STRANDS] Iniciando flujo avanzado (thread_id={thread_id})")
-    print(f"[STRANDS] Pregunta recibida: {question}")
-
+    
     graph = create_advanced_graph(use_checkpointer=True)
     config = {"configurable": {"thread_id": thread_id}}
-
-    # --- Verificar estado persistido ---
+    
     existing_state = _load_existing_state(graph, config)
+    
     if existing_state and existing_state.get("pending_disambiguation", False):
-        print("[STRANDS] Reanudando flujo de desambiguación previa.")
+        print("[PROCESS] ✅ Continuing disambiguation flow...")
+        print(f"[PROCESS] Original question: {existing_state.get('original_question')}")
+        print(f"[PROCESS] Options available: {len(existing_state.get('disambiguation_options', []))}")
         initial_state = {**existing_state, "question": question}
     else:
         initial_state = _create_initial_state(question, max_hops)
-
-    # --- Ejecución principal ---
+    
     result = await graph.ainvoke(initial_state, config=config)
-
+    
     _verify_checkpoint(graph, config)
-
+    
     total_time = time.time() - start_time
     tool_times = result.get("tool_execution_times", {})
-
-    print(f"[STRANDS] Tiempo total: {total_time:.2f}s")
-    if "selected_graph" in result:
-        print(f"[STRANDS] Grafo seleccionado: {result.get('selected_graph')}")
-    else:
-        print("[STRANDS] No se detectó grafo en el resultado")
-
+    
+    _print_execution_summary(total_time, tool_times)
+    
     if telemetry_logger:
         print_telemetry_summary(telemetry_logger, result)
         telemetry_logger.save_to_file(result)
-
-    trace_path = [n["id"] for n in result.get("visited_nodes", [])] if "visited_nodes" in result else []
-
-    result["trace_path"] = trace_path
-    result["source"] = "strands"
-
+    
     return result
 
 

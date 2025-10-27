@@ -58,6 +58,9 @@ async def main_supervisor(state: TypedDict) -> TypedDict:
     if "COMPLETO" in decision or "COMPLETE" in decision:
         print("[SUPERVISOR] Pregunta respondida, ir a format")
         supervisor_decision = "COMPLETO"
+        # Copiar accumulated_data a answer para que el main router pueda acceder
+        answer = state.get('answer', '') or accumulated
+        return {**state, "supervisor_decision": supervisor_decision, "answer": answer}
     else:
         print("[SUPERVISOR] Necesita mas informacion, volviendo al main router")
         supervisor_decision = "VOLVER_MAIN_ROUTER"
@@ -72,8 +75,8 @@ def create_route_from_supervisor(classifier_node_name: str):
         print(f"[ROUTING] classifier_node_name: '{classifier_node_name}'")
         
         if decision == "COMPLETO":
-            print(f"[ROUTING] → format_response")
-            return "format_response"
+            print(f"[ROUTING] → COMPLETO (END)")
+            return "COMPLETO"
         if "VOLVER_MAIN_ROUTER" in decision:
             print(f"[ROUTING] → return_to_main_router")
             return "return_to_main_router"

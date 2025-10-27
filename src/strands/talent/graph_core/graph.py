@@ -45,6 +45,7 @@ def create_streaming_graph():
         route_from_main_supervisor,
         {
             "talent_classifier": "talent_classifier",
+            "COMPLETO": END,
             "return_to_main_router": END
         }
     )

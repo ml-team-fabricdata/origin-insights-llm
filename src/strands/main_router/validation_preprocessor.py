@@ -230,22 +230,16 @@ async def validation_preprocessor_node(state: MainRouterState) -> MainRouterStat
 
     try:
         print("[VALIDATION] Ejecutando router y extractor en paralelo...")
-        try:
-            tool_name, entity_names_raw = await asyncio.gather(
-                _validation_router(state),
-                _extract_entity_name(state['question'])
-            )
-        except ValueError as router_error:
-            # Si el router falla (LLM genera respuesta inválida), skip validation
-            print(f"[VALIDATION] Router error: {router_error}")
-            print("[VALIDATION] Skipping validation due to router error")
-            return _handle_no_entity(state)
+        tool_name, entity_names_raw = await asyncio.gather(
+            _validation_router(state),
+            _extract_entity_name(state['question'])
+        )
         
         print(f"[VALIDATION] Tool seleccionado: {tool_name}")
 
         # Check if NO validation needed
-        if tool_name and "NO_ENTITY" in tool_name.upper():
-            print("[VALIDATION] Consulta general detectada, saltando validación")
+        if not tool_name or (tool_name and "NO_ENTITY" in tool_name.upper()):
+            print("[VALIDATION] Consulta general detectada (no tool o NO_ENTITY), saltando validación")
             return _handle_no_entity(state)
 
         tool_fn = VALIDATION_TOOLS_MAP.get(tool_name)

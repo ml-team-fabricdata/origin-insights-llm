@@ -3,7 +3,7 @@
 Tool sets and configurations for business domain routers.
 """
 
-from app.strands.business.nodes.prompt_business import (
+from src.strands.business.nodes.prompt_business import (
     INTELLIGENCE_ROUTER_PROMPT,
     PRICING_ROUTER_PROMPT,
     RANKINGS_ROUTER_PROMPT
@@ -13,8 +13,10 @@ from app.strands.business.nodes.prompt_business import (
 PRICING_TOOLS = {
     "tool_prices_latest",
     "tool_prices_history",
+    "tool_prices_history_light",
     "tool_prices_changes_last_n_days",
     "tool_prices_stats",
+    "tool_prices_stats_fast",
     "query_presence_with_price",
     "build_presence_with_price_query",
     "tool_hits_with_quality"

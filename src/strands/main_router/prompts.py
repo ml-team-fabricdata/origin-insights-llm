@@ -86,21 +86,31 @@ Complete: The required validation tool is: _____
 """
 
 
-ENTITY_EXTRACTION_PROMPT = """EXTRACT ENTITY NAME(S). NO EXPLANATIONS.
+ENTITY_EXTRACTION_PROMPT = """EXTRACT ENTITY NAME(S) EXACTLY AS WRITTEN. NO EXPLANATIONS. NO EXPANSIONS.
 
-RULES:
-- Extract movie/series titles, actor names, or director names
-- Specific entity -> return the name
+CRITICAL RULES:
+- Extract EXACTLY as it appears in the question
+- DO NOT expand partial names (e.g., "Coppola" stays "Coppola", NOT "Francis Ford Coppola")
+- DO NOT add first names if only last name is given
+- DO NOT add full titles if only partial title is given
+- Specific entity -> return EXACTLY as written
 - Two entities -> "NAME1 | NAME2"
 - General query with NO specific entity -> "NO_ENTITY"
 
 EXAMPLES:
 "Tom Hanks filmography" -> Tom Hanks
+"Hanks movies" -> Hanks
+"Coppola films" -> Coppola
 "where can I watch Avatar" -> Avatar
 "donde puedo ver Inception" -> Inception
-"Spielberg and Cruise films" -> Steven Spielberg | Tom Cruise
+"Spielberg and Cruise films" -> Spielberg | Cruise
 "best action movies" -> NO_ENTITY
 "popular directors" -> NO_ENTITY
+
+FORBIDDEN:
+ "Coppola" -> "Francis Ford Coppola" (DO NOT expand)
+ "Hanks" -> "Tom Hanks" (DO NOT add first name)
+ "Coppola" -> "Coppola" (CORRECT: exact match)
 """
 
 

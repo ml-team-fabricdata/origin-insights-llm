@@ -1,14 +1,14 @@
-from app.strands.common.graph_core.state import State
-from app.strands.common.nodes.prompt_common import VALIDATION_PROMPT
-from app.strands.common.nodes.router_configs import (
+from src.strands.common.graph_core.state import State
+from src.strands.common.nodes.prompt_common import VALIDATION_PROMPT
+from src.strands.common.nodes.router_configs import (
     VALIDATION_TOOLS,
     VALIDATION_ROUTER_PROMPT
 )
-from app.strands.config.llm_models import MODEL_NODE_EXECUTOR
-from app.strands.core.nodes.base_node import BaseExecutorNode
-from app.strands.core.factories.router_factory import create_router
+from src.strands.config.llm_models import MODEL_NODE_EXECUTOR
+from src.strands.core.nodes.base_node import BaseExecutorNode
+from src.strands.core.factories.router_factory import create_router
 
-from app.strands.common.common_modules.validation import (
+from src.strands.common.common_modules.validation import (
     validate_title,
     validate_actor,
     validate_director

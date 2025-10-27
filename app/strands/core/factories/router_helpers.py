@@ -36,7 +36,7 @@ async def route_with_llm(
     prompt: str,
     valid_tools: Set[str],
     fallback_tool: Optional[str] = None
-) -> str:
+) -> Optional[str]:
     """Use LLM to select the appropriate tool from valid options.
     
     Args:
@@ -47,10 +47,7 @@ async def route_with_llm(
         fallback_tool: Optional fallback if LLM returns invalid tool
         
     Returns:
-        Selected tool name
-        
-    Raises:
-        ValueError: If LLM returns invalid tool and no fallback provided
+        Selected tool name or None if no valid tool is found
     """
     print("   Router LLM analizando pregunta...")
     print(f"   Tools disponibles: {', '.join(sorted(valid_tools))}")
@@ -76,6 +73,9 @@ async def route_with_llm(
             print(f"   Tool encontrada en texto: {tool_name}")
             return tool_name
     
-    error_msg = f"Tool invalida: '{response}'. Tools validas: {', '.join(sorted(valid_tools))}"
-    print(f"   {error_msg}")
-    raise ValueError(error_msg)
+    if fallback_tool:
+        print(f"   Tool no encontrada, usando fallback: {fallback_tool}")
+        return fallback_tool
+    
+    print(f"   Tool no encontrada, retornando None")
+    return None

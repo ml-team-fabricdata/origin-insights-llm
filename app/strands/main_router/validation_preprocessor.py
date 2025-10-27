@@ -1,10 +1,10 @@
 import asyncio
 from strands import Agent
-from app.strands.config.llm_models import MODEL_NODE_EXECUTOR
+from src.strands.config.llm_models import MODEL_NODE_EXECUTOR
 from .state import MainRouterState
-from app.strands.common.common_modules.validation import validate_title, validate_actor, validate_director
-from app.strands.core.factories.router_factory import create_router
-from app.strands.main_router.prompts import ENTITY_EXTRACTION_PROMPT, VALIDATION_ROUTER_PROMPT_STRICT
+from src.strands.common.common_modules.validation import validate_title, validate_actor, validate_director
+from src.strands.core.factories.router_factory import create_router
+from src.strands.main_router.prompts import ENTITY_EXTRACTION_PROMPT, VALIDATION_ROUTER_PROMPT_STRICT
 
 ROUTING_MAP = {
     "business": "business_graph",
@@ -20,7 +20,7 @@ VALIDATION_TOOLS_MAP = {
     "validate_director": validate_director
 }
 
-VALIDATION_TOOLS = list(VALIDATION_TOOLS_MAP.keys())
+VALIDATION_TOOLS = list(VALIDATION_TOOLS_MAP.keys()) + ["NO_ENTITY"]
 
 
 def _extract_text_from_result(result) -> str:
@@ -224,32 +224,38 @@ async def validation_preprocessor_node(state: MainRouterState) -> MainRouterStat
     if state.get("validation_done", False):
         print("[VALIDATION] Ya validado, saltando...")
         return state
-    
+
     if state.get("skip_validation", False):
         return _handle_skip_validation(state)
-    
+
     try:
         print("[VALIDATION] Ejecutando router y extractor en paralelo...")
         tool_name, entity_names_raw = await asyncio.gather(
             _validation_router(state),
             _extract_entity_name(state['question'])
         )
-        print(f"[VALIDATION] Tool seleccionado: {tool_name}")
         
+        print(f"[VALIDATION] Tool seleccionado: {tool_name}")
+
+        # Check if NO validation needed
+        if not tool_name or (tool_name and "NO_ENTITY" in tool_name.upper()):
+            print("[VALIDATION] Consulta general detectada (no tool o NO_ENTITY), saltando validación")
+            return _handle_no_entity(state)
+
         tool_fn = VALIDATION_TOOLS_MAP.get(tool_name)
         if not tool_fn:
             return _handle_tool_not_found(state, tool_name)
-        
+
         if not entity_names_raw:
             return _handle_extraction_error(state)
-        
+
         print(f"[VALIDATION] Entidad(es) extraída(s): '{entity_names_raw}'")
-        
+
         if "NO_ENTITY" in entity_names_raw.upper():
             return _handle_no_entity(state)
-        
+
         entity_names = [name.strip() for name in entity_names_raw.split(" | ")]
-        
+
         if len(entity_names) > 1:
             validation_status, needs_user_input, validated_entities = _process_multiple_entities(
                 entity_names, tool_name, tool_fn

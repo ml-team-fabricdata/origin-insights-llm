@@ -56,6 +56,7 @@ def create_streaming_graph():
             "content_classifier": "content_classifier",
             "metadata_node": "metadata_node",
             "discovery_node": "discovery_node",
+            "COMPLETO": END,
             "return_to_main_router": END
         }
     )

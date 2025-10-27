@@ -1,8 +1,8 @@
 from langgraph.graph import StateGraph, END
 from .state import State, create_initial_state
-from .supervisor import main_supervisor, content_classifier, route_from_main_supervisor, format_response
-from app.strands.content.nodes.discovery import discovery_node
-from app.strands.content.nodes.metadata import metadata_node
+from .supervisor import main_supervisor, content_classifier
+from src.strands.content.nodes.discovery import discovery_node
+from src.strands.content.nodes.metadata import metadata_node
 
 
 def _route_from_supervisor(state: State) -> str:
@@ -46,17 +46,17 @@ def create_streaming_graph():
     graph.add_node("content_classifier", content_classifier)
     graph.add_node("metadata_node", metadata_node)
     graph.add_node("discovery_node", discovery_node)
-    graph.add_node("format_response", format_response)
-
 
     graph.set_entry_point("main_supervisor")
 
     graph.add_conditional_edges(
         "main_supervisor",
-        route_from_main_supervisor,
+        _route_from_supervisor,
         {
             "content_classifier": "content_classifier",
-            "format_response": "format_response",
+            "metadata_node": "metadata_node",
+            "discovery_node": "discovery_node",
+            "COMPLETO": END,
             "return_to_main_router": END
         }
     )
@@ -72,7 +72,6 @@ def create_streaming_graph():
 
     graph.add_edge("metadata_node", "main_supervisor")
     graph.add_edge("discovery_node", "main_supervisor")
-    graph.add_edge("format_response", END)
 
     return graph.compile()
 

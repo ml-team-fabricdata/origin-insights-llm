@@ -241,34 +241,45 @@ Return ONLY the tool name, nothing else.
 """
 
 PRICING_ROUTER_PROMPT = """
-Select the ONE tool that best matches the question. Return ONLY the tool name.
+CRITICAL: You MUST return EXACTLY ONE tool name from the list below, with NO additional text.
 
-Question Analysis:
-- "current price", "latest price", "precio actual", "cuánto cuesta" → tool_prices_latest
-- "price history", "historical prices", "historial de precios", "evolución" → tool_prices_history or tool_prices_history_light
-- "price changes", "cambios de precio", "increases", "decreases", "bajó", "subió" → tool_prices_changes_last_n_days
-- "price statistics", "average price", "estadísticas", "promedio", "median" → tool_prices_stats or tool_prices_stats_fast
-- "hits", "popularity", "quality filters", "definition", "license" → tool_hits_with_quality
-- "presence with price", "catalog with prices" → query_presence_with_price
+Question: {question}
 
-Available Tools:
-1. tool_prices_latest - Últimos precios registrados (DISTINCT ON created_at DESC)
-2. tool_prices_history - Histórico completo de precios con todas las columnas
-3. tool_prices_history_light - Histórico LIGERO (solo campos esenciales, más rápido)
-4. tool_prices_changes_last_n_days - Cambios de precio en N días (up/down/all) con LAG window
-5. tool_prices_stats - Estadísticas exactas de precios (min/max/avg/percentiles con PERCENTILE_CONT)
-6. tool_prices_stats_fast - Estadísticas APROXIMADAS (PERCENTILE_DISC, ultra-rápido para >100k rows)
-7. tool_hits_with_quality - Popularidad/hits con filtros de calidad (definition/license)
-8. query_presence_with_price - Presencia con información de precio (LEFT JOIN LATERAL)
-9. build_presence_with_price_query - Construye SQL para presencia+precio
+ANALYZE the question and select the SINGLE BEST tool from this list:
 
-Selection Guidelines:
-- Use _light version for large datasets or quick queries
-- Use _fast version for statistics on >100k rows or dashboards
-- Use tool_prices_changes for temporal analysis with direction filter
-- Use tool_hits_with_quality when definition/license filters are mentioned
+tool_prices_latest
+tool_prices_history
+tool_prices_history_light
+tool_prices_changes_last_n_days
+tool_prices_stats
+tool_prices_stats_fast
+tool_hits_with_quality
+query_presence_with_price
 
-Return ONLY the tool name, nothing else.
+RULES:
+1. Return ONLY the tool name, no explanations or other text
+2. If unsure, choose tool_prices_latest as default
+3. NEVER return a sentence or explanation
+4. If no tool matches, return tool_prices_latest
+
+EXAMPLES:
+- "current price of Netflix" → tool_prices_latest
+- "price history of Disney+" → tool_prices_history_light
+- "price changes last 30 days" → tool_prices_changes_last_n_days
+- "average price statistics" → tool_prices_stats
+- "high quality hits" → tool_hits_with_quality
+
+YOUR RESPONSE MUST BE ONE OF THESE EXACT STRINGS:
+- tool_prices_latest
+- tool_prices_history
+- tool_prices_history_light
+- tool_prices_changes_last_n_days
+- tool_prices_stats
+- tool_prices_stats_fast
+- tool_hits_with_quality
+- query_presence_with_price
+
+DO NOT return anything else. Just the tool name.
 """
 
 RANKINGS_ROUTER_PROMPT = """

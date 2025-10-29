@@ -201,9 +201,14 @@ async def advanced_router_node(state: MainRouterState) -> MainRouterState:
         question_context = _create_context_aware_question(
             state['question'], visited, state.get("needs_rerouting", False)
         )
-        
+
+        messages = [
+            *state["history"],
+            {"role": "user", "content": [{"text": str(question_context)}]}
+        ]
+
         agent = Agent(model=MODEL_CLASSIFIER, system_prompt=ADVANCED_ROUTER_PROMPT)
-        response = await agent.invoke_async(question_context)
+        response = await agent.invoke_async(messages)
         result_str = _extract_response(response)
         
         result = _parse_json_response(result_str)

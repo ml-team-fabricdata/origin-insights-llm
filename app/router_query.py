@@ -4,6 +4,7 @@ import hashlib
 import time
 from fastapi import APIRouter
 from pydantic import BaseModel
+from app.db.message_history import load_messages, save_message
 from app.strands.main_router.graph import process_question_advanced
 
 router = APIRouter()
@@ -44,15 +45,19 @@ def get_thread_id(user_id: str | None, session_id: str | None) -> str:
 @router.post("/query")
 async def query(payload: QueryIn):
     thread_id = get_thread_id(payload.user_id, payload.session_id)
+    question = payload.message
 
     print(f"[QUERY] Thread ID usado: {thread_id}")
 
+    history = load_messages(payload.session_id, question)
     result = await process_question_advanced(
-        question=payload.message,
+        question=question,
         thread_id=thread_id,
         max_hops=3,
-        enable_telemetry=False
+        enable_telemetry=False,
+        history=history
     )
+    save_message(payload.session_id, question, result["answer"])
 
     return {
         "thread_id": thread_id,

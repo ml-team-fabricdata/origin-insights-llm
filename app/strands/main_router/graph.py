@@ -370,7 +370,8 @@ async def process_question_advanced(
     max_hops: int = 3,
     enable_telemetry: bool = True,
     thread_id: str = "default",
-    context: dict = None
+    context: dict = None,
+    history: list = None
 ) -> MainRouterState:
     telemetry_logger = TelemetryLogger(log_to_file=enable_telemetry) if enable_telemetry else None
     start_time = time.time()
@@ -390,7 +391,8 @@ async def process_question_advanced(
         initial_state = {**existing_state, "question": question}
     else:
         initial_state = _create_initial_state(question, max_hops)
-    
+
+    initial_state["history"] = history or []
     result = await graph.ainvoke(initial_state, config=config)
     
     _verify_checkpoint(graph, config)

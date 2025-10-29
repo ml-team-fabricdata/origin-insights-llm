@@ -3,6 +3,7 @@ from typing import TypedDict, Literal, Optional, Dict, Any, List
 class MainRouterState(TypedDict, total=False):
     question: str
     answer: str
+    history: list[dict]
     selected_graph: Optional[Literal["business", "talent", "content", "common", "platform"]]
     routing_done: bool
     error: Optional[str]

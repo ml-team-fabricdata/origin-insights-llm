@@ -109,14 +109,14 @@ async def format_response(state: TypedDict) -> TypedDict:
     # Use LLM to check if response contains real data or is a "no data" response
     check_prompt = """Evaluate if the response contains REAL DATA or is a "no data" response.
 
-REAL DATA = specific information, numbers, lists, titles, names, facts from database
-NO DATA = "no results", "not found", "not available", "0 rows", generic apologies
+    REAL DATA = specific information, numbers, lists, titles, names, facts from database
+    NO DATA = "no results", "not found", "not available", "0 rows", generic apologies
 
-Response to evaluate:
-{response}
+    Response to evaluate:
+    {response}
 
-Answer ONLY with ONE WORD: DATA or NO_DATA
-"""
+    Answer ONLY with ONE WORD: DATA or NO_DATA
+    """
     
     checker = Agent(model=MODEL_SUPERVISOR, system_prompt=check_prompt.format(response=accumulated[:500]))
     check_result = await checker.invoke_async("Evaluate:")

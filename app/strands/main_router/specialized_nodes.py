@@ -256,12 +256,50 @@ async def responder_formatter_node(state: MainRouterState) -> MainRouterState:
     if not answer:
         answer = "I couldn't generate a response. Please try rephrasing your question."
     
-    print("\n RESULTADO:")
+    # Determinar el tipo de respuesta
+    response_content = None
+    
+    # Caso 1: answer ya es un dict (JSON estructurado)
+    if isinstance(answer, dict):
+        response_content = answer
+    
+    # Caso 2: answer es string que contiene un dict
+    elif isinstance(answer, str):
+        # Limpiar metadatos de debug si existen
+        if "\n\n--- Data from " in answer:
+            # Extraer solo la parte después del último marcador
+            parts = answer.split("\n\n--- Data from ")
+            if len(parts) > 1:
+                answer = parts[-1].split(" ---\n", 1)[-1]
+        
+        answer = answer.strip()
+        
+        # Intentar parsear si parece un dict
+        if answer.startswith("{") or answer.startswith("{'"):
+            import ast
+            try:
+                parsed = ast.literal_eval(answer)
+                if isinstance(parsed, dict):
+                    response_content = parsed
+            except:
+                pass  # Si falla, mantener como string
+    
+    # Construir respuesta JSON estructurada
+    response_json = {
+        "thread_id": state.get("thread_id") or state.get("session_id"),
+        "response": response_content if response_content else answer,
+        "selected_graph": state.get("selected_graph"),
+        "domain_status": state.get("domain_graph_status"),
+        "pending_disambiguation": state.get("pending_disambiguation", False),
+        "options": state.get("disambiguation_options")
+    }
+    
+    print("\n RESULTADO JSON:")
     print("="*80)
-    print(answer)
+    print(response_json)
     print("="*80 + "\n")
     
-    result = {**state, "answer": answer}
+    result = {**state, "answer": response_json}
     
     print(f"[RESPONDER] pending_disambiguation={result.get('pending_disambiguation')}")
     

@@ -39,12 +39,23 @@ class TelemetryLogger:
         
         filename = self.log_dir / f"telemetry_{self.session_id}.json"
         
+        # Obtener answer - mantener estructura JSON si existe
+        answer = state.get("answer", "")
+        
+        # Si answer es un dict (JSON estructurado), guardarlo completo
+        if isinstance(answer, dict):
+            final_answer = answer
+        else:
+            # Si es string, truncar para preview
+            answer_str = str(answer) if not isinstance(answer, str) else answer
+            final_answer = answer_str[:200] if len(answer_str) > 200 else answer_str
+        
         telemetry_data = {
             "session_id": self.session_id,
             "timestamp": datetime.now().isoformat(),
             "total_time": time.time() - self.start_time,
             "question": state.get("question", ""),
-            "final_answer": state.get("answer", "")[:200],
+            "final_answer": final_answer,
             "route_summary": self._build_route_summary(state),
             "events": self.events,
             "tool_execution_times": state.get("tool_execution_times", {}),

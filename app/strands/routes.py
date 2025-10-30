@@ -28,8 +28,15 @@ async def strand_ask(request: Request):
         print(f"[API DEBUG] disambiguation_options: {result.get('disambiguation_options')}")
         
         answer = result.get("answer", "") or result.get("accumulated_data", "")
+
+        # Si answer es un dict (JSON estructurado), retornarlo directamente
+        if isinstance(answer, dict):
+            return {
+                "ok": True,
+                **answer  # Spread del JSON: thread_id, response, selected_graph, domain_status, pending_disambiguation, options
+            }
         
-        # Detectar si hay disambiguación pendiente
+        # Fallback para respuestas string (legacy o casos especiales)
         pending_disambiguation = result.get("pending_disambiguation", False)
         disambiguation_options = result.get("disambiguation_options", [])
         

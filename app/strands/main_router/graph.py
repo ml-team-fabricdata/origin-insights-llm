@@ -13,7 +13,6 @@ from .specialized_nodes import (
     error_handler_node,
     responder_formatter_node
 )
-from app.strands.core.nodes.supervisor_helpers import format_response
 from .routing_gates import (
     route_from_router,
     route_from_validation,
@@ -165,14 +164,6 @@ async def domain_graph_node(state: MainRouterState) -> MainRouterState:
     return _handle_success(state, answer, tool_times)
 
 
-async def format_response_node(state: MainRouterState) -> MainRouterState:
-    result = await format_response(state)
-    return {
-        **state,
-        "answer": result.get("answer", state.get("answer", ""))
-    }
-
-
 def _add_nodes(graph: StateGraph):
     nodes = {
         "user_selection_resolver": user_selection_resolver_node,
@@ -182,7 +173,6 @@ def _add_nodes(graph: StateGraph):
         "aggregator": aggregator_node,
         "validation_preprocessor": validation_preprocessor_node,
         "domain_graph": domain_graph_node,
-        "format_response": format_response_node,
         "disambiguation": disambiguation_node,
         "not_found_responder": not_found_responder_node,
         "error_handler": error_handler_node,
@@ -274,14 +264,13 @@ def _add_edges(graph: StateGraph):
         "domain_graph",
         route_from_domain_graph,
         {
-            "format_response": "format_response",
+            "responder_formatter": "responder_formatter",
             "advanced_router": "advanced_router",
             "clarifier": "clarifier",
             "error_handler": "error_handler"
         }
     )
     
-    graph.add_edge("format_response", "responder_formatter")
     graph.add_edge("responder_formatter", END)
     graph.add_edge("error_handler", "responder_formatter")
 

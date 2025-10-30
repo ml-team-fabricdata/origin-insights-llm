@@ -43,8 +43,8 @@ def route_from_validation(state: MainRouterState) -> Literal["parallel_executor"
     return "domain_graph"
 
 
-def route_from_domain_graph(state: MainRouterState) -> Literal["format_response", "advanced_router", "clarifier", "error_handler"]:
-    """Domain Graph → Format Response (si success) o Re-routing/Error"""
+def route_from_domain_graph(state: MainRouterState) -> Literal["responder_formatter", "advanced_router", "clarifier", "error_handler"]:
+    """Domain Graph → Responder Formatter (si success) o Re-routing/Error"""
     domain_status = state.get("domain_graph_status")
     visited_graphs = state.get("visited_graphs", [])
     current_hop = len(visited_graphs)
@@ -59,12 +59,12 @@ def route_from_domain_graph(state: MainRouterState) -> Literal["format_response"
     
     # CRITICAL: Prevenir loops infinitos
     if current_hop >= max_hops:
-        print(f"[ROUTING] ⚠️ Max hops reached ({current_hop}/{max_hops}). Forcing format_response.")
-        return "format_response"
+        print(f"[ROUTING] ⚠️ Max hops reached ({current_hop}/{max_hops}). Forcing responder_formatter.")
+        return "responder_formatter"
     
     if domain_status == "success":
-        print(f"[ROUTING] ✅ Success → format_response")
-        return "format_response"
+        print(f"[ROUTING] ✅ Success → responder_formatter")
+        return "responder_formatter"
     
     if domain_status == "not_my_scope":
         print(f"[ROUTING] 🔄 Re-routing requested. Hop: {current_hop + 1}/{max_hops}")
@@ -78,8 +78,8 @@ def route_from_domain_graph(state: MainRouterState) -> Literal["format_response"
         print(f"[ROUTING] ❌ Error → error_handler")
         return "error_handler"
     
-    print(f"[ROUTING] ⚠️ No status match, defaulting to format_response")
-    return "format_response"  # Default: formatear respuesta
+    print(f"[ROUTING] ⚠️ No status match, defaulting to responder_formatter")
+    return "responder_formatter"  # Default: formatear respuesta
 
 
 def route_from_aggregator(state: MainRouterState) -> Literal["domain_graph", "error_handler"]:

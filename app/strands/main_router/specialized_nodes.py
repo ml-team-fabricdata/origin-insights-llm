@@ -251,43 +251,40 @@ async def responder_formatter_node(state: MainRouterState) -> MainRouterState:
     print("RESPONDER/FORMATTER")
     print("="*80)
     
+    from app.strands.main_router.prompts import RESPONSE_FORMATTER_PROMPT
+    from app.config import get_llm
+    
     answer = state.get("answer", "")
     
     if not answer:
         answer = "I couldn't generate a response. Please try rephrasing your question."
     
-    # Determinar el tipo de respuesta
-    response_content = None
+    # Limpiar metadatos de debug si existen
+    raw_answer = answer
+    if isinstance(answer, str) and "\n\n--- Data from " in answer:
+        parts = answer.split("\n\n--- Data from ")
+        if len(parts) > 1:
+            raw_answer = parts[-1].split(" ---\n", 1)[-1]
     
-    # Caso 1: answer ya es un dict (JSON estructurado)
-    if isinstance(answer, dict):
-        response_content = answer
+    # Pasar por el LLM formatter para limpiar y estructurar
+    llm = get_llm()
+    formatter_prompt = f"{RESPONSE_FORMATTER_PROMPT}\n\nRaw data to format:\n{raw_answer}\n\nFormatted response:"
     
-    # Caso 2: answer es string que contiene un dict
-    elif isinstance(answer, str):
-        # Limpiar metadatos de debug si existen
-        if "\n\n--- Data from " in answer:
-            # Extraer solo la parte después del último marcador
-            parts = answer.split("\n\n--- Data from ")
-            if len(parts) > 1:
-                answer = parts[-1].split(" ---\n", 1)[-1]
-        
-        answer = answer.strip()
-        
-        # Intentar parsear si parece un dict
-        if answer.startswith("{") or answer.startswith("{'"):
-            import ast
-            try:
-                parsed = ast.literal_eval(answer)
-                if isinstance(parsed, dict):
-                    response_content = parsed
-            except:
-                pass  # Si falla, mantener como string
+    formatted_response = await llm.ainvoke(formatter_prompt)
+    
+    # Extraer el texto formateado
+    if hasattr(formatted_response, 'content'):
+        clean_response = formatted_response.content
+    else:
+        clean_response = str(formatted_response)
+    
+    print(f"[FORMATTER] Original length: {len(str(raw_answer))}")
+    print(f"[FORMATTER] Formatted length: {len(clean_response)}")
     
     # Construir respuesta JSON estructurada
     response_json = {
         "thread_id": state.get("thread_id") or state.get("session_id"),
-        "response": response_content if response_content else answer,
+        "response": clean_response,
         "selected_graph": state.get("selected_graph"),
         "domain_status": state.get("domain_graph_status"),
         "pending_disambiguation": state.get("pending_disambiguation", False),

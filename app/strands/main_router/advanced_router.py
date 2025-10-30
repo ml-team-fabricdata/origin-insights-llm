@@ -1,6 +1,7 @@
 import json
 from strands import Agent
 from app.strands.config.llm_models import MODEL_CLASSIFIER
+from app.util.response_format import extract_response
 from .state import MainRouterState
 from .prompts import ADVANCED_ROUTER_PROMPT
 from .config import (
@@ -16,22 +17,6 @@ from .config import (
 )
 from .telemetry import log_router_decision, log_candidate_discard, log_rerouting
 from .router_cache import get_router_cache
-
-
-def _extract_response(response) -> str:
-    if hasattr(response, 'message'):
-        message = response.message
-        if isinstance(message, dict) and 'content' in message:
-            return message['content'][0]['text']
-        return str(message)
-    
-    if isinstance(response, dict):
-        if 'content' in response and isinstance(response['content'], list):
-            return response['content'][0].get('text', '')
-        if 'message' in response:
-            return response['message']
-    
-    return str(response)
 
 
 def _parse_json_response(result_str: str) -> dict:
@@ -209,7 +194,7 @@ async def advanced_router_node(state: MainRouterState) -> MainRouterState:
 
         agent = Agent(model=MODEL_CLASSIFIER, system_prompt=ADVANCED_ROUTER_PROMPT)
         response = await agent.invoke_async(messages)
-        result_str = _extract_response(response)
+        result_str = extract_response(response)
         
         result = _parse_json_response(result_str)
         primary = result.get("primary", "COMMON").upper()

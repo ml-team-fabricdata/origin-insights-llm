@@ -1,5 +1,6 @@
 from .state import MainRouterState
 from app.strands.main_router.session_state import session_memory
+from app.util.response_format import extract_response
 import re
 
 
@@ -252,6 +253,7 @@ async def responder_formatter_node(state: MainRouterState) -> MainRouterState:
     print("="*80)
     
     answer = state.get("answer", "")
+    answer = extract_response(answer)
     
     if not answer:
         answer = "I couldn't generate a response. Please try rephrasing your question."

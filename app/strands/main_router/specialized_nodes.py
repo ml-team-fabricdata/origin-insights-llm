@@ -228,13 +228,13 @@ async def error_handler_node(state: MainRouterState) -> MainRouterState:
     
     formatted_message = f"""System Error
 
-I encountered an error while processing your question.
+        I encountered an error while processing your question.
 
-Your question: {question}
+        Your question: {question}
 
-Error: {error}
+        Error: {error}
 
-Please try rephrasing your question or contact support if the issue persists."""
+        Please try rephrasing your question or contact support if the issue persists."""
     
     print(f"[ERROR_HANDLER] Error: {error}")
     print("="*80 + "\n")
@@ -252,7 +252,8 @@ async def responder_formatter_node(state: MainRouterState) -> MainRouterState:
     print("="*80)
     
     from app.strands.main_router.prompts import RESPONSE_FORMATTER_PROMPT
-    from app.config import get_llm
+    from app.strands.config.llm_models import MODEL_FORMATTER
+    from strands import Agent
     
     answer = state.get("answer", "")
     
@@ -267,16 +268,17 @@ async def responder_formatter_node(state: MainRouterState) -> MainRouterState:
             raw_answer = parts[-1].split(" ---\n", 1)[-1]
     
     # Pasar por el LLM formatter para limpiar y estructurar
-    llm = get_llm()
-    formatter_prompt = f"{RESPONSE_FORMATTER_PROMPT}\n\nRaw data to format:\n{raw_answer}\n\nFormatted response:"
+    question = state.get("question", "")
+    formatter_agent = Agent(model=MODEL_FORMATTER, system_prompt=RESPONSE_FORMATTER_PROMPT)
     
-    formatted_response = await llm.ainvoke(formatter_prompt)
+    user_message = f"User question: {question}\n\nRaw data to format:\n{raw_answer}"
+    formatted_response = await formatter_agent.invoke_async(user_message)
     
     # Extraer el texto formateado
-    if hasattr(formatted_response, 'content'):
-        clean_response = formatted_response.content
+    if isinstance(formatted_response, dict):
+        clean_response = str(formatted_response.get('message', formatted_response)).strip()
     else:
-        clean_response = str(formatted_response)
+        clean_response = str(getattr(formatted_response, "message", formatted_response)).strip()
     
     print(f"[FORMATTER] Original length: {len(str(raw_answer))}")
     print(f"[FORMATTER] Formatted length: {len(clean_response)}")
